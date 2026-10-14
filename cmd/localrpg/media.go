@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -14,36 +15,43 @@ import (
 )
 
 func handleTTSCommand(args []string) {
+	code := runTTSCommand(args, os.Stdout, os.Stderr)
+	if code != 0 {
+		os.Exit(code)
+	}
+}
+
+func runTTSCommand(args []string, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "batch" {
-		handleTTSBatchCommand(args[1:])
-		return
+		return runTTSBatchCommand(args[1:], stdout, stderr)
 	}
 
 	fs := flag.NewFlagSet("tts", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	voice := fs.String("voice", "", "Voice ID override")
 	pitch := fs.Float64("pitch", 0, "Pitch override")
 	rate := fs.Float64("rate", 0, "Speech rate override")
 	if err := fs.Parse(args); err != nil {
-		return
+		return 1
 	}
 
 	text := strings.TrimSpace(strings.Join(fs.Args(), " "))
 	if text == "" {
-		fmt.Fprintln(os.Stderr, "Usage: localrpg tts [--voice id] [--pitch n] [--rate n] <text>")
-		os.Exit(1)
+		fmt.Fprintln(stderr, "Usage: localrpg tts [--voice id] [--pitch n] [--rate n] <text>")
+		return 1
 	}
 
 	cfgMgr := config.NewConfigManager()
 	cfg, err := cfgMgr.Load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error loading config: %v\n", err)
+		return 1
 	}
 
 	client, err := media.NewTTSClientWithSharedKey(cfg.Media.TTS, cfg.Providers.Gemini.APIKey)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error building TTS client: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error building TTS client: %v\n", err)
+		return 1
 	}
 
 	voiceCfg := &entity.VoiceConfig{
@@ -67,19 +75,28 @@ func handleTTSCommand(args []string) {
 	pipeline.SetOpusBitrate(cfg.OpusBitrate())
 	path, err := pipeline.SynthesizeUtterance(context.Background(), "cli", voiceCfg, text)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error synthesizing: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error synthesizing: %v\n", err)
+		return 1
 	}
 
-	fmt.Println(path)
+	fmt.Fprintln(stdout, path)
+	return 0
 }
 
 func handleImageCommand(args []string) {
+	code := runImageCommand(args, os.Stdout, os.Stderr)
+	if code != 0 {
+		os.Exit(code)
+	}
+}
+
+func runImageCommand(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Usage: localrpg image <prompt>")
-		os.Exit(1)
+		fmt.Fprintln(stderr, "Usage: localrpg image <prompt>")
+		return 1
 	}
 
 	prompt := args[0]
-	fmt.Printf("Generating image: %s\n", prompt)
+	fmt.Fprintf(stdout, "Generating image: %s\n", prompt)
+	return 0
 }

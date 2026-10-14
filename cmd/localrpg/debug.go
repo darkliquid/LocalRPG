@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -60,10 +61,17 @@ func parseDebugArgs(args []string) (string, debugConfig, error) {
 }
 
 func handleDebugCommand(args []string) {
+	code := runDebugCommand(args, os.Stdout, os.Stderr)
+	if code != 0 {
+		os.Exit(code)
+	}
+}
+
+func runDebugCommand(args []string, stdout, stderr io.Writer) int {
 	subcmd, cfg, err := parseDebugArgs(args)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Usage: localrpg debug <test-run|server> [flags]\nError: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Usage: localrpg debug <test-run|server> [flags]\nError: %v\n", err)
+		return 1
 	}
 
 	collector := debugger.NewCollector(1000, 5000)
@@ -75,9 +83,9 @@ func handleDebugCommand(args []string) {
 
 	switch subcmd {
 	case "server":
-		fmt.Println("LocalRPG Debug Server mode active")
-		fmt.Printf("  • LocalRPG App GUI:   http://localhost:%d\n", cfg.Port)
-		fmt.Printf("  • Live Debugger UI:   http://localhost:%d\n", cfg.DebuggerPort)
+		fmt.Fprintln(stdout, "LocalRPG Debug Server mode active")
+		fmt.Fprintf(stdout, "  • LocalRPG App GUI:   http://localhost:%d\n", cfg.Port)
+		fmt.Fprintf(stdout, "  • Live Debugger UI:   http://localhost:%d\n", cfg.DebuggerPort)
 
 		dbgHttpServer := &http.Server{
 			Addr:    fmt.Sprintf(":%d", cfg.DebuggerPort),
@@ -85,7 +93,7 @@ func handleDebugCommand(args []string) {
 		}
 		go func() {
 			if err := dbgHttpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				fmt.Fprintf(os.Stderr, "Debugger server error: %v\n", err)
+				fmt.Fprintf(stderr, "Debugger server error: %v\n", err)
 			}
 		}()
 
@@ -104,40 +112,40 @@ func handleDebugCommand(args []string) {
 
 		go func() {
 			if err := appHttpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				fmt.Fprintf(os.Stderr, "App server error: %v\n", err)
+				fmt.Fprintf(stderr, "App server error: %v\n", err)
 			}
 		}()
 
 		<-sigChan
-		fmt.Println("\nShutting down debug servers...")
+		fmt.Fprintln(stdout, "\nShutting down debug servers...")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		_ = dbgHttpServer.Shutdown(shutdownCtx)
 		_ = appHttpServer.Shutdown(shutdownCtx)
 
 	case "test-system":
-		os.Exit(runTestSystem(cfg))
+		return runTestSystem(cfg, stdout, stderr)
 
 	case "test-run":
 		if cfg.Scenario == "" {
-			fmt.Fprintln(os.Stderr, "Error: --scenario is required for test-run")
-			os.Exit(1)
+			fmt.Fprintln(stderr, "Error: --scenario is required for test-run")
+			return 1
 		}
 
 		f, err := os.Open(cfg.Scenario)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Open scenario: %v\n", err)
-			os.Exit(1)
+			fmt.Fprintf(stderr, "Open scenario: %v\n", err)
+			return 1
 		}
 		defer f.Close()
 
 		scenario, err := driver.ParseScenario(f)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Parse scenario: %v\n", err)
-			os.Exit(1)
+			fmt.Fprintf(stderr, "Parse scenario: %v\n", err)
+			return 1
 		}
 
-		fmt.Printf("Running Scenario: %s (%d steps)\n", scenario.Name, len(scenario.Steps))
+		fmt.Fprintf(stdout, "Running Scenario: %s (%d steps)\n", scenario.Name, len(scenario.Steps))
 		d := driver.New(driver.Config{
 			// The app binds 127.0.0.1 explicitly, so address it the same way:
 			// "localhost" can resolve to ::1 first on some machines.
@@ -152,7 +160,7 @@ func handleDebugCommand(args []string) {
 			if rec.Status == "failed" {
 				statusStr = "[FAIL]"
 			}
-			fmt.Printf("%s Step %d: %s %s (%dms)\n", statusStr, rec.StepIndex, rec.ActionType, rec.Selector, rec.DurationMs)
+			fmt.Fprintf(stdout, "%s Step %d: %s %s (%dms)\n", statusStr, rec.StepIndex, rec.ActionType, rec.Selector, rec.DurationMs)
 		})
 
 		report := debugger.TestReport{
@@ -168,13 +176,14 @@ func handleDebugCommand(args []string) {
 
 		reportPath := filepath.Join(cfg.ReportDir, fmt.Sprintf("report-%d.html", time.Now().Unix()))
 		if err := debugger.ExportHTMLReport(report, reportPath); err == nil {
-			fmt.Printf("Report saved to %s\n", reportPath)
+			fmt.Fprintf(stdout, "Report saved to %s\n", reportPath)
 		}
 
 		if runErr != nil {
-			fmt.Fprintf(os.Stderr, "Test run failed: %v\n", runErr)
-			os.Exit(1)
+			fmt.Fprintf(stderr, "Test run failed: %v\n", runErr)
+			return 1
 		}
-		fmt.Println("Test run completed successfully!")
+		fmt.Fprintln(stdout, "Test run completed successfully!")
 	}
+	return 0
 }

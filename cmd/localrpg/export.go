@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,10 +18,18 @@ import (
 )
 
 func handleExportCommand(args []string) {
-	fs := flag.NewFlagSet("export", flag.ExitOnError)
+	code := runExportCommand(args, os.Stdout, os.Stderr)
+	if code != 0 {
+		os.Exit(code)
+	}
+}
+
+func runExportCommand(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("export", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: localrpg export <web|video> <game-id> [flags]")
-		fmt.Fprintln(os.Stderr, "Export the campaign as an animated web bundle or a video")
+		fmt.Fprintln(stderr, "Usage: localrpg export <web|video> <game-id> [flags]")
+		fmt.Fprintln(stderr, "Export the campaign as an animated web bundle or a video")
 		fs.PrintDefaults()
 	}
 	out := fs.String("out", "", "Output path for export")
@@ -39,33 +48,34 @@ func handleExportCommand(args []string) {
 
 	if len(args) == 0 {
 		fs.Usage()
-		os.Exit(0)
+		return 0
 	}
 
 	// Go's flag package stops at the first positional argument, which would read
 	// `export video --dir x <game>` as the game id "--dir". Separate the two so a
 	// flag works wherever it is written.
 	flags, positional := splitExportArgs(fs, args)
-	_ = fs.Parse(flags)
+	if err := fs.Parse(flags); err != nil {
+		return 1
+	}
 
 	if len(positional) == 0 {
 		fs.Usage()
-		os.Exit(0)
+		return 0
 	}
 
 	format := positional[0]
 	if format == "inspect" {
 		if len(positional) < 2 {
-			fmt.Fprintln(os.Stderr, "Error: missing bundle path")
-			os.Exit(1)
+			fmt.Fprintln(stderr, "Error: missing bundle path")
+			return 1
 		}
-		handleExportInspect(positional[1])
-		return
+		return runExportInspect(positional[1], stdout, stderr)
 	}
 	if len(positional) < 2 {
-		fmt.Fprintln(os.Stderr, "Error: missing game ID")
+		fmt.Fprintln(stderr, "Error: missing game ID")
 		fs.Usage()
-		os.Exit(1)
+		return 1
 	}
 	gameID := positional[1]
 
@@ -74,30 +84,30 @@ func handleExportCommand(args []string) {
 
 	script, err := compiler.Compile(context.Background(), gameID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to compile replay script: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Failed to compile replay script: %v\n", err)
+		return 1
 	}
 	for _, miss := range compiler.SpeechMisses() {
-		fmt.Fprintf(os.Stderr, "No clip for a beat: %s\n", miss)
+		fmt.Fprintf(stderr, "No clip for a beat: %s\n", miss)
 	}
 	if len(compiler.SpeechMisses()) > 0 {
-		fmt.Fprintf(os.Stderr, "Looked for clips in %s; pass --dir if the app keeps its campaigns elsewhere.\n", compiler.CacheDir())
+		fmt.Fprintf(stderr, "Looked for clips in %s; pass --dir if the app keeps its campaigns elsewhere.\n", compiler.CacheDir())
 	}
 
 	switch format {
 	case "web":
 		target := resolveOutPath(*out, gameID, "-web.html")
 		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "Web export failed: %v\n", err)
-			os.Exit(1)
+			fmt.Fprintf(stderr, "Web export failed: %v\n", err)
+			return 1
 		}
 		exporter := export.NewWebExporter(*dir)
 		// A bundle is the theatre's own player, so it ships the frontend build and
 		// renders performance tags the way the campaign's settings ask for.
 		assets, assetErr := gui.AssetFS()
 		if assetErr != nil {
-			fmt.Fprintf(os.Stderr, "Web export failed: %v\n", assetErr)
-			os.Exit(1)
+			fmt.Fprintf(stderr, "Web export failed: %v\n", assetErr)
+			return 1
 		}
 		exporter.SetAssets(assets)
 		if cfg, cfgErr := config.NewConfigManager().Load(); cfgErr == nil && cfg != nil {
@@ -105,20 +115,20 @@ func handleExportCommand(args []string) {
 		}
 		path, err := exporter.Export(context.Background(), script, target)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Web export failed: %v\n", err)
-			os.Exit(1)
+			fmt.Fprintf(stderr, "Web export failed: %v\n", err)
+			return 1
 		}
 		if info, statErr := os.Stat(path); statErr == nil {
-			fmt.Printf("Exported web replay bundle to %s (%d KB)\n", absPath(path), info.Size()/1024)
+			fmt.Fprintf(stdout, "Exported web replay bundle to %s (%d KB)\n", absPath(path), info.Size()/1024)
 			break
 		}
-		fmt.Printf("Exported web replay bundle to %s\n", absPath(path))
+		fmt.Fprintf(stdout, "Exported web replay bundle to %s\n", absPath(path))
 
 	case "video":
 		target := resolveOutPath(*out, gameID, ".webm")
 		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "Video export failed: %v\n", err)
-			os.Exit(1)
+			fmt.Fprintf(stderr, "Video export failed: %v\n", err)
+			return 1
 		}
 		pipeline := export.NewVideoPipeline(*dir)
 		pipeline.SetStill(*still)
@@ -136,25 +146,26 @@ func handleExportCommand(args []string) {
 		} else {
 			// A bad geometry is not worth abandoning a long render for, so the
 			// default resolution stands and the reason is reported.
-			fmt.Fprintf(os.Stderr, "export: ignoring --size %q: %v\n", *size, err)
+			fmt.Fprintf(stderr, "export: ignoring --size %q: %v\n", *size, err)
 		}
 
 		// Progress is opt-in. A render can take a while, but a quiet default is
 		// what a script wants, so --progress draws a live bar instead.
 		if *showProgress {
-			pipeline.SetProgress(renderProgressBar)
+			pipeline.SetProgress(func(p scene.Progress) { renderProgressBar(stdout, p) })
 		}
 
 		if err := pipeline.RenderVideo(context.Background(), script, target); err != nil {
-			fmt.Fprintf(os.Stderr, "Video render failed: %v\n", err)
-			os.Exit(1)
+			fmt.Fprintf(stderr, "Video render failed: %v\n", err)
+			return 1
 		}
-		fmt.Printf("Rendered video replay to %s\n", absPath(target))
+		fmt.Fprintf(stdout, "Rendered video replay to %s\n", absPath(target))
 
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown export format: %s (supported: web, video)\n", format)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Unknown export format: %s (supported: web, video)\n", format)
+		return 1
 	}
+	return 0
 }
 
 // splitExportArgs separates flags from positional arguments, so a flag may be
@@ -218,15 +229,15 @@ func resolveOutPath(out, gameID, ext string) string {
 // renderProgressBar draws a single line that overwrites itself, so an export
 // says where it is without filling a terminal. It is only installed when
 // --progress is passed.
-func renderProgressBar(p scene.Progress) {
+func renderProgressBar(stdout io.Writer, p scene.Progress) {
 	switch p.Phase {
 	case "encode":
 		// Transient: the done line follows immediately.
 		return
 	case "done":
-		fmt.Fprintf(os.Stderr, "\r%s\n", formatProgress(p, progressBarWidth))
+		fmt.Fprintf(stdout, "\r%s\n", formatProgress(p, progressBarWidth))
 	default:
-		fmt.Fprintf(os.Stderr, "\r%s", formatProgress(p, progressBarWidth))
+		fmt.Fprintf(stdout, "\r%s", formatProgress(p, progressBarWidth))
 	}
 }
 
@@ -298,11 +309,11 @@ func parseSize(value string) (int, int, error) {
 
 // handleExportInspect reports what a bundle's beats can play, so a bundle a browser refuses
 // can be diagnosed without the app that made it.
-func handleExportInspect(path string) {
+func runExportInspect(path string, stdout, stderr io.Writer) int {
 	beats, err := export.InspectBundle(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Inspect failed: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Inspect failed: %v\n", err)
+		return 1
 	}
 
 	var clips, playable int
@@ -323,11 +334,12 @@ func handleExportInspect(path string) {
 			problems++
 			line += fmt.Sprintf(" [%d bytes, UNPLAYABLE: %s]", clip.Bytes, clip.Problem)
 		}
-		fmt.Println(line)
+		fmt.Fprintln(stdout, line)
 	}
 
-	fmt.Printf("\n%d beats, %d clips, %d playable, %d unplayable\n", len(beats), clips, playable, problems)
+	fmt.Fprintf(stdout, "\n%d beats, %d clips, %d playable, %d unplayable\n", len(beats), clips, playable, problems)
 	if problems > 0 {
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
