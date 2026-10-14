@@ -22,27 +22,14 @@ type defaultCheckResolver struct {
 	store     *storage.Store
 }
 
+// Resolve rolls a check under the campaign's mechanics. It reads the notation from the
+// request, the profile, or 2d6 in that order, adds the bonuses the actor's state
+// grants, rolls the opponent when the check is opposed, and maps the result onto the
+// profile's outcome table when there is one.
 func (r defaultCheckResolver) Resolve(_ context.Context, req harness.CheckRequest, actor *entity.Entity) (*harness.CheckResult, error) {
-	profile := req.Profile
-	if profile == "" {
-		profile = "default"
-	}
-	var chosen core.ResolutionProfile
-	hasProfile := false
-	if r.mechanics != nil {
-		chosen, hasProfile = r.mechanics.Checks.Profiles[profile]
-	}
+	chosen, profile, hasProfile := r.checkProfile(req)
 
-	notation := req.Notation
-	if notation == "" && hasProfile {
-		notation = chosen.Notation
-	}
-	if notation == "" {
-		notation = "2d6"
-	}
-	if hasProfile {
-		notation = rules.ProfileNotation(notation, chosen)
-	}
+	notation := checkNotation(req, chosen, hasProfile)
 	roll, err := rules.EvaluateRoll(notation)
 	if err != nil {
 		return nil, fmt.Errorf("resolve check: %w", err)
@@ -74,16 +61,9 @@ func (r defaultCheckResolver) Resolve(_ context.Context, req harness.CheckReques
 
 	// An opposed check rolls the opponent with the same notation and compares the
 	// totals; everything after this maps a win or a loss like any other outcome.
-	actorWon := true
-	opposed := false
-	if stat := rules.OpposedStat(req, chosen, hasProfile); stat != "" && req.Target != "" {
-		oppRoll, oppTotal, won, err := rules.ResolveOpposed(
-			notation, total, r.opponentBonus(req.Target, stat), rules.ProfileTies(chosen, hasProfile))
-		if err != nil {
-			return nil, err
-		}
-		res.OpposedRoll, res.OpposedTotal, res.OpposedActor = oppRoll, oppTotal, req.Target
-		actorWon, opposed = won, true
+	actorWon, opposed, err := r.resolveOpposition(res, req, notation, chosen, hasProfile, total)
+	if err != nil {
+		return nil, err
 	}
 
 	if hasProfile {
@@ -113,6 +93,56 @@ func (r defaultCheckResolver) Resolve(_ context.Context, req harness.CheckReques
 		}
 	}
 	return res, nil
+}
+
+// checkProfile is the resolution profile a check runs under: the one it names, and the
+// default profile when it names none. It reports the profile's name and whether the
+// mechanics define it at all, which is what decides whether its notation and its
+// outcome tables apply.
+func (r defaultCheckResolver) checkProfile(req harness.CheckRequest) (core.ResolutionProfile, string, bool) {
+	profile := req.Profile
+	if profile == "" {
+		profile = "default"
+	}
+	if r.mechanics == nil {
+		return core.ResolutionProfile{}, profile, false
+	}
+	chosen, hasProfile := r.mechanics.Checks.Profiles[profile]
+	return chosen, profile, hasProfile
+}
+
+// checkNotation is the dice a check is rolled with: the notation the request names, the
+// profile's own when it names none, and 2d6 when neither does. A profile gets the last
+// word, because its notation is what its outcome table is written against.
+func checkNotation(req harness.CheckRequest, chosen core.ResolutionProfile, hasProfile bool) string {
+	notation := req.Notation
+	if notation == "" && hasProfile {
+		notation = chosen.Notation
+	}
+	if notation == "" {
+		notation = "2d6"
+	}
+	if hasProfile {
+		notation = rules.ProfileNotation(notation, chosen)
+	}
+	return notation
+}
+
+// resolveOpposition rolls the opponent when the check is opposed, writing the
+// opponent's roll and stat onto the result. It reports who won, and whether the check
+// was opposed at all.
+func (r defaultCheckResolver) resolveOpposition(res *harness.CheckResult, req harness.CheckRequest, notation string, chosen core.ResolutionProfile, hasProfile bool, total int) (actorWon, opposed bool, err error) {
+	stat := rules.OpposedStat(req, chosen, hasProfile)
+	if stat == "" || req.Target == "" {
+		return true, false, nil
+	}
+	oppRoll, oppTotal, won, err := rules.ResolveOpposed(
+		notation, total, r.opponentBonus(req.Target, stat), rules.ProfileTies(chosen, hasProfile))
+	if err != nil {
+		return false, false, err
+	}
+	res.OpposedRoll, res.OpposedTotal, res.OpposedActor = oppRoll, oppTotal, req.Target
+	return won, true, nil
 }
 
 // opponentBonus reads the opponent's governing stat from the campaign index. An

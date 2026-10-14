@@ -74,39 +74,17 @@ func ResolveContentLock(paths *core.PathResolver, gameID string) (content.Conten
 		return content.ContentLock{}, nil, fmt.Errorf("load game manifest: %w", err)
 	}
 
-	var warnings []string
-
 	sysDir := paths.SystemDir(gameManifest.SystemID)
-	sysManifest, sysErr := core.LoadSystemManifest(filepath.Join(sysDir, "system.yaml"))
-	if sysErr != nil {
-		if os.IsNotExist(sysErr) || strings.Contains(sysErr.Error(), "no such file or directory") {
-			warnings = append(warnings, fmt.Sprintf("system %q is missing on disk", gameManifest.SystemID))
-		} else {
-			return content.ContentLock{}, nil, fmt.Errorf("load system %q: %w", gameManifest.SystemID, sysErr)
-		}
-	}
-
 	worldDir := paths.WorldDir(gameManifest.WorldID)
-	worldManifest, worldErr := core.LoadWorldManifest(filepath.Join(worldDir, "world.yaml"))
-	if worldErr != nil {
-		if os.IsNotExist(worldErr) || strings.Contains(worldErr.Error(), "no such file or directory") {
-			warnings = append(warnings, fmt.Sprintf("world %q is missing on disk", gameManifest.WorldID))
-		} else {
-			return content.ContentLock{}, nil, fmt.Errorf("load world %q: %w", gameManifest.WorldID, worldErr)
-		}
+
+	sysManifest, worldManifest, warnings, err := loadCampaignSources(gameManifest, sysDir, worldDir)
+	if err != nil {
+		return content.ContentLock{}, nil, err
 	}
 
 	// 1. Check requirements
-	if sysManifest != nil && worldManifest != nil {
-		for _, req := range worldManifest.Requires {
-			if req.Type == "" || req.Type == "system" {
-				if req.ID == "" || req.ID == gameManifest.SystemID {
-					if !req.Satisfies(sysManifest.Version) {
-						return content.ContentLock{}, nil, fmt.Errorf("incompatible system %q: world %q requires version constraint %q, but system version is %q", gameManifest.SystemID, gameManifest.WorldID, req.Version, sysManifest.Version)
-					}
-				}
-			}
-		}
+	if err := checkWorldRequires(gameManifest, worldManifest, sysManifest); err != nil {
+		return content.ContentLock{}, nil, err
 	}
 
 	// 2. Check lockfile
@@ -127,6 +105,83 @@ func ResolveContentLock(paths *core.PathResolver, gameID string) (content.Conten
 	if err != nil {
 		return content.ContentLock{}, nil, fmt.Errorf("load lockfile: %w", err)
 	}
+
+	warnings = append(warnings, contentDriftWarnings(gameManifest, sysManifest, worldManifest, lock, sysDir, worldDir)...)
+
+	return lock, warnings, nil
+}
+
+// loadCampaignSources loads the system and world a campaign is built from. One that is
+// simply absent is a warning rather than a failure, because a campaign can be opened
+// while its world or system is still being written; any other failure is an error.
+func loadCampaignSources(gameManifest *core.GameManifest, sysDir, worldDir string) (*core.SystemManifest, *core.WorldManifest, []string, error) {
+	var warnings []string
+
+	sysManifest, sysErr := core.LoadSystemManifest(filepath.Join(sysDir, "system.yaml"))
+	if sysErr != nil {
+		if os.IsNotExist(sysErr) || strings.Contains(sysErr.Error(), "no such file or directory") {
+			warnings = append(warnings, fmt.Sprintf("system %q is missing on disk", gameManifest.SystemID))
+		} else {
+			return nil, nil, nil, fmt.Errorf("load system %q: %w", gameManifest.SystemID, sysErr)
+		}
+	}
+
+	worldManifest, worldErr := core.LoadWorldManifest(filepath.Join(worldDir, "world.yaml"))
+	if worldErr != nil {
+		if os.IsNotExist(worldErr) || strings.Contains(worldErr.Error(), "no such file or directory") {
+			warnings = append(warnings, fmt.Sprintf("world %q is missing on disk", gameManifest.WorldID))
+		} else {
+			return nil, nil, nil, fmt.Errorf("load world %q: %w", gameManifest.WorldID, worldErr)
+		}
+	}
+
+	return sysManifest, worldManifest, warnings, nil
+}
+
+// checkWorldRequires enforces the version constraints a world places on the system it
+// runs on. A requirement naming another type, or a system other than this one, is not
+// this campaign's to answer for, so it is passed over.
+//
+// Nothing is checked when either manifest is missing: the world's requirements cannot
+// be read without them, and the absence has already been reported as a warning.
+func checkWorldRequires(gameManifest *core.GameManifest, worldManifest *core.WorldManifest, sysManifest *core.SystemManifest) error {
+	if sysManifest == nil || worldManifest == nil {
+		return nil
+	}
+	return checkRequires(worldManifest.Requires, gameManifest.SystemID, gameManifest.WorldID, sysManifest.Version)
+}
+
+// checkRequires enforces the version constraints a world places on the system it runs
+// on. A requirement naming another type, or a system other than this one, is not this
+// campaign's to answer for, so it is passed over.
+//
+// It is shared because a campaign is checked twice against the same rule: once when it
+// is created, where the ids come from the request, and once every time it is opened,
+// where they come from its own manifest.
+func checkRequires(requires []core.ContentRequirement, systemID, worldID, systemVersion string) error {
+	for _, req := range requires {
+		if req.Type != "" && req.Type != "system" {
+			continue
+		}
+		if req.ID != "" && req.ID != systemID {
+			continue
+		}
+		if !req.Satisfies(systemVersion) {
+			return fmt.Errorf("incompatible system %q: world %q requires version constraint %q, but system version is %q", systemID, worldID, req.Version, systemVersion)
+		}
+	}
+	return nil
+}
+
+// contentDriftWarnings is what a lockfile raises against the content now on disk: a
+// digest that changed, a version that changed, and an entry the lockfile does not
+// hold at all.
+//
+// Content whose digest cannot be taken is skipped rather than reported, and that is
+// also what keeps the version comparison safe: a directory with no behavioural files
+// is a content half that is not on disk, which is why its manifest is nil.
+func contentDriftWarnings(gameManifest *core.GameManifest, sysManifest *core.SystemManifest, worldManifest *core.WorldManifest, lock content.ContentLock, sysDir, worldDir string) []string {
+	var warnings []string
 
 	// Current digests
 	currentSysDigest, err := content.BehaviouralDigest(sysDir)
@@ -157,5 +212,5 @@ func ResolveContentLock(paths *core.PathResolver, gameID string) (content.Conten
 		}
 	}
 
-	return lock, warnings, nil
+	return warnings
 }

@@ -76,94 +76,108 @@ func CheckContinuity(input ContinuityInput) []ContinuityFinding {
 	return findings
 }
 
+// continuityFindings collects continuity findings as a rule is checked, keeping one
+// per note so a name that appears three times is reported once.
+type continuityFindings struct {
+	seen     map[string]bool
+	findings []ContinuityFinding
+}
+
+func (f *continuityFindings) add(rule, note string) {
+	if f.seen[note] {
+		return
+	}
+	f.seen[note] = true
+	f.findings = append(f.findings, ContinuityFinding{Rule: rule, Note: note})
+}
+
 // checkUnknownEntities flags a name that claims canon and has no note. It fires on a
 // speaker attribution, a naming construction, or a proper noun phrase absent from context/working set.
 func checkUnknownEntities(input ContinuityInput, narration string) []ContinuityFinding {
-	findings := make([]ContinuityFinding, 0)
-
-	isKnown := func(name string) bool {
-		slug := entity.Slugify(name)
-		if slug == "" {
-			return true
-		}
-		unprefixed := strings.TrimPrefix(slug, "the-")
-		matchSlug := func(target string) bool {
-			targetUnprefixed := strings.TrimPrefix(target, "the-")
-			return target == slug || target == unprefixed || targetUnprefixed == slug || targetUnprefixed == unprefixed
-		}
-
-		if input.PlayerID != "" && matchSlug(entity.Slugify(input.PlayerID)) {
-			return true
-		}
-		for _, ref := range input.Context.Refs {
-			if ref.Kind == harness.RefEntity && matchSlug(ref.ID) {
-				return true
-			}
-		}
-		for _, ref := range input.Context.WorkingSet {
-			if matchSlug(ref.ID) {
-				return true
-			}
-		}
-		if input.WorkingSet != nil {
-			for _, e := range input.WorkingSet.Entries {
-				if matchSlug(e.ID) {
-					return true
-				}
-			}
-		}
-		if input.Store != nil {
-			if resolvesToEntity(input.Store, name) {
-				return true
-			}
-			if ent, err := input.Store.GetEntity(slug); err == nil && ent != nil {
-				return true
-			}
-		}
-		if input.Turn != nil {
-			for _, m := range input.Turn.Entities {
-				if matchSlug(m.ID) {
-					return true
-				}
-			}
-		}
-		return false
-	}
-
-	seenNotes := make(map[string]bool)
-	addFinding := func(rule, note string) {
-		if !seenNotes[note] {
-			seenNotes[note] = true
-			findings = append(findings, ContinuityFinding{Rule: rule, Note: note})
-		}
-	}
+	found := &continuityFindings{seen: map[string]bool{}, findings: make([]ContinuityFinding, 0)}
 
 	for _, line := range strings.Split(narration, "\n") {
 		candidate := speakingName(line)
 		if candidate == "" {
 			continue
 		}
-		if isKnown(candidate) {
+		if knownEntityName(input, candidate) {
 			continue
 		}
-		addFinding(RuleUnknownEntity, fmt.Sprintf("%q speaks but has no note", candidate))
+		found.add(RuleUnknownEntity, fmt.Sprintf("%q speaks but has no note", candidate))
 	}
 
-	for _, phrase := range namedPhrases(narration) {
-		if isKnown(phrase) {
+	addUnknownPhraseFindings(found, input, namedPhrases(narration))
+	addUnknownPhraseFindings(found, input, properNounPhrases(narration))
+
+	return found.findings
+}
+
+// knownEntityName reports whether a name in the narration resolves to something the
+// turn already knows: the player, the context's references, the working set, the store,
+// or an entity the turn has already mentioned.
+//
+// A name is matched through its slug with a leading "the-" ignored on both sides, so
+// "the Ember Warden" and "Ember Warden" are the same being. A name that slugs to
+// nothing is treated as known, because there is nothing to look up.
+func knownEntityName(input ContinuityInput, name string) bool {
+	slug := entity.Slugify(name)
+	if slug == "" {
+		return true
+	}
+	unprefixed := strings.TrimPrefix(slug, "the-")
+	matchSlug := func(target string) bool {
+		targetUnprefixed := strings.TrimPrefix(target, "the-")
+		return target == slug || target == unprefixed || targetUnprefixed == slug || targetUnprefixed == unprefixed
+	}
+
+	if input.PlayerID != "" && matchSlug(entity.Slugify(input.PlayerID)) {
+		return true
+	}
+	for _, ref := range input.Context.Refs {
+		if ref.Kind == harness.RefEntity && matchSlug(ref.ID) {
+			return true
+		}
+	}
+	for _, ref := range input.Context.WorkingSet {
+		if matchSlug(ref.ID) {
+			return true
+		}
+	}
+	if input.WorkingSet != nil {
+		for _, e := range input.WorkingSet.Entries {
+			if matchSlug(e.ID) {
+				return true
+			}
+		}
+	}
+	if input.Store != nil {
+		if resolvesToEntity(input.Store, name) {
+			return true
+		}
+		if ent, err := input.Store.GetEntity(slug); err == nil && ent != nil {
+			return true
+		}
+	}
+	if input.Turn != nil {
+		for _, m := range input.Turn.Entities {
+			if matchSlug(m.ID) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// addUnknownPhraseFindings reports every phrase that claims canon and has no note
+// behind it.
+func addUnknownPhraseFindings(found *continuityFindings, input ContinuityInput, phrases []string) {
+	for _, phrase := range phrases {
+		if knownEntityName(input, phrase) {
 			continue
 		}
-		addFinding(RuleUnknownEntity, fmt.Sprintf("%q is named but has no note", phrase))
+		found.add(RuleUnknownEntity, fmt.Sprintf("%q is named but has no note", phrase))
 	}
-
-	for _, phrase := range properNounPhrases(narration) {
-		if isKnown(phrase) {
-			continue
-		}
-		addFinding(RuleUnknownEntity, fmt.Sprintf("%q is named but has no note", phrase))
-	}
-
-	return findings
 }
 
 var leadingPrepositions = map[string]bool{
