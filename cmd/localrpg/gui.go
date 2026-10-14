@@ -113,59 +113,82 @@ func runGUICommand(args []string, stdout, stderr io.Writer) int {
 
 	handler := gui.ProtectCrossOrigin(gui.NewServer(svc, gui.AssetHandler()))
 
-	// 1. Explicit TCP Web Mode
-	if cfg.WebMode {
-		addr := fmt.Sprintf("127.0.0.1:%d", cfg.Port)
-		fmt.Fprintf(stdout, "Starting LocalRPG Web GUI on http://%s\n", addr)
-		if err := http.ListenAndServe(addr, handler); err != nil {
-			fmt.Fprintf(stderr, "Server failed: %v\n", err)
-			return 1
-		}
-		return 0
+	// Three ways to serve the same app, in the order of how much of the machine
+	// they claim: an explicit port, a socket, or the native window.
+	switch {
+	case cfg.WebMode:
+		return serveWebMode(stdout, stderr, cfg.Port, handler)
+	case cfg.Headless || cfg.SocketPath != "" || !hasDisplay():
+		return serveSocketDaemon(stdout, stderr, cfg, handler)
+	default:
+		return serveDesktopApp(stdout, stderr, svc, handler)
+	}
+}
+
+// hasDisplay reports whether a desktop window has somewhere to appear.
+func hasDisplay() bool {
+	return os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != ""
+}
+
+// serveWebMode serves the app over loopback TCP, which a browser can reach.
+func serveWebMode(stdout, stderr io.Writer, port int, handler http.Handler) int {
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	fmt.Fprintf(stdout, "Starting LocalRPG Web GUI on http://%s\n", addr)
+	if err := http.ListenAndServe(addr, handler); err != nil {
+		fmt.Fprintf(stderr, "Server failed: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+// serveSocketDaemon serves the app over a Unix domain socket, which is what an
+// explicit --socket, --headless, or a host with no display gets. The socket is
+// unlinked on the way out, and a signal closes the listener rather than reaching
+// the process.
+func serveSocketDaemon(stdout, stderr io.Writer, cfg *guiConfig, handler http.Handler) int {
+	sockPath := cfg.SocketPath
+	if sockPath == "" {
+		sockPath = gui.DefaultSocketPath()
 	}
 
-	// 2. Explicit or Headless Unix Domain Socket Mode
-	hasDisplay := os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != ""
-	if cfg.Headless || cfg.SocketPath != "" || !hasDisplay {
-		sockPath := cfg.SocketPath
-		if sockPath == "" {
-			sockPath = gui.DefaultSocketPath()
-		}
+	listener, err := gui.ListenUnix(sockPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "Socket error: %v\n", err)
+		return 1
+	}
+	defer listener.Close()
+	defer os.Remove(sockPath)
 
-		listener, err := gui.ListenUnix(sockPath)
-		if err != nil {
-			fmt.Fprintf(stderr, "Socket error: %v\n", err)
-			return 1
-		}
-		defer listener.Close()
-		defer os.Remove(sockPath)
+	// Handle graceful shutdown signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	// The signal closes the listener, which is what unblocks Serve below. The
+	// flag tells that apart from a server failure, so a clean Ctrl-C is not
+	// reported as one; the deferred drain runs when this command returns.
+	var shuttingDown atomic.Bool
+	go func() {
+		<-sigChan
+		fmt.Fprintln(stdout, "\nShutting down LocalRPG GUI socket daemon...")
+		shuttingDown.Store(true)
+		_ = listener.Close()
+		_ = os.Remove(sockPath)
+	}()
 
-		// Handle graceful shutdown signals
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-		// The signal closes the listener, which is what unblocks Serve below. The
-		// flag tells that apart from a server failure, so a clean Ctrl-C is not
-		// reported as one; the deferred drain runs when this command returns.
-		var shuttingDown atomic.Bool
-		go func() {
-			<-sigChan
-			fmt.Fprintln(stdout, "\nShutting down LocalRPG GUI socket daemon...")
-			shuttingDown.Store(true)
-			_ = listener.Close()
-			_ = os.Remove(sockPath)
-		}()
-		fmt.Fprintf(stdout, "LocalRPG GUI daemon listening on Unix domain socket: %s (0 TCP ports)\n", sockPath)
-		if !hasDisplay && !cfg.Headless {
-			fmt.Fprintln(stdout, "Note: No desktop display detected ($DISPLAY / $WAYLAND_DISPLAY unset).")
-		}
-		if err := http.Serve(listener, handler); err != nil && err != http.ErrServerClosed && !shuttingDown.Load() {
-			fmt.Fprintf(stderr, "Daemon failed: %v\n", err)
-			return 1
-		}
-		return 0
+	fmt.Fprintf(stdout, "LocalRPG GUI daemon listening on Unix domain socket: %s (0 TCP ports)\n", sockPath)
+	if !hasDisplay() && !cfg.Headless {
+		fmt.Fprintln(stdout, "Note: No desktop display detected ($DISPLAY / $WAYLAND_DISPLAY unset).")
 	}
 
-	// 3. Default: Native Wails v3 Desktop Window (Zero-TCP)
+	if err := http.Serve(listener, handler); err != nil && err != http.ErrServerClosed && !shuttingDown.Load() {
+		fmt.Fprintf(stderr, "Daemon failed: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+// serveDesktopApp serves the app in a native Wails v3 window, which is the
+// default because it binds no TCP port at all.
+func serveDesktopApp(stdout, stderr io.Writer, svc *gui.Service, handler http.Handler) int {
 	app := application.New(application.Options{
 		Name:        "LocalRPG",
 		Description: "Local-First LLM Tabletop RPG Client",
@@ -200,15 +223,32 @@ func runGUICommand(args []string, stdout, stderr io.Writer) int {
 		DefaultContextMenuDisabled: false,
 	})
 
-	// The desktop window gets a native directory chooser. Browser and socket
-	// modes have no dialog, so the UI falls back to a path field.
-	//
-	// PromptForSingleSelection marshals the dialog onto the application's main
-	// thread itself, so this closure is not wrapped in another InvokeSync: a
-	// second hop would run the inner one from inside a main-thread callback,
-	// where the idle it posts can never be serviced. The dialog is attached to
-	// the window so it is modal to it rather than a free-floating toplevel. A
-	// dismissed dialog is reported as a cancellation, not a failure.
+	installDirectoryPicker(app, svc, window)
+	installSaveFilePicker(app, svc, window)
+
+	// With no native View menu, Developer Tools keeps its conventional
+	// accelerator as a direct window binding so debugging stays reachable.
+	window.RegisterKeyBinding("F12", func(application.Window) {
+		window.OpenDevTools()
+	})
+
+	if err := app.Run(); err != nil {
+		fmt.Fprintf(stderr, "Wails application failed: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+// installDirectoryPicker gives the desktop window a native directory chooser.
+// Browser and socket modes have no dialog, so the UI falls back to a path field.
+//
+// PromptForSingleSelection marshals the dialog onto the application's main
+// thread itself, so this closure is not wrapped in another InvokeSync: a
+// second hop would run the inner one from inside a main-thread callback,
+// where the idle it posts can never be serviced. The dialog is attached to
+// the window so it is modal to it rather than a free-floating toplevel. A
+// dismissed dialog is reported as a cancellation, not a failure.
+func installDirectoryPicker(app *application.App, svc *gui.Service, window *application.WebviewWindow) {
 	svc.SetDirectoryPicker(func(title, defaultDir string) (string, error) {
 		if title == "" {
 			title = "Choose a folder"
@@ -228,7 +268,11 @@ func runGUICommand(args []string, stdout, stderr io.Writer) int {
 		}
 		return chosen, nil
 	})
+}
 
+// installSaveFilePicker gives the desktop window a native save dialog, carrying
+// the filters the request asked for.
+func installSaveFilePicker(app *application.App, svc *gui.Service, window *application.WebviewWindow) {
 	svc.SetSaveFilePicker(func(req gui.ChooseSaveFileRequestDTO) (string, error) {
 		options := &application.SaveFileDialogOptions{
 			Title:                req.Title,
@@ -250,18 +294,6 @@ func runGUICommand(args []string, stdout, stderr io.Writer) int {
 		}
 		return chosen, nil
 	})
-
-	// With no native View menu, Developer Tools keeps its conventional
-	// accelerator as a direct window binding so debugging stays reachable.
-	window.RegisterKeyBinding("F12", func(application.Window) {
-		window.OpenDevTools()
-	})
-
-	if err := app.Run(); err != nil {
-		fmt.Fprintf(stderr, "Wails application failed: %v\n", err)
-		return 1
-	}
-	return 0
 }
 
 // localRPGApplicationMenu is the native menu macOS shows in the global menu bar.

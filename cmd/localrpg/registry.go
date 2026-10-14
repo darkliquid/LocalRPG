@@ -227,14 +227,7 @@ func runRegistryInstall(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	spec := positional[0]
-	var targetID, targetVersion string
-	if parts := strings.SplitN(spec, "@", 2); len(parts) == 2 {
-		targetID = parts[0]
-		targetVersion = parts[1]
-	} else {
-		targetID = spec
-	}
+	targetID, targetVersion := splitPackageSpec(positional[0])
 
 	mgr := config.NewConfigManager()
 	cfg, _ := mgr.Load()
@@ -242,30 +235,9 @@ func runRegistryInstall(args []string, stdout, stderr io.Writer) int {
 	resolver := registryResolver(cfg)
 
 	client := registry.NewClient(cfg.Registries, resolver.CacheDir())
-	matches, err := client.Search(context.Background(), targetID)
-	if err != nil {
-		fmt.Fprintf(stderr, "Search error: %v\n", err)
-		return 1
-	}
-
-	var candidate *registry.PackageRef
-	for i := range matches {
-		ref := &matches[i]
-		if ref.Package.ID == targetID {
-			if targetVersion == "" || ref.Package.Version == targetVersion {
-				candidate = ref
-				break
-			}
-		}
-	}
-
+	candidate, code := findRegistryCandidate(client, targetID, targetVersion, stderr)
 	if candidate == nil {
-		if targetVersion != "" {
-			fmt.Fprintf(stderr, "Package %s@%s not found in configured registries\n", targetID, targetVersion)
-		} else {
-			fmt.Fprintf(stderr, "Package %s not found in configured registries\n", targetID)
-		}
-		return 1
+		return code
 	}
 
 	if !*yes {
@@ -297,6 +269,43 @@ func runRegistryInstall(args []string, stdout, stderr io.Writer) int {
 
 	fmt.Fprintf(stdout, "Installed %s %q (%s) as %s\n", m.Type, m.Name, m.Version, m.ID)
 	return 0
+}
+
+// splitPackageSpec splits an install spec into the id and the version it names,
+// which is empty when the spec is an id alone.
+func splitPackageSpec(spec string) (id, version string) {
+	if parts := strings.SplitN(spec, "@", 2); len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return spec, ""
+}
+
+// findRegistryCandidate searches the configured registries for the package the
+// install named, preferring the version it asked for. It reports the reason to
+// stderr and returns a non-zero code when there is no such package.
+func findRegistryCandidate(client *registry.Client, targetID, targetVersion string, stderr io.Writer) (*registry.PackageRef, int) {
+	matches, err := client.Search(context.Background(), targetID)
+	if err != nil {
+		fmt.Fprintf(stderr, "Search error: %v\n", err)
+		return nil, 1
+	}
+
+	for i := range matches {
+		ref := &matches[i]
+		if ref.Package.ID != targetID {
+			continue
+		}
+		if targetVersion == "" || ref.Package.Version == targetVersion {
+			return ref, 0
+		}
+	}
+
+	if targetVersion != "" {
+		fmt.Fprintf(stderr, "Package %s@%s not found in configured registries\n", targetID, targetVersion)
+	} else {
+		fmt.Fprintf(stderr, "Package %s not found in configured registries\n", targetID)
+	}
+	return nil, 1
 }
 
 func runRegistryUpdate(args []string, stdout, stderr io.Writer) int {

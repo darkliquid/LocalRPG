@@ -25,26 +25,7 @@ func handleExportCommand(args []string) {
 }
 
 func runExportCommand(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("export", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	fs.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: localrpg export <web|video> <game-id> [flags]")
-		fmt.Fprintln(stderr, "Export the campaign as an animated web bundle or a video")
-		fs.PrintDefaults()
-	}
-	out := fs.String("out", "", "Output path for export")
-	dir := fs.String("dir", ".", "Root directory")
-	noArt := fs.Bool("no-art", false, "Skip scene imagery")
-	noAudio := fs.Bool("no-audio", false, "Skip speech clips, using only cached audio")
-	still := fs.Bool("still", false, "Render one frame per beat instead of animating")
-	fps := fs.Int("fps", scene.DefaultFPS, "Video frame rate")
-	size := fs.String("size", "1920x1080", "Video size as WxH")
-	quality := fs.Int("quality", 80, "VP8 quality, 0-100")
-	effort := fs.Int("effort", export.DefaultEffort, "Encoder effort, 0-6 (higher is slower and cleaner)")
-	intro := fs.Duration("intro", 1500*time.Millisecond, "Hold the opening picture this long before the story starts")
-	outro := fs.Duration("outro", 1500*time.Millisecond, "Hold the closing picture this long after the story ends")
-	gap := fs.Duration("gap", 300*time.Millisecond, "Hold every segment this much longer than the script paces it")
-	showProgress := fs.Bool("progress", false, "Show a live progress bar while rendering")
+	fs, f := newExportFlags(stderr)
 
 	if len(args) == 0 {
 		fs.Usage()
@@ -79,95 +60,195 @@ func runExportCommand(args []string, stdout, stderr io.Writer) int {
 	}
 	gameID := positional[1]
 
-	compiler := export.NewScriptCompiler(*dir)
-	compiler.SetMedia(!*noArt, !*noAudio)
+	compiler := export.NewScriptCompiler(*f.dir)
+	compiler.SetMedia(!*f.noArt, !*f.noAudio)
 
 	script, err := compiler.Compile(context.Background(), gameID)
 	if err != nil {
 		fmt.Fprintf(stderr, "Failed to compile replay script: %v\n", err)
 		return 1
 	}
-	for _, miss := range compiler.SpeechMisses() {
-		fmt.Fprintf(stderr, "No clip for a beat: %s\n", miss)
-	}
-	if len(compiler.SpeechMisses()) > 0 {
-		fmt.Fprintf(stderr, "Looked for clips in %s; pass --dir if the app keeps its campaigns elsewhere.\n", compiler.CacheDir())
-	}
+	reportSpeechMisses(stderr, compiler)
 
 	switch format {
 	case "web":
-		target := resolveOutPath(*out, gameID, "-web.html")
-		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			fmt.Fprintf(stderr, "Web export failed: %v\n", err)
-			return 1
-		}
-		exporter := export.NewWebExporter(*dir)
-		// A bundle is the theatre's own player, so it ships the frontend build and
-		// renders performance tags the way the campaign's settings ask for.
-		assets, assetErr := gui.AssetFS()
-		if assetErr != nil {
-			fmt.Fprintf(stderr, "Web export failed: %v\n", assetErr)
-			return 1
-		}
-		exporter.SetAssets(assets)
-		if cfg, cfgErr := config.NewConfigManager().Load(); cfgErr == nil && cfg != nil {
-			exporter.SetDisplayMode(cfg.Media.TTS.SpeechCues.DisplayMode)
-		}
-		path, err := exporter.Export(context.Background(), script, target)
-		if err != nil {
-			fmt.Fprintf(stderr, "Web export failed: %v\n", err)
-			return 1
-		}
-		if info, statErr := os.Stat(path); statErr == nil {
-			fmt.Fprintf(stdout, "Exported web replay bundle to %s (%d KB)\n", absPath(path), info.Size()/1024)
-			break
-		}
-		fmt.Fprintf(stdout, "Exported web replay bundle to %s\n", absPath(path))
-
+		return exportWebBundle(stdout, stderr, *f.dir, script, *f.out, gameID)
 	case "video":
-		target := resolveOutPath(*out, gameID, ".webm")
-		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			fmt.Fprintf(stderr, "Video export failed: %v\n", err)
-			return 1
-		}
-		pipeline := export.NewVideoPipeline(*dir)
-		pipeline.SetStill(*still)
-		pipeline.SetFPS(*fps)
-		pipeline.SetQuality(*quality)
-		pipeline.SetEffort(*effort)
-		pipeline.SetIntro(*intro)
-		pipeline.SetOutro(*outro)
-		pipeline.SetGap(*gap)
-		if cfg, cfgErr := config.NewConfigManager().Load(); cfgErr == nil && cfg != nil {
-			pipeline.SetDisplayMode(scene.DisplayMode(cfg.Media.TTS.SpeechCues.DisplayMode))
-		}
-		if width, height, err := parseSize(*size); err == nil {
-			pipeline.SetSize(width, height)
-		} else {
-			// A bad geometry is not worth abandoning a long render for, so the
-			// default resolution stands and the reason is reported.
-			fmt.Fprintf(stderr, "export: ignoring --size %q: %v\n", *size, err)
-		}
-
-		// Progress is opt-in. A render can take a while, but a quiet default is
-		// what a script wants, so --progress draws a live bar instead.
-		if *showProgress {
-			pipeline.SetProgress(func(p scene.Progress) { renderProgressBar(stdout, p) })
-		}
-
-		if err := pipeline.RenderVideo(context.Background(), script, target); err != nil {
-			fmt.Fprintf(stderr, "Video render failed: %v\n", err)
-			return 1
-		}
-		fmt.Fprintf(stdout, "Rendered video replay to %s\n", absPath(target))
-
+		return renderVideoExport(stdout, stderr, f.videoOptions(), script, gameID)
 	default:
 		fmt.Fprintf(stderr, "Unknown export format: %s (supported: web, video)\n", format)
 		return 1
 	}
+}
+
+// exportFlagValues are the flags one export run was given.
+type exportFlagValues struct {
+	out          *string
+	dir          *string
+	noArt        *bool
+	noAudio      *bool
+	still        *bool
+	fps          *int
+	size         *string
+	quality      *int
+	effort       *int
+	intro        *time.Duration
+	outro        *time.Duration
+	gap          *time.Duration
+	showProgress *bool
+}
+
+// newExportFlags declares the export command's flags and returns the set with the
+// values they bind to.
+func newExportFlags(stderr io.Writer) (*flag.FlagSet, exportFlagValues) {
+	fs := flag.NewFlagSet("export", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "Usage: localrpg export <web|video> <game-id> [flags]")
+		fmt.Fprintln(stderr, "Export the campaign as an animated web bundle or a video")
+		fs.PrintDefaults()
+	}
+
+	return fs, exportFlagValues{
+		out:          fs.String("out", "", "Output path for export"),
+		dir:          fs.String("dir", ".", "Root directory"),
+		noArt:        fs.Bool("no-art", false, "Skip scene imagery"),
+		noAudio:      fs.Bool("no-audio", false, "Skip speech clips, using only cached audio"),
+		still:        fs.Bool("still", false, "Render one frame per beat instead of animating"),
+		fps:          fs.Int("fps", scene.DefaultFPS, "Video frame rate"),
+		size:         fs.String("size", "1920x1080", "Video size as WxH"),
+		quality:      fs.Int("quality", 80, "VP8 quality, 0-100"),
+		effort:       fs.Int("effort", export.DefaultEffort, "Encoder effort, 0-6 (higher is slower and cleaner)"),
+		intro:        fs.Duration("intro", 1500*time.Millisecond, "Hold the opening picture this long before the story starts"),
+		outro:        fs.Duration("outro", 1500*time.Millisecond, "Hold the closing picture this long after the story ends"),
+		gap:          fs.Duration("gap", 300*time.Millisecond, "Hold every segment this much longer than the script paces it"),
+		showProgress: fs.Bool("progress", false, "Show a live progress bar while rendering"),
+	}
+}
+
+// videoOptions carries the flags a video render reads.
+func (f exportFlagValues) videoOptions() videoExportOptions {
+	return videoExportOptions{
+		dir:          *f.dir,
+		out:          *f.out,
+		still:        *f.still,
+		fps:          *f.fps,
+		quality:      *f.quality,
+		effort:       *f.effort,
+		intro:        *f.intro,
+		outro:        *f.outro,
+		gap:          *f.gap,
+		size:         *f.size,
+		showProgress: *f.showProgress,
+	}
+}
+
+// reportSpeechMisses names the beats that have no clip and where the clips were
+// looked for, so a campaign kept elsewhere is a one-flag fix.
+func reportSpeechMisses(stderr io.Writer, compiler *export.ScriptCompiler) {
+	misses := compiler.SpeechMisses()
+	for _, miss := range misses {
+		fmt.Fprintf(stderr, "No clip for a beat: %s\n", miss)
+	}
+	if len(misses) > 0 {
+		fmt.Fprintf(stderr, "Looked for clips in %s; pass --dir if the app keeps its campaigns elsewhere.\n", compiler.CacheDir())
+	}
+}
+
+// exportWebBundle writes the theatre's own player, its assets and the compiled
+// script, as the standalone bundle a browser can open.
+func exportWebBundle(stdout, stderr io.Writer, dir string, script *scene.Script, out, gameID string) int {
+	target := resolveOutPath(out, gameID, "-web.html")
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		fmt.Fprintf(stderr, "Web export failed: %v\n", err)
+		return 1
+	}
+
+	exporter := export.NewWebExporter(dir)
+	// A bundle is the theatre's own player, so it ships the frontend build and
+	// renders performance tags the way the campaign's settings ask for.
+	assets, assetErr := gui.AssetFS()
+	if assetErr != nil {
+		fmt.Fprintf(stderr, "Web export failed: %v\n", assetErr)
+		return 1
+	}
+	exporter.SetAssets(assets)
+	if cfg, cfgErr := config.NewConfigManager().Load(); cfgErr == nil && cfg != nil {
+		exporter.SetDisplayMode(cfg.Media.TTS.SpeechCues.DisplayMode)
+	}
+
+	path, err := exporter.Export(context.Background(), script, target)
+	if err != nil {
+		fmt.Fprintf(stderr, "Web export failed: %v\n", err)
+		return 1
+	}
+	if info, statErr := os.Stat(path); statErr == nil {
+		fmt.Fprintf(stdout, "Exported web replay bundle to %s (%d KB)\n", absPath(path), info.Size()/1024)
+		return 0
+	}
+	fmt.Fprintf(stdout, "Exported web replay bundle to %s\n", absPath(path))
 	return 0
 }
 
+// videoExportOptions are the flags one video render takes.
+type videoExportOptions struct {
+	dir          string
+	out          string
+	still        bool
+	fps          int
+	quality      int
+	effort       int
+	intro        time.Duration
+	outro        time.Duration
+	gap          time.Duration
+	size         string
+	showProgress bool
+}
+
+// renderVideoExport renders the compiled script to a video file, reporting the
+// destination when it is done.
+func renderVideoExport(stdout, stderr io.Writer, opts videoExportOptions, script *scene.Script, gameID string) int {
+	target := resolveOutPath(opts.out, gameID, ".webm")
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		fmt.Fprintf(stderr, "Video export failed: %v\n", err)
+		return 1
+	}
+
+	pipeline := export.NewVideoPipeline(opts.dir)
+	pipeline.SetStill(opts.still)
+	pipeline.SetFPS(opts.fps)
+	pipeline.SetQuality(opts.quality)
+	pipeline.SetEffort(opts.effort)
+	pipeline.SetIntro(opts.intro)
+	pipeline.SetOutro(opts.outro)
+	pipeline.SetGap(opts.gap)
+	if cfg, cfgErr := config.NewConfigManager().Load(); cfgErr == nil && cfg != nil {
+		pipeline.SetDisplayMode(scene.DisplayMode(cfg.Media.TTS.SpeechCues.DisplayMode))
+	}
+	if width, height, err := parseSize(opts.size); err == nil {
+		pipeline.SetSize(width, height)
+	} else {
+		// A bad geometry is not worth abandoning a long render for, so the
+		// default resolution stands and the reason is reported.
+		fmt.Fprintf(stderr, "export: ignoring --size %q: %v\n", opts.size, err)
+	}
+
+	// Progress is opt-in. A render can take a while, but a quiet default is
+	// what a script wants, so --progress draws a live bar instead.
+	if opts.showProgress {
+		pipeline.SetProgress(func(p scene.Progress) { renderProgressBar(stdout, p) })
+	}
+
+	if err := pipeline.RenderVideo(context.Background(), script, target); err != nil {
+		fmt.Fprintf(stderr, "Video render failed: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Rendered video replay to %s\n", absPath(target))
+	return 0
+}
+
+// reportSpeechMisses names the beats that have no clip and where the clips were
+// looked for, so a campaign kept elsewhere is a one-flag fix.
 // splitExportArgs separates flags from positional arguments, so a flag may be
 // written before or after the format and game id. Go's flag package stops at the
 // first positional argument, which would otherwise read `export video --dir x
