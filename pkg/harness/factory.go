@@ -91,11 +91,6 @@ func BuildModelFor(id string, cfg ProviderConfig) (ModelProvider, error) {
 	return model, nil
 }
 
-// BuildModel constructs a model provider from the registry by descriptor ID.
-func BuildModel(descriptorID string, cfg ProviderConfig) (ModelProvider, error) {
-	return BuildModelFor(descriptorID, cfg)
-}
-
 // sharedKeyFor picks the provider-wide credential a role inherits when it has
 // none of its own: an Inworld role gets providers.inworld.api_key, every other
 // role keeps the Gemini key it has always used.

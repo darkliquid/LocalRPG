@@ -51,3 +51,15 @@ func TestStateGetSet(t *testing.T) {
 		t.Errorf("expected raw state to reflect changes, got %+v", raw)
 	}
 }
+
+func TestStateEmptyPath(t *testing.T) {
+	s := NewState(map[string]any{"hp": 100})
+
+	if err := s.Set("", 50); err == nil {
+		t.Error("expected Set(\"\") to error with empty path")
+	}
+
+	if val, ok := s.Get(""); ok || val != nil {
+		t.Errorf("expected Get(\"\") to return (nil, false), got (%v, %v)", val, ok)
+	}
+}

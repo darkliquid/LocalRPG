@@ -139,7 +139,7 @@ func (t *Timeline) stageAndWriteEntities(turn *Turn, extracted []harness.Extract
 	}
 
 	for id, ent := range pending {
-		ent.History = appendTurnNumber(ent.History, turn.Number)
+		ent.History = appendUniqueInts(ent.History, turn.Number)
 		pending[id] = ent
 	}
 	if err := t.writeEntities(pending); err != nil {
@@ -518,15 +518,6 @@ func containsMention(mentions []entity.Mention, id string) bool {
 		}
 	}
 	return false
-}
-
-func appendTurnNumber(history []int, turnNumber int) []int {
-	for _, number := range history {
-		if number == turnNumber {
-			return history
-		}
-	}
-	return append(history, turnNumber)
 }
 
 // SetPlayerLocation points a player note at a location, writing the note before the

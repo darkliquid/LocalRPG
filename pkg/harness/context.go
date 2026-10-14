@@ -640,17 +640,17 @@ func (c *ContextAssembler) sceneRecall(req ContextRequest) (string, []Ref) {
 	return sb.String(), dedupeRefs(refs)
 }
 
-// TurnRecordView is the part of a past turn recall needs. It keeps the assembler
+// turnRecordView is the part of a past turn recall needs. It keeps the assembler
 // from depending on the storage projection for a ranking that only reads two
 // fields.
-type TurnRecordView struct {
+type turnRecordView struct {
 	Number    int
 	Narration string
 }
 
 // rankedTurn is a recalled turn and the weight it is ranked by.
 type rankedTurn struct {
-	record TurnRecordView
+	record turnRecordView
 	score  float64
 }
 
@@ -795,7 +795,7 @@ func (c *ContextAssembler) rankTurns(candidates []storage.TurnRecord, excluded m
 		}
 		weight := math.Pow(0.5, float64(age)/float64(halfLife))
 		ranked = append(ranked, rankedTurn{
-			record: TurnRecordView{Number: candidate.Number, Narration: candidate.Narration},
+			record: turnRecordView{Number: candidate.Number, Narration: candidate.Narration},
 			score:  float64(overlap) * weight,
 		})
 	}

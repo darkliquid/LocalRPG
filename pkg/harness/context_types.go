@@ -4,14 +4,10 @@ package harness
 type RefKind string
 
 const (
-	RefEntity   RefKind = "entity"
-	RefTurn     RefKind = "turn"
-	RefSummary  RefKind = "summary"
-	RefThread   RefKind = "thread"
-	RefWorld    RefKind = "world"
-	RefSystem   RefKind = "system"
-	RefLocation RefKind = "location"
-	RefSession  RefKind = "session"
+	RefEntity  RefKind = "entity"
+	RefTurn    RefKind = "turn"
+	RefSummary RefKind = "summary"
+	RefThread  RefKind = "thread"
 )
 
 // Ref is one thing a section read. Relation names why: present, mention,

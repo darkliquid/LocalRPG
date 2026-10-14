@@ -22,6 +22,10 @@ func (s *State) Get(path string) (any, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	if path == "" {
+		return nil, false
+	}
+
 	parts := strings.Split(path, ".")
 	var current any = s.data
 
@@ -43,10 +47,11 @@ func (s *State) Set(path string, val any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	parts := strings.Split(path, ".")
-	if len(parts) == 0 {
+	if path == "" {
 		return fmt.Errorf("empty path")
 	}
+
+	parts := strings.Split(path, ".")
 
 	current := s.data
 	for i := 0; i < len(parts)-1; i++ {
