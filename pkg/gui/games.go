@@ -25,8 +25,7 @@ import (
 
 func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDTO, error) {
 	gameDir := s.resolver.GameDir(gameID)
-	manifestPath := filepath.Join(gameDir, "game.yaml")
-	gameManifest, err := core.LoadGameManifest(manifestPath)
+	gameManifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
 	if err != nil {
 		return nil, fmt.Errorf("read game manifest: %w", err)
 	}
@@ -36,69 +35,25 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		return nil, fmt.Errorf("resolve content lock: %w", err)
 	}
 
-	playerID, err := engine.ResolvePlayerID(s.storeOrNil(gameID), gameManifest)
+	player, err := s.playerState(gameDir, gameID, gameManifest)
 	if err != nil {
-		return nil, fmt.Errorf("resolve player: %w", err)
-	}
-	if playerID == "" {
-		return nil, fmt.Errorf("campaign %q has no player note", gameID)
-	}
-	playerFile := filepath.Join(gameDir, "entities", playerID+".md")
-	data, err := os.ReadFile(playerFile)
-	if err != nil {
-		return nil, fmt.Errorf("read player entity: %w", err)
-	}
-
-	ent, err := entity.ParseMarkdownEntity(data)
-	if err != nil {
-		return nil, fmt.Errorf("parse player entity: %w", err)
-	}
-
-	var stateMap map[string]any
-	if ent.State != nil {
-		stateMap = ent.State.Raw()
+		return nil, err
 	}
 
 	arcs, clocks, locations := s.gameCorpus(gameID)
-
-	var narratorVoice, startLocation string
-	if gameManifest.Settings != nil {
-		if nv, ok := gameManifest.Settings["narrator_voice"].(string); ok {
-			narratorVoice = nv
-		}
-		if sl, ok := gameManifest.Settings[engine.StartLocationSetting].(string); ok {
-			startLocation = sl
-		}
-	}
+	narratorVoice, startLocation := gameSettingStrings(gameManifest)
 
 	// The campaign route serves the world's banner when the campaign has none of
 	// its own, so one URL covers both and a change to either is a new URL.
 	bannerURL, _ := s.gameAssetURL(gameDir, gameManifest.WorldID, "banner", gameID)
 
-	var systemManifest *core.SystemManifest
-	if sm, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(gameManifest.SystemID), "system.yaml")); err == nil {
-		systemManifest = sm
-	}
-
-	// The world's genre tints the app's chrome, so a genre-less campaign keeps the
-	// neutral look.
-	worldGenre := ""
-	if world, err := core.LoadWorldManifest(filepath.Join(s.resolver.WorldDir(gameManifest.WorldID), "world.yaml")); err == nil {
-		worldGenre = strings.TrimSpace(world.Genre)
-	}
+	systemManifest := s.campaignSystemManifest(gameManifest)
+	worldGenre := s.campaignGenre(gameManifest)
 
 	return &GameStateDTO{
-		GameID:   gameID,
-		GameName: gameManifest.Name,
-		Player: PlayerDTO{
-			ID:                playerID,
-			Name:              ent.Name,
-			Type:              ent.Type,
-			State:             stateMap,
-			Appearance:        ent.Appearance,
-			CurrentAppearance: ent.CurrentAppearance,
-			Voice:             voiceProfileDTO(ent.Voice),
-		},
+		GameID:        gameID,
+		GameName:      gameManifest.Name,
+		Player:        player,
 		Arcs:          arcs,
 		Clocks:        clocks,
 		Locations:     locations,
@@ -114,6 +69,77 @@ func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDT
 		Advancement:         s.computeAdvancement(gameID, systemManifest),
 		ContentWarnings:     contentWarnings,
 	}, nil
+}
+
+// playerState reads and parses the player's own note. A campaign without one is an
+// error rather than an empty state, because every later field is read off it.
+func (s *Service) playerState(gameDir, gameID string, manifest *core.GameManifest) (PlayerDTO, error) {
+	playerID, err := engine.ResolvePlayerID(s.storeOrNil(gameID), manifest)
+	if err != nil {
+		return PlayerDTO{}, fmt.Errorf("resolve player: %w", err)
+	}
+	if playerID == "" {
+		return PlayerDTO{}, fmt.Errorf("campaign %q has no player note", gameID)
+	}
+	data, err := os.ReadFile(filepath.Join(gameDir, "entities", playerID+".md"))
+	if err != nil {
+		return PlayerDTO{}, fmt.Errorf("read player entity: %w", err)
+	}
+
+	ent, err := entity.ParseMarkdownEntity(data)
+	if err != nil {
+		return PlayerDTO{}, fmt.Errorf("parse player entity: %w", err)
+	}
+
+	var stateMap map[string]any
+	if ent.State != nil {
+		stateMap = ent.State.Raw()
+	}
+
+	return PlayerDTO{
+		ID:                playerID,
+		Name:              ent.Name,
+		Type:              ent.Type,
+		State:             stateMap,
+		Appearance:        ent.Appearance,
+		CurrentAppearance: ent.CurrentAppearance,
+		Voice:             voiceProfileDTO(ent.Voice),
+	}, nil
+}
+
+// gameSettingStrings are the two settings the state route reads out of a campaign's
+// manifest: the narrator's voice and the pinned start location.
+func gameSettingStrings(manifest *core.GameManifest) (narratorVoice, startLocation string) {
+	if manifest.Settings == nil {
+		return "", ""
+	}
+	if nv, ok := manifest.Settings["narrator_voice"].(string); ok {
+		narratorVoice = nv
+	}
+	if sl, ok := manifest.Settings[engine.StartLocationSetting].(string); ok {
+		startLocation = sl
+	}
+	return narratorVoice, startLocation
+}
+
+// campaignSystemManifest is the campaign's system manifest, or nil when it cannot be
+// read, which the state route tolerates rather than failing on.
+func (s *Service) campaignSystemManifest(manifest *core.GameManifest) *core.SystemManifest {
+	sm, err := core.LoadSystemManifest(filepath.Join(s.resolver.SystemDir(manifest.SystemID), "system.yaml"))
+	if err != nil {
+		return nil
+	}
+	return sm
+}
+
+// campaignGenre is the world's genre, which tints the app's chrome, so a genre-less
+// campaign keeps the neutral look.
+func (s *Service) campaignGenre(manifest *core.GameManifest) string {
+	world, err := core.LoadWorldManifest(filepath.Join(s.resolver.WorldDir(manifest.WorldID), "world.yaml"))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(world.Genre)
 }
 
 // gameCorpus reads the campaign's living world from the index: the locations it
@@ -449,17 +475,8 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 }
 
 func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*GameSummaryDTO, error) {
-	if req.Name == "" {
-		return nil, fmt.Errorf("campaign name is required")
-	}
-	if req.SystemID == "" {
-		return nil, fmt.Errorf("system_id is required")
-	}
-	if req.WorldID == "" {
-		return nil, fmt.Errorf("world_id is required")
-	}
-	if req.PlayerName == "" {
-		req.PlayerName = "Adventurer"
+	if err := validateCreateGame(&req); err != nil {
+		return nil, err
 	}
 
 	gameID := req.ID
@@ -473,7 +490,62 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 	if err != nil {
 		return nil, fmt.Errorf("load system %q: %w", req.SystemID, err)
 	}
-	fields := engine.CharacterFields(sysManifest)
+	if err := validateCharacterAnswers(req, engine.CharacterFields(sysManifest)); err != nil {
+		return nil, err
+	}
+
+	voice := playerVoice(req.Player)
+	if err := s.initCampaign(gameID, req, voice); err != nil {
+		return nil, err
+	}
+
+	// Spend the client deferred while building this campaign now belongs to it.
+	// Nothing is recorded under this token unless the client asked for deferral.
+	if err := s.CommitDeferredUsage(gameID, gameID); err != nil {
+		trace.OrNil(s.logger).Event("usage.commit_error", map[string]any{"game": gameID, "error": err.Error()})
+	}
+
+	s.applyCreateGameSettings(ctx, gameID, req)
+
+	// A voice the player did not choose is chosen from their description, so the
+	// protagonist can speak in their own voice from the first turn.
+	if voice == nil {
+		_ = s.assignPlayerVoice(gameID, req.PlayerName)
+	}
+
+	return &GameSummaryDTO{
+		ID:         gameID,
+		Name:       req.Name,
+		SystemID:   req.SystemID,
+		WorldID:    req.WorldID,
+		PlayerName: req.PlayerName,
+		TurnCount:  0,
+		LastPlayed: time.Now().Format(time.RFC3339),
+	}, nil
+}
+
+// validateCreateGame checks the fields a campaign cannot be built without, and
+// defaults the player's name rather than refusing the create over it.
+func validateCreateGame(req *CreateGameRequestDTO) error {
+	if req.Name == "" {
+		return fmt.Errorf("campaign name is required")
+	}
+	if req.SystemID == "" {
+		return fmt.Errorf("system_id is required")
+	}
+	if req.WorldID == "" {
+		return fmt.Errorf("world_id is required")
+	}
+	if req.PlayerName == "" {
+		req.PlayerName = "Adventurer"
+	}
+	return nil
+}
+
+// validateCharacterAnswers enforces the system's required character prompts, but only
+// when the caller supplied a player at all: a programmatic or legacy create with no
+// player object keeps working and simply leaves the protagonist lightly described.
+func validateCharacterAnswers(req CreateGameRequestDTO, fields []core.CharacterCreationField) error {
 	answers := map[string]string{
 		"appearance": req.Player.Appearance,
 		"age":        req.Player.Age,
@@ -484,9 +556,7 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 	for key, value := range req.Player.Extra {
 		answers[key] = value
 	}
-	// Required prompts are enforced only when the caller is doing character
-	// creation. A programmatic or legacy create with no player object keeps
-	// working and simply leaves the protagonist lightly described.
+
 	playerProvided := strings.TrimSpace(req.Player.Appearance) != "" ||
 		strings.TrimSpace(req.Player.Background) != "" ||
 		strings.TrimSpace(req.Player.Age) != "" ||
@@ -494,24 +564,35 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 		strings.TrimSpace(req.Player.Pronouns) != "" ||
 		len(req.Player.Extra) > 0 ||
 		req.Player.Voice != nil
-	if playerProvided {
-		for _, id := range engine.RequiredCharacterFields(fields) {
-			if strings.TrimSpace(answers[id]) == "" {
-				return nil, fmt.Errorf("character field %q is required", id)
-			}
-		}
+	if !playerProvided {
+		return nil
 	}
 
-	var voice *entity.VoiceConfig
-	if req.Player.Voice != nil && strings.TrimSpace(req.Player.Voice.VoiceID) != "" {
-		voice = &entity.VoiceConfig{
-			Provider:   req.Player.Voice.Provider,
-			VoiceID:    req.Player.Voice.VoiceID,
-			Pitch:      req.Player.Voice.Pitch,
-			SpeechRate: req.Player.Voice.SpeechRate,
+	for _, id := range engine.RequiredCharacterFields(fields) {
+		if strings.TrimSpace(answers[id]) == "" {
+			return fmt.Errorf("character field %q is required", id)
 		}
 	}
+	return nil
+}
 
+// playerVoice is the voice the player chose for their character, or nil when they
+// chose none and one should be picked from their description instead.
+func playerVoice(player PlayerCharacterDTO) *entity.VoiceConfig {
+	if player.Voice == nil || strings.TrimSpace(player.Voice.VoiceID) == "" {
+		return nil
+	}
+	return &entity.VoiceConfig{
+		Provider:   player.Voice.Provider,
+		VoiceID:    player.Voice.VoiceID,
+		Pitch:      player.Voice.Pitch,
+		SpeechRate: player.Voice.SpeechRate,
+	}
+}
+
+// initCampaign writes the campaign to disk. The session it opens is closed at once,
+// because every turn reopens it: a campaign is not held open between requests.
+func (s *Service) initCampaign(gameID string, req CreateGameRequestDTO, voice *entity.VoiceConfig) error {
 	session, err := engine.InitGame(s.resolver, engine.InitOptions{
 		GameID:     gameID,
 		Name:       req.Name,
@@ -530,16 +611,15 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 		OpeningPrompt: req.OpeningPrompt,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("init game: %w", err)
+		return fmt.Errorf("init game: %w", err)
 	}
 	_ = session.Close()
+	return nil
+}
 
-	// Spend the client deferred while building this campaign now belongs to it.
-	// Nothing is recorded under this token unless the client asked for deferral.
-	if err := s.CommitDeferredUsage(gameID, gameID); err != nil {
-		trace.OrNil(s.logger).Event("usage.commit_error", map[string]any{"game": gameID, "error": err.Error()})
-	}
-
+// applyCreateGameSettings writes the two settings a create can carry. A failed write
+// is not fatal: the campaign exists, and the studio can set either one later.
+func (s *Service) applyCreateGameSettings(ctx context.Context, gameID string, req CreateGameRequestDTO) {
 	if strings.TrimSpace(req.NarratorVoice) != "" {
 		_ = s.UpdateGameSettings(ctx, gameID, map[string]any{
 			"narrator_voice": strings.TrimSpace(req.NarratorVoice),
@@ -550,22 +630,6 @@ func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*Ga
 			engine.StartLocationSetting: strings.TrimSpace(req.StartLocation),
 		})
 	}
-
-	// A voice the player did not choose is chosen from their description, so the
-	// protagonist can speak in their own voice from the first turn.
-	if voice == nil {
-		_ = s.assignPlayerVoice(gameID, req.PlayerName)
-	}
-
-	return &GameSummaryDTO{
-		ID:         gameID,
-		Name:       req.Name,
-		SystemID:   req.SystemID,
-		WorldID:    req.WorldID,
-		PlayerName: req.PlayerName,
-		TurnCount:  0,
-		LastPlayed: time.Now().Format(time.RFC3339),
-	}, nil
 }
 
 // assignPlayerVoice gives the player note a voice profile matched from its

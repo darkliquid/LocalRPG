@@ -59,25 +59,13 @@ type GenerateCharacterResponse struct {
 // GenerateCharacter fills starting values for the fields the client asks about.
 // A failure is returned as a *harness.GenerationFailure; a partial success is a
 // 200 with Warning set. The player can always type the answers themselves.
+// GenerateCharacter fills starting values for the fields the client asks about.
+// A failure is returned as a *harness.GenerationFailure; a partial success is a
+// 200 with Warning set. The player can always type the answers themselves.
 func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRequest) (*GenerateCharacterResponse, error) {
 	resp := &GenerateCharacterResponse{Values: map[string]string{}, GeneratedBy: "none"}
 
-	fields := req.Fields
-	if len(fields) == 0 && req.SystemID != "" {
-		path := filepath.Join(s.resolver.SystemDir(req.SystemID), "system.yaml")
-		if manifest, err := core.LoadSystemManifest(path); err == nil {
-			fields = manifest.CharacterCreation.Fields
-		}
-	}
-
-	generatable := make([]core.CharacterCreationField, 0, len(fields))
-	for _, field := range fields {
-		// A voice is chosen from the configured profiles, never invented as text.
-		if field.Kind == "voice" || !field.Generatable {
-			continue
-		}
-		generatable = append(generatable, field)
-	}
+	generatable := s.generatableCharacterFields(req)
 	if len(generatable) == 0 {
 		return resp, nil
 	}
@@ -105,10 +93,9 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 	outcome := collectTextAttempts(ctx, router, []string{"character", "gm"}, request)
 	attempts := outcome.Attempts
 	resp.GeneratedBy = outcome.GeneratedBy
-	values := outcome.Values
 
 	for _, field := range generatable {
-		if value, ok := values[field.ID]; ok && strings.TrimSpace(value) != "" {
+		if value, ok := outcome.Values[field.ID]; ok && strings.TrimSpace(value) != "" {
 			resp.Values[field.ID] = strings.TrimSpace(value)
 		}
 	}
@@ -117,22 +104,13 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 
 	if len(resp.Values) == 0 {
 		resp.GeneratedBy = "none"
-		failure := &harness.GenerationFailure{
-			Code:        pickFailureCode(attempts),
-			Message:     harness.SummarizeAttempts(attempts, "the model did not return any usable character values"),
-			Attempts:    attempts,
-			PromptChars: len([]rune(request.PromptText())),
-			ElapsedMS:   time.Since(started).Milliseconds(),
-		}
+		failure := noCharacterValuesFailure(attempts, request, started)
 		s.setTextOutcome(span, generationOutcome{Attempts: attempts}, 0)
 		s.recordGeneration(ctx, span, "character", roleForAttempts(attempts), started, failure)
 		return nil, failure
 	}
 
-	requested := make([]string, 0, len(generatable))
-	for _, field := range generatable {
-		requested = append(requested, field.ID)
-	}
+	requested := characterFieldIDs(generatable)
 	if len(attempts) > 0 && missingFields(requested, resp.Values) > 0 {
 		resp.Warning = &harness.GenerationFailure{
 			Code:      attempts[len(attempts)-1].Code,
@@ -144,6 +122,51 @@ func (s *Service) GenerateCharacter(ctx context.Context, req GenerateCharacterRe
 	s.setTextOutcome(span, outcome, len(resp.Values))
 	s.recordGeneration(ctx, span, "character", outcome.GeneratedBy, started, nil)
 	return resp, nil
+}
+
+// generatableCharacterFields is the fields of a character request that can be
+// invented. The request may name them itself, and otherwise they come from the
+// system's character-creation schema.
+func (s *Service) generatableCharacterFields(req GenerateCharacterRequest) []core.CharacterCreationField {
+	fields := req.Fields
+	if len(fields) == 0 && req.SystemID != "" {
+		path := filepath.Join(s.resolver.SystemDir(req.SystemID), "system.yaml")
+		if manifest, err := core.LoadSystemManifest(path); err == nil {
+			fields = manifest.CharacterCreation.Fields
+		}
+	}
+
+	generatable := make([]core.CharacterCreationField, 0, len(fields))
+	for _, field := range fields {
+		// A voice is chosen from the configured profiles, never invented as text.
+		if field.Kind == "voice" || !field.Generatable {
+			continue
+		}
+		generatable = append(generatable, field)
+	}
+	return generatable
+}
+
+// characterFieldIDs is the ids of the fields a request asked for, which is what the
+// missing-field count is measured against.
+func characterFieldIDs(fields []core.CharacterCreationField) []string {
+	ids := make([]string, 0, len(fields))
+	for _, field := range fields {
+		ids = append(ids, field.ID)
+	}
+	return ids
+}
+
+// noCharacterValuesFailure is the failure a character generation gets when the model
+// returned nothing usable, with every attempt summarised onto it.
+func noCharacterValuesFailure(attempts []harness.Attempt, request harness.GenerateRequest, started time.Time) *harness.GenerationFailure {
+	return &harness.GenerationFailure{
+		Code:        pickFailureCode(attempts),
+		Message:     harness.SummarizeAttempts(attempts, "the model did not return any usable character values"),
+		Attempts:    attempts,
+		PromptChars: len([]rune(request.PromptText())),
+		ElapsedMS:   time.Since(started).Milliseconds(),
+	}
 }
 
 const characterGeneratorSystemPrompt = `You invent player characters for a tabletop roleplaying game.
