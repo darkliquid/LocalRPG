@@ -237,11 +237,11 @@ func (s *Server) handleStartDirectoryChoice(w http.ResponseWriter, r *http.Reque
 
 	switch err := s.service.StartDirectoryChoice(req); {
 	case errors.Is(err, ErrNoNativeDialog):
-		http.Error(w, err.Error(), http.StatusNotImplemented)
+		s.writeAPIError(w, err)
 	case errors.Is(err, ErrDirectoryChoiceInFlight):
-		http.Error(w, err.Error(), http.StatusConflict)
+		s.writeAPIError(w, err)
 	case err != nil:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 	default:
 		writeJSONStatus(w, http.StatusAccepted, DirectoryChoiceDTO{Status: DirectoryChoicePending})
 	}
@@ -256,11 +256,11 @@ func (s *Server) handleStartSaveFileChoice(w http.ResponseWriter, r *http.Reques
 
 	switch err := s.service.StartSaveFileChoice(req); {
 	case errors.Is(err, ErrNoNativeSaveFileDialog):
-		http.Error(w, err.Error(), http.StatusNotImplemented)
+		s.writeAPIError(w, err)
 	case errors.Is(err, ErrSaveFileChoiceInFlight):
-		http.Error(w, err.Error(), http.StatusConflict)
+		s.writeAPIError(w, err)
 	case err != nil:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 	default:
 		writeJSONStatus(w, http.StatusAccepted, SaveFileChoiceDTO{Status: SaveFileChoicePending})
 	}

@@ -152,8 +152,11 @@ func TestStartTTSBatchRouteSurfacesTheReason(t *testing.T) {
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/game/"+gameID+"/tts/batch", nil))
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want 500", rec.Code)
+	// 503, not 500: a provider that cannot do this as configured is a fault of ours
+	// that the user can act on, so the mapper says so and keeps the message. What
+	// this test is named for, the reason reaching the manager, is unchanged.
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 	}
 	if !strings.Contains(rec.Body.String(), "batch API") {
 		t.Errorf("expected the reason in the body, got %q", rec.Body.String())

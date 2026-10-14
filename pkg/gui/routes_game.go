@@ -22,7 +22,7 @@ func (s *Server) handleGameRoutes(w http.ResponseWriter, r *http.Request) {
 	// two-part requirement every other game route satisfies.
 	if len(parts) == 1 && r.Method == http.MethodDelete {
 		if err := s.service.DeleteGame(r.Context(), gameID); err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

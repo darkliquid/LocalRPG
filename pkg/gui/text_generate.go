@@ -276,7 +276,7 @@ func (s *Server) handleGenerateTextRoute(w http.ResponseWriter, r *http.Request)
 		if writeGenerationFailure(w, err) {
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, resp)

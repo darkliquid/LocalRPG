@@ -25,7 +25,7 @@ func (s *Server) handleGameLocationRoute(w http.ResponseWriter, r *http.Request,
 
 	path, contentType, err := s.service.GetLocationArt(r.Context(), gameID, locationID, r.URL.Query().Get("force") == "1")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", contentType)
@@ -52,7 +52,7 @@ func (s *Server) handleGameCharacterRoute(w http.ResponseWriter, r *http.Request
 				if writeGenerationFailure(w, err) {
 					return
 				}
-				writeGameError(w, err)
+				s.writeAPIError(w, err)
 				return
 			}
 			writeJSON(w, dto)
@@ -67,7 +67,7 @@ func (s *Server) handleGameCharacterRoute(w http.ResponseWriter, r *http.Request
 			}
 			data, contentType, err := s.service.GetCharacterPortrait(r.Context(), gameID, characterID, version...)
 			if err != nil {
-				writeGameError(w, err)
+				s.writeAPIError(w, err)
 				return
 			}
 			w.Header().Set("Content-Type", contentType)
@@ -94,7 +94,7 @@ func (s *Server) handleGameEntityRoute(w http.ResponseWriter, r *http.Request, g
 	if len(parts) >= 4 && parts[3] == "turns" && r.Method == http.MethodGet {
 		turns, err := s.service.GetEntityTurns(r.Context(), gameID, entityID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, turns)
@@ -109,7 +109,7 @@ func (s *Server) handleGameEntityRoute(w http.ResponseWriter, r *http.Request, g
 		}
 		memories, err := s.service.ListEntityMemories(gameID, entityID, limit)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, memories)
@@ -124,7 +124,7 @@ func (s *Server) handleGameEntityRoute(w http.ResponseWriter, r *http.Request, g
 			return
 		}
 		if err := s.service.SaveEntityInFolder(r.Context(), gameID, entityID, body.Folder, body.Markdown); err != nil {
-			writeSaveError(w, err, body.Markdown)
+			s.writeSaveError(w, err, body.Markdown)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -134,7 +134,7 @@ func (s *Server) handleGameEntityRoute(w http.ResponseWriter, r *http.Request, g
 	if len(parts) >= 4 && parts[3] == "art" && r.Method == http.MethodGet {
 		path, contentType, err := s.service.GetLocationArt(r.Context(), gameID, entityID, r.URL.Query().Get("force") == "1")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.Header().Set("Content-Type", contentType)
@@ -163,7 +163,7 @@ func (s *Server) handleGameEntityRoute(w http.ResponseWriter, r *http.Request, g
 
 		merged, err := s.service.MergeEntities(r.Context(), gameID, parts[2], req.Into)
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, merged)
@@ -172,7 +172,7 @@ func (s *Server) handleGameEntityRoute(w http.ResponseWriter, r *http.Request, g
 
 	if r.Method == http.MethodDelete {
 		if err := s.service.DeleteGameEntity(r.Context(), gameID, entityID); err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -181,7 +181,7 @@ func (s *Server) handleGameEntityRoute(w http.ResponseWriter, r *http.Request, g
 
 	ent, err := s.service.GetEntity(r.Context(), gameID, entityID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, ent)

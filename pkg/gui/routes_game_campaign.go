@@ -14,7 +14,7 @@ import (
 func (s *Server) handleGameStateRoute(w http.ResponseWriter, r *http.Request, gameID string) {
 	state, err := s.service.GetGameState(r.Context(), gameID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, state)
@@ -23,12 +23,12 @@ func (s *Server) handleGameStateRoute(w http.ResponseWriter, r *http.Request, ga
 // handleGameContextRoute answers GET /api/game/{id}/context.
 func (s *Server) handleGameContextRoute(w http.ResponseWriter, r *http.Request, gameID string) {
 	if r.Method != http.MethodGet {
-		http.NotFound(w, r)
+		methodNotAllowed(w, http.MethodGet)
 		return
 	}
 	turnCtx, err := s.service.GetTurnContext(gameID)
 	if err != nil {
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, turnCtx)
@@ -37,12 +37,12 @@ func (s *Server) handleGameContextRoute(w http.ResponseWriter, r *http.Request, 
 // handleGameWorkingSetRoute answers GET /api/game/{id}/working-set.
 func (s *Server) handleGameWorkingSetRoute(w http.ResponseWriter, r *http.Request, gameID string) {
 	if r.Method != http.MethodGet {
-		http.NotFound(w, r)
+		methodNotAllowed(w, http.MethodGet)
 		return
 	}
 	workingSet, err := s.service.GetWorkingSet(gameID)
 	if err != nil {
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, workingSet)
@@ -52,7 +52,7 @@ func (s *Server) handleGameWorkingSetRoute(w http.ResponseWriter, r *http.Reques
 func (s *Server) handleGameEntitiesRoute(w http.ResponseWriter, r *http.Request, gameID string) {
 	entities, err := s.service.ListEntities(r.Context(), gameID)
 	if err != nil {
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, entities)
@@ -62,7 +62,7 @@ func (s *Server) handleGameEntitiesRoute(w http.ResponseWriter, r *http.Request,
 func (s *Server) handleGameRecapRoute(w http.ResponseWriter, r *http.Request, gameID string) {
 	recap, err := s.service.GetRecap(r.Context(), gameID)
 	if err != nil {
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, recap)
@@ -75,7 +75,7 @@ func (s *Server) handleGameFindingsRoute(w http.ResponseWriter, r *http.Request,
 	case http.MethodGet:
 		found, err := s.service.Findings(gameID)
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, found)
@@ -86,7 +86,7 @@ func (s *Server) handleGameFindingsRoute(w http.ResponseWriter, r *http.Request,
 			return
 		}
 		if err := s.service.AddressFinding(gameID, req.Turn, req.Rule); err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -100,7 +100,7 @@ func (s *Server) handleGameFindingsRoute(w http.ResponseWriter, r *http.Request,
 func (s *Server) handleGameGraphRoute(w http.ResponseWriter, r *http.Request, gameID string) {
 	graph, err := s.service.GetGraph(r.Context(), gameID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, graph)
@@ -110,7 +110,7 @@ func (s *Server) handleGameGraphRoute(w http.ResponseWriter, r *http.Request, ga
 func (s *Server) handleGameChronicleRoute(w http.ResponseWriter, r *http.Request, gameID string) {
 	chronicle, err := s.service.GetChronicle(r.Context(), gameID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, chronicle)
@@ -124,7 +124,7 @@ func (s *Server) handleGameUsageRoute(w http.ResponseWriter, r *http.Request, ga
 	}
 	dto, err := s.service.GameUsage(r.Context(), gameID)
 	if err != nil {
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, dto)
@@ -133,12 +133,12 @@ func (s *Server) handleGameUsageRoute(w http.ResponseWriter, r *http.Request, ga
 // handleGameRestartRoute answers POST /api/game/{id}/restart.
 func (s *Server) handleGameRestartRoute(w http.ResponseWriter, r *http.Request, gameID string) {
 	if r.Method != http.MethodPost {
-		http.NotFound(w, r)
+		methodNotAllowed(w, http.MethodPost)
 		return
 	}
 	game, err := s.service.RestartGame(r.Context(), gameID)
 	if err != nil {
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, game)
@@ -148,7 +148,7 @@ func (s *Server) handleGameRestartRoute(w http.ResponseWriter, r *http.Request, 
 // the client sent are written, so an absent field keeps its stored value.
 func (s *Server) handleGameSettingsRoute(w http.ResponseWriter, r *http.Request, gameID string) {
 	if r.Method != http.MethodPatch {
-		http.NotFound(w, r)
+		methodNotAllowed(w, http.MethodPatch)
 		return
 	}
 	var patch GameSettingsPatchDTO
@@ -166,7 +166,7 @@ func (s *Server) handleGameSettingsRoute(w http.ResponseWriter, r *http.Request,
 		values[engine.StartLocationSetting] = strings.TrimSpace(*patch.StartLocation)
 	}
 	if err := s.service.UpdateGameSettings(r.Context(), gameID, values); err != nil {
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -187,7 +187,7 @@ func (s *Server) handleGameAdvanceRoute(w http.ResponseWriter, r *http.Request, 
 	}
 	advancement, err := s.service.AdvanceUnlock(r.Context(), gameID, req.UnlockID)
 	if err != nil {
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, map[string]any{"advancement": advancement})

@@ -42,12 +42,12 @@ func (s *Server) handleGameTTSRoute(w http.ResponseWriter, r *http.Request, game
 	switch parts[2] {
 	case "uncached":
 		if r.Method != http.MethodGet {
-			http.NotFound(w, r)
+			methodNotAllowed(w, http.MethodGet)
 			return
 		}
 		cached, uncached, err := s.service.CountUncachedBeats(gameID)
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, map[string]int{"cached": cached, "uncached": uncached})
@@ -56,7 +56,7 @@ func (s *Server) handleGameTTSRoute(w http.ResponseWriter, r *http.Request, game
 		case http.MethodGet:
 			jobs, err := s.service.TTSBatchJobs(gameID)
 			if err != nil {
-				writeGameError(w, err)
+				s.writeAPIError(w, err)
 				return
 			}
 			writeJSON(w, jobs)
@@ -64,7 +64,7 @@ func (s *Server) handleGameTTSRoute(w http.ResponseWriter, r *http.Request, game
 			force := r.URL.Query().Get("force") == "1" || r.URL.Query().Get("force") == "true"
 			job, err := s.service.StartTTSBatch(r.Context(), gameID, force)
 			if err != nil {
-				writeGameError(w, err)
+				s.writeAPIError(w, err)
 				return
 			}
 			writeJSON(w, job)
