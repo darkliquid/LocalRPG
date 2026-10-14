@@ -121,9 +121,19 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 		return "", fmt.Errorf("web export needs the built player: run `mise run build:frontend`")
 	}
 
+	page, err := w.bundlePage(webPayloadFor(script, w.displayMode))
+	if err != nil {
+		return "", err
+	}
+	return writeBundleFile(outPath, page)
+}
+
+// webPayloadFor folds a script and its media into the document the player reads: the
+// campaign's own labels, its chapters, and every scene with every beat.
+func webPayloadFor(script *scene.Script, displayMode string) *webPayload {
 	payload := &webPayload{
 		GameName:    script.GameName,
-		DisplayMode: w.displayMode,
+		DisplayMode: displayMode,
 		Total:       script.TotalDuration.Seconds(),
 		Captions:    scene.Captions(script.Beats()),
 	}
@@ -143,55 +153,60 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 	payload.ChaptersVTT = scene.ChaptersVTT(script.Chapters, script.TotalDuration)
 
 	for i := range script.Scenes {
-		sc := script.Scenes[i]
-		entry := webScene{Location: sc.LocationName, Weather: sc.Weather}
+		payload.Scenes = append(payload.Scenes, webSceneFor(script.Scenes[i]))
+	}
+	return payload
+}
 
-		if uri, err := imageDataURI(sc.ArtPath); err == nil {
-			entry.Art = uri
-		}
-
-		for j := range sc.Beats {
-			beat := sc.Beats[j]
-
-			jsBeat := webBeat{
-				Kind:     string(beat.Kind),
-				Speaker:  beat.Speaker,
-				Text:     beat.Text,
-				Art:      entry.Art,
-				Duration: beat.Duration.Seconds(),
-				Reading:  scene.ReadingDuration(beat.Text).Seconds(),
-				Player:   beat.Player,
-				Outcome:  beat.Outcome,
-			}
-
-			// A beat's own illustration wins over the scene's backdrop. A missing
-			// asset keeps the backdrop rather than failing the bundle.
-			if beat.ArtPath != "" && beat.ArtPath != sc.ArtPath {
-				if uri, err := imageDataURI(beat.ArtPath); err == nil {
-					jsBeat.Art = uri
-				}
-			}
-
-			if uri, err := imageDataURI(beat.PortraitPath); err == nil {
-				jsBeat.Portrait = uri
-			}
-
-			for _, clip := range beat.AudioPaths {
-				if uri, err := dataURI(clip); err == nil {
-					jsBeat.Audio = append(jsBeat.Audio, uri)
-				}
-			}
-
-			entry.Beats = append(entry.Beats, jsBeat)
-		}
-
-		payload.Scenes = append(payload.Scenes, entry)
+// webSceneFor folds one scene into the player's shape, with its backdrop inlined and handed
+// to each of its beats as the picture they fall back to.
+func webSceneFor(sc scene.Scene) webScene {
+	entry := webScene{Location: sc.LocationName, Weather: sc.Weather}
+	if uri, err := imageDataURI(sc.ArtPath); err == nil {
+		entry.Art = uri
 	}
 
-	page, err := w.bundlePage(payload)
-	if err != nil {
-		return "", err
+	for _, beat := range sc.Beats {
+		entry.Beats = append(entry.Beats, webBeatFor(beat, entry.Art, sc.ArtPath))
 	}
+	return entry
+}
+
+// webBeatFor folds one beat into the player's shape, inlining its portrait and its clips.
+//
+// A beat's own illustration wins over the scene's backdrop, and a missing asset keeps the
+// backdrop rather than failing the bundle.
+func webBeatFor(beat scene.Beat, backdrop, sceneArtPath string) webBeat {
+	jsBeat := webBeat{
+		Kind:     string(beat.Kind),
+		Speaker:  beat.Speaker,
+		Text:     beat.Text,
+		Art:      backdrop,
+		Duration: beat.Duration.Seconds(),
+		Reading:  scene.ReadingDuration(beat.Text).Seconds(),
+		Player:   beat.Player,
+		Outcome:  beat.Outcome,
+	}
+
+	if beat.ArtPath != "" && beat.ArtPath != sceneArtPath {
+		if uri, err := imageDataURI(beat.ArtPath); err == nil {
+			jsBeat.Art = uri
+		}
+	}
+	if uri, err := imageDataURI(beat.PortraitPath); err == nil {
+		jsBeat.Portrait = uri
+	}
+	for _, clip := range beat.AudioPaths {
+		if uri, err := dataURI(clip); err == nil {
+			jsBeat.Audio = append(jsBeat.Audio, uri)
+		}
+	}
+	return jsBeat
+}
+
+// writeBundleFile writes the rendered page where it belongs, creating the directory when the
+// caller named one that does not exist yet.
+func writeBundleFile(outPath string, page []byte) (string, error) {
 	if dir := filepath.Dir(outPath); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return "", fmt.Errorf("create export dir: %w", err)
@@ -200,11 +215,9 @@ func (w *WebExporter) Export(ctx context.Context, script *scene.Script, outPath 
 	if err := os.WriteFile(outPath, page, 0644); err != nil {
 		return "", fmt.Errorf("write bundle: %w", err)
 	}
-
 	return outPath, nil
 }
 
-// bundlePage is the built player with its stylesheet, its script, and the story in one
 // compressed bundle, and a bootstrap that inflates it. A page opened from disk can fetch
 // nothing beside it — a module script and a stylesheet over file:// are both refused by
 // CORS — and the page's own code is a fixed third of a megabyte, so the whole bundle is
