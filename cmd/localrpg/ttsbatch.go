@@ -56,76 +56,127 @@ func runTTSBatchCommand(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if *showStatus {
-		jobs, err := store.ListTTSJobs(gameID)
-		if err != nil {
-			fmt.Fprintf(stderr, "Error listing jobs: %v\n", err)
-			return 1
-		}
-		printTTSJobs(stdout, jobs)
-		return 0
+		return showTTSBatchJobs(stdout, stderr, store, gameID)
 	}
 
-	client, err := media.NewTTSClientWithSharedKey(cfg.Media.TTS, cfg.Providers.Gemini.APIKey)
-	if err != nil {
-		fmt.Fprintf(stderr, "Error building TTS client: %v\n", err)
-		return 1
+	run, code := newTTSBatchRun(cfg, resolver, store, gameID, *force, stderr)
+	if run == nil {
+		return code
 	}
-	batchClient, ok := client.(media.BatchTTSClient)
-	if !ok {
-		fmt.Fprintln(stderr, "The configured TTS provider has no batch API; choose one that does.")
-		return 1
-	}
-
-	ctx := context.Background()
-	providerKey := ""
-	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
-		providerKey = string(key)
-	}
-	batchEngine := ttsbatch.New(batchClient, media.NewContentCache(resolver.CacheDir()), store)
-	batchEngine.SetOpusBitrate(cfg.OpusBitrate())
-	opts := ttsbatch.Options{GameID: gameID, Provider: providerKey, Model: cfg.Media.TTS.Model, Force: *force}
 
 	if *cancel != "" {
-		if err := batchClient.CancelBatch(ctx, media.BatchJobHandle{ID: *cancel}); err != nil {
-			fmt.Fprintf(stderr, "Error cancelling %s: %v\n", *cancel, err)
-			return 1
-		}
-		_ = store.UpdateTTSJobStatus(*cancel, "cancelled", 0, nil)
-		fmt.Fprintf(stdout, "Cancelled %s\n", *cancel)
-		return 0
+		return cancelTTSBatchJob(stdout, stderr, run, store, *cancel)
 	}
-
 	if *resume != "" {
-		job, err := batchEngine.Resume(ctx, opts, *resume)
-		if err != nil {
-			fmt.Fprintf(stderr, "Error finishing %s: %v\n", *resume, err)
-			return 1
-		}
-		fmt.Fprintf(stdout, "Job %s: %d rendered, %d failed.\n", job.ID, job.Completed, len(job.FailedKeys))
-		return 0
+		return resumeTTSBatchJob(stdout, stderr, run, *resume)
 	}
 
-	groups, err := planCampaignGroups(resolver, store, cfg, gameID, client)
+	groups, err := planCampaignGroups(resolver, store, cfg, gameID, run.client)
 	if err != nil {
 		fmt.Fprintf(stderr, "Error planning speech: %v\n", err)
 		return 1
 	}
 
 	if !*wait {
-		job, err := batchEngine.Submit(ctx, opts, groups)
-		if err != nil {
-			fmt.Fprintf(stderr, "Error submitting batch: %v\n", err)
-			return 1
-		}
-		if job == nil {
-			fmt.Fprintln(stdout, "Every clip is already cached; nothing to backfill.")
-			return 0
-		}
-		fmt.Fprintf(stdout, "Submitted job %s (%d requests). Finish it with --resume %s.\n", job.ID, job.RequestCount, job.ID)
-		return 0
+		return submitTTSBatch(stdout, stderr, run, groups)
+	}
+	return runTTSBatchToCompletion(stdout, stderr, run, groups)
+}
+
+// ttsBatchRun is a backfill's wiring: the provider, its batch API, the engine that
+// drives it, and the options every job it starts runs with.
+type ttsBatchRun struct {
+	client media.TTSClient
+	batch  media.BatchTTSClient
+	engine *ttsbatch.Engine
+	opts   ttsbatch.Options
+	ctx    context.Context
+}
+
+// newTTSBatchRun builds the batch client and the engine that drives it. It reports
+// the reason to stderr and returns a non-zero code when the configured provider
+// cannot run a backfill.
+func newTTSBatchRun(cfg *config.Config, resolver *core.PathResolver, store *storage.Store, gameID string, force bool, stderr io.Writer) (*ttsBatchRun, int) {
+	client, err := media.NewTTSClientWithSharedKey(cfg.Media.TTS, cfg.Providers.Gemini.APIKey)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error building TTS client: %v\n", err)
+		return nil, 1
+	}
+	batchClient, ok := client.(media.BatchTTSClient)
+	if !ok {
+		fmt.Fprintln(stderr, "The configured TTS provider has no batch API; choose one that does.")
+		return nil, 1
 	}
 
-	job, err := batchEngine.Run(ctx, opts, groups)
+	providerKey := ""
+	if key, ok := media.TTSKeyFor(cfg.Media.TTS); ok {
+		providerKey = string(key)
+	}
+
+	engine := ttsbatch.New(batchClient, media.NewContentCache(resolver.CacheDir()), store)
+	engine.SetOpusBitrate(cfg.OpusBitrate())
+
+	return &ttsBatchRun{
+		client: client,
+		batch:  batchClient,
+		engine: engine,
+		ctx:    context.Background(),
+		opts:   ttsbatch.Options{GameID: gameID, Provider: providerKey, Model: cfg.Media.TTS.Model, Force: force},
+	}, 0
+}
+
+// showTTSBatchJobs lists the campaign's batch jobs.
+func showTTSBatchJobs(stdout, stderr io.Writer, store *storage.Store, gameID string) int {
+	jobs, err := store.ListTTSJobs(gameID)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error listing jobs: %v\n", err)
+		return 1
+	}
+	printTTSJobs(stdout, jobs)
+	return 0
+}
+
+// cancelTTSBatchJob cancels a submitted job at the provider and records it locally.
+func cancelTTSBatchJob(stdout, stderr io.Writer, run *ttsBatchRun, store *storage.Store, id string) int {
+	if err := run.batch.CancelBatch(run.ctx, media.BatchJobHandle{ID: id}); err != nil {
+		fmt.Fprintf(stderr, "Error cancelling %s: %v\n", id, err)
+		return 1
+	}
+	_ = store.UpdateTTSJobStatus(id, "cancelled", 0, nil)
+	fmt.Fprintf(stdout, "Cancelled %s\n", id)
+	return 0
+}
+
+// resumeTTSBatchJob finishes a job that was submitted earlier.
+func resumeTTSBatchJob(stdout, stderr io.Writer, run *ttsBatchRun, id string) int {
+	job, err := run.engine.Resume(run.ctx, run.opts, id)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error finishing %s: %v\n", id, err)
+		return 1
+	}
+	reportTTSBatchJob(stdout, job)
+	return 0
+}
+
+// submitTTSBatch hands the planned groups to the provider and reports the job to
+// finish later.
+func submitTTSBatch(stdout, stderr io.Writer, run *ttsBatchRun, groups []media.ClipGroup) int {
+	job, err := run.engine.Submit(run.ctx, run.opts, groups)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error submitting batch: %v\n", err)
+		return 1
+	}
+	if job == nil {
+		fmt.Fprintln(stdout, "Every clip is already cached; nothing to backfill.")
+		return 0
+	}
+	fmt.Fprintf(stdout, "Submitted job %s (%d requests). Finish it with --resume %s.\n", job.ID, job.RequestCount, job.ID)
+	return 0
+}
+
+// runTTSBatchToCompletion runs the backfill now, which is what --wait asks for.
+func runTTSBatchToCompletion(stdout, stderr io.Writer, run *ttsBatchRun, groups []media.ClipGroup) int {
+	job, err := run.engine.Run(run.ctx, run.opts, groups)
 	if err != nil {
 		fmt.Fprintf(stderr, "Error running batch: %v\n", err)
 		return 1
@@ -134,8 +185,13 @@ func runTTSBatchCommand(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Every clip is already cached; nothing to backfill.")
 		return 0
 	}
-	fmt.Fprintf(stdout, "Job %s: %d rendered, %d failed.\n", job.ID, job.Completed, len(job.FailedKeys))
+	reportTTSBatchJob(stdout, job)
 	return 0
+}
+
+// reportTTSBatchJob prints how a finished job ended.
+func reportTTSBatchJob(stdout io.Writer, job *storage.TTSJob) {
+	fmt.Fprintf(stdout, "Job %s: %d rendered, %d failed.\n", job.ID, job.Completed, len(job.FailedKeys))
 }
 
 // planCampaignGroups plans every uncached group the campaign's turns need, using
