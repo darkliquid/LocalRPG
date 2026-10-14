@@ -92,28 +92,28 @@ func main() {
 **Files:**
 - Modify: `pkg/content/unpack.go`, `pkg/content/provenance.go`, `pkg/content/pack.go`
 
-- [ ] **Step 1: Record the count for the package**
+- [x] **Step 1: Record the count for the package**
 
 Run the measurement, filter for `pkg/content`. Expected: five, from 230 lines down to 87.
 
-- [ ] **Step 2: `Unpack` (230) becomes its phases**
+- [x] **Step 2: `Unpack` (230) becomes its phases**
 
 `prepareDestination` (validate and create the parent), `openPackageArchive` (gzip in, tar out), `readManifestMember` (the first member, its size caps, parse, and the ID, type and file checks), `declaredFiles` (the safe-path and duplicate index), `extractMembers` (the loop, with `readSignatureMember` and `writeVerifiedMember` for the two things inside it), `missingDeclaredFiles`, and the rename. The signature bytes and the extracted set travel in a small struct rather than as five return values, and the containment check stays inlined in `writeVerifiedMember`.
 
-- [ ] **Step 3: `SignPackageFile` (149) becomes its phases**
+- [x] **Step 3: `SignPackageFile` (149) becomes its phases**
 
 Building the signature block, writing it into the archive, and the read-back verification are three phases.
 
-- [ ] **Step 4: `BuildManifest` (128), `ReadPackageManifestAndSig` (112), `Pack` (87)**
+- [x] **Step 4: `BuildManifest` (128), `ReadPackageManifestAndSig` (112), `Pack` (87)**
 
 Same treatment, smaller.
 
-- [ ] **Step 5: Test**
+- [x] **Step 5: Test**
 
 Run: `go test ./pkg/content/ ./pkg/gui/`
 Expected: pass unchanged, including `unpack_test.go`, `provenance_test.go`, `determinism_test.go` and the content import tests in `pkg/gui`.
 
-- [ ] **Step 6: Re-measure and verify**
+- [x] **Step 6: Re-measure and verify**
 
 Run: `go vet ./... && mise run test && mise run lint`
 Expected: pass, and `pkg/content` no longer appears in the measurement.
@@ -156,10 +156,10 @@ The command bodies are phases by construction: parse, build what the command nee
 
 ### Task 10: the gate
 
-- [ ] **Step 1: Make the measurement a check**
+- [x] **Step 1: Make the measurement a check**
 
 A test that fails when a function crosses eighty lines, run with the suite, so the list cannot grow back. The same instinct as the `interface{}` rule and the docs guards.
 
-- [ ] **Step 2: Record why any function is exempt**
+- [x] **Step 2: Record why any function is exempt**
 
 If an entry turns out to read well over the line, its reason goes in the check's table rather than in silence.
