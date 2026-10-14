@@ -648,6 +648,12 @@ type TurnRecordView struct {
 	Narration string
 }
 
+// rankedTurn is a recalled turn and the weight it is ranked by.
+type rankedTurn struct {
+	record TurnRecordView
+	score  float64
+}
+
 // relevantHistory retrieves turns that share entities with the ones in play. It
 // does only what scene recall cannot: it finds the turn where a promise was made or
 // a secret was told, wherever it happened and however long ago.
@@ -661,43 +667,10 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) (string, []Ref) {
 		return "", nil
 	}
 
-	limit := c.limits.RetrievalTurns
-	if limit <= 0 {
-		limit = defaultRetrievalTurns
-	}
-	charLimit := c.limits.RetrievalChars
-	if charLimit <= 0 {
-		charLimit = defaultRecallChars
-	}
-	halfLife := c.limits.RetrievalHalflife
-	if halfLife <= 0 {
-		halfLife = defaultRetrievalHalflife
-	}
+	limit, charLimit, halfLife := c.retrievalLimits()
 
-	numbers := make([]int, 0, len(window))
-	for _, turn := range window {
-		numbers = append(numbers, turn.Number)
-	}
-
-	mentioned, err := c.store.EntitiesInTurns(numbers)
-	if err != nil {
-		return "", nil
-	}
-
-	// Only characters are queried: the location is scene recall's job, and arcs are
-	// always in the prompt already.
-	query := make([]string, 0, len(mentioned))
-	for _, id := range mentioned {
-		if id == req.PlayerID || id == req.LocationID {
-			continue
-		}
-		ent, err := c.store.GetEntity(id)
-		if err != nil || ent == nil || ent.Type != "character" {
-			continue
-		}
-		query = append(query, id)
-	}
-	if len(query) == 0 {
+	query, err := c.retrievalQuery(req, turnNumbers(window))
+	if err != nil || len(query) == 0 {
 		return "", nil
 	}
 
@@ -712,6 +685,68 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) (string, []Ref) {
 		return "", nil
 	}
 
+	excluded := c.excludedTurns(req, window)
+	ranked := rankAndTrim(c.rankTurns(candidates, excluded, query, before, halfLife), limit)
+	return retrievalSection(ranked, charLimit)
+}
+
+// retrievalLimits is how much retrieval may return, how much of each turn it may quote,
+// and how fast a recalled turn's weight decays with age. Each is defaulted when the
+// configuration asks for nothing.
+func (c *ContextAssembler) retrievalLimits() (limit, charLimit, halfLife int) {
+	limit = c.limits.RetrievalTurns
+	if limit <= 0 {
+		limit = defaultRetrievalTurns
+	}
+	charLimit = c.limits.RetrievalChars
+	if charLimit <= 0 {
+		charLimit = defaultRecallChars
+	}
+	halfLife = c.limits.RetrievalHalflife
+	if halfLife <= 0 {
+		halfLife = defaultRetrievalHalflife
+	}
+	return limit, charLimit, halfLife
+}
+
+// turnNumbers is the numbers of a window of turns, which is what the store is queried
+// by.
+func turnNumbers(window []RecentTurn) []int {
+	numbers := make([]int, 0, len(window))
+	for _, turn := range window {
+		numbers = append(numbers, turn.Number)
+	}
+	return numbers
+}
+
+// retrievalQuery is the entities whose turns are worth recalling: the characters the
+// window mentions, minus the player and the location.
+//
+// Only characters are queried, because the location is scene recall's job and arcs are
+// always in the prompt already.
+func (c *ContextAssembler) retrievalQuery(req ContextRequest, numbers []int) ([]string, error) {
+	mentioned, err := c.store.EntitiesInTurns(numbers)
+	if err != nil {
+		return nil, err
+	}
+
+	query := make([]string, 0, len(mentioned))
+	for _, id := range mentioned {
+		if id == req.PlayerID || id == req.LocationID {
+			continue
+		}
+		ent, err := c.store.GetEntity(id)
+		if err != nil || ent == nil || ent.Type != "character" {
+			continue
+		}
+		query = append(query, id)
+	}
+	return query, nil
+}
+
+// excludedTurns is what retrieval must not return: the window it is working from, and
+// everything scene recall has already put in the prompt.
+func (c *ContextAssembler) excludedTurns(req ContextRequest, window []RecentTurn) map[int]bool {
 	excluded := make(map[int]bool, len(window))
 	for _, turn := range window {
 		excluded[turn.Number] = true
@@ -719,21 +754,23 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) (string, []Ref) {
 	for _, turn := range c.recalledTurns(req) {
 		excluded[turn.Number] = true
 	}
+	return excluded
+}
 
-	type scored struct {
-		record TurnRecordView
-		score  float64
-	}
-	ranked := make([]scored, 0, len(candidates))
+// rankTurns scores each candidate turn by how many of the query entities it names,
+// decayed by how long ago it happened, and keeps only those that name any of them.
+//
+// Overlap is per candidate: how many of the query entities this turn names, counted once
+// each. One entity can hold several mention rows, because the table's key includes the
+// kind, and counting rows would weight an entity who is both wikilinked and extracted
+// twice.
+func (c *ContextAssembler) rankTurns(candidates []storage.TurnRecord, excluded map[int]bool, query []string, before, halfLife int) []rankedTurn {
+	ranked := make([]rankedTurn, 0, len(candidates))
 	for _, candidate := range candidates {
 		if excluded[candidate.Number] {
 			continue
 		}
 
-		// Overlap is per candidate: how many of the query entities this turn names,
-		// counted once each. One entity can hold several mention rows, because the
-		// table's key includes the kind, and counting rows would weight an entity who
-		// is both wikilinked and extracted twice.
 		mentions, err := c.store.ListEntitiesForTurn(candidate.Number)
 		if err != nil {
 			continue
@@ -757,11 +794,17 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) (string, []Ref) {
 			age = 0
 		}
 		weight := math.Pow(0.5, float64(age)/float64(halfLife))
-		ranked = append(ranked, scored{
+		ranked = append(ranked, rankedTurn{
 			record: TurnRecordView{Number: candidate.Number, Narration: candidate.Narration},
 			score:  float64(overlap) * weight,
 		})
 	}
+	return ranked
+}
+
+// rankAndTrim puts the best-scoring recalls first, the most recent first among equals,
+// and keeps no more than the limit.
+func rankAndTrim(ranked []rankedTurn, limit int) []rankedTurn {
 	sort.SliceStable(ranked, func(i, j int) bool {
 		if ranked[i].score == ranked[j].score {
 			return ranked[i].record.Number > ranked[j].record.Number
@@ -771,7 +814,13 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) (string, []Ref) {
 	if len(ranked) > limit {
 		ranked = ranked[:limit]
 	}
+	return ranked
+}
 
+// retrievalSection renders the recalled turns as the prompt's own section, with the refs
+// a trace attributes them by. A turn whose narration truncates to nothing is dropped,
+// because a heading with no prose under it is noise.
+func retrievalSection(ranked []rankedTurn, charLimit int) (string, []Ref) {
 	lines := make([]string, 0, len(ranked))
 	var refs []Ref
 	for _, entry := range ranked {
@@ -794,21 +843,83 @@ func (c *ContextAssembler) relevantHistory(req ContextRequest) (string, []Ref) {
 	return sb.String(), dedupeRefs(refs)
 }
 
+// renderedSections is what a set of sections amounts to: the whole prompt, the stable
+// prefix of it with the part that may be cached behind it, and each section's cost.
+type renderedSections struct {
+	prompt  string
+	prefix  string
+	delta   string
+	stats   []SectionStat
+	reports []SectionReport
+}
+
 // fitToBudget drops optional sections in rank order until the prompt fits, then
 // records every section's cost so a trace can explain the result.
 func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) AssembleResult {
-	trimmed := make([]string, 0)
 	budget := c.limits.TokenBudget
+	trimmed := c.trimToBudget(req, sections, budget)
+	rendered := renderSections(sections)
 
-	total := func() int {
-		sum := 0
-		for _, candidate := range sections {
-			sum += estimateTokens(candidate.text)
-		}
-		return sum
+	prefixHash := PrefixHash(rendered.prefix)
+	result := AssembleResult{
+		Prompt:          rendered.prompt,
+		PrefixPrompt:    rendered.prefix,
+		DeltaPrompt:     rendered.delta,
+		EstimatedTokens: estimateTokens(rendered.prompt),
+		Trimmed:         trimmed,
+		Sections:        rendered.stats,
+		Context: TurnContext{
+			TurnNumber:      req.TurnNumber,
+			Mode:            req.Mode,
+			Budget:          c.limits.TokenBudget,
+			EstimatedTokens: estimateTokens(rendered.prompt),
+			Sections:        rendered.reports,
+			Refs:            dedupeRefs(collectRefs(sections)),
+			WorkingSet:      req.WorkingSet,
+			Threads:         req.Threads,
+			SummaryVersion:  req.SummaryVersion,
+			PromptHash:      hashPrompt(rendered.prompt),
+			PrefixHash:      prefixHash,
+			Strategy:        StrategyFullPrompt,
+		},
 	}
 
-	for budget > 0 && total() > budget {
+	// The prompt is recorded here and nowhere else. Everything downstream refers
+	// to it by hash, so the trace holds one copy rather than one per call site.
+	c.logger = trace.OrNil(c.logger)
+	c.logger.Event("context.assembled", map[string]any{
+		"estimated_tokens": result.EstimatedTokens,
+		"budget":           budget,
+		"trimmed":          trimmed,
+		"recall_turns":     len(c.windowTurns(req)),
+		"sections":         rendered.stats,
+		"prompt":           result.Prompt,
+	})
+
+	return result
+}
+
+// sectionsTokens is what a set of sections costs, which is what the budget is compared
+// against.
+func sectionsTokens(sections []section) int {
+	sum := 0
+	for _, candidate := range sections {
+		sum += estimateTokens(candidate.text)
+	}
+	return sum
+}
+
+// trimToBudget drops droppable sections in rank order until the prompt fits the budget,
+// shortening the recall window when there is nothing left that may be dropped whole. It
+// reports what was dropped, in the order it went.
+//
+// Rank runs from least to most valuable, so rank one goes first and the search starts
+// from the top after each drop: dropping a later rank can only help once the earlier one
+// is gone.
+func (c *ContextAssembler) trimToBudget(req ContextRequest, sections []section, budget int) []string {
+	trimmed := make([]string, 0)
+
+	for budget > 0 && sectionsTokens(sections) > budget {
 		dropped := false
 		for _, rank := range []int{1, 2, 3, 4, 5, 6} {
 			for index := range sections {
@@ -834,11 +945,19 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 		trimmed = append(trimmed, "shorter excerpts of recent turns")
 	}
 
-	var prompt strings.Builder
-	var prefixPrompt strings.Builder
-	var deltaPrompt strings.Builder
-	stats := make([]SectionStat, 0, len(sections))
-	reports := make([]SectionReport, 0, len(sections))
+	return trimmed
+}
+
+// renderSections walks the sections in order, writing the ones that survived into the
+// prompt and recording what each cost. A section that never changes between turns is
+// part of the prefix, which is what the rest of the prompt is cached behind.
+func renderSections(sections []section) renderedSections {
+	var prompt, prefixPrompt, deltaPrompt strings.Builder
+	rendered := renderedSections{
+		stats:   make([]SectionStat, 0, len(sections)),
+		reports: make([]SectionReport, 0, len(sections)),
+	}
+
 	for _, candidate := range sections {
 		included := candidate.text != ""
 		tokens := estimateTokens(candidate.text)
@@ -850,12 +969,12 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 				deltaPrompt.WriteString(candidate.text)
 			}
 		}
-		stats = append(stats, SectionStat{
+		rendered.stats = append(rendered.stats, SectionStat{
 			Name:     candidate.name,
 			Tokens:   tokens,
 			Included: included,
 		})
-		reports = append(reports, SectionReport{
+		rendered.reports = append(rendered.reports, SectionReport{
 			Name:     candidate.name,
 			Tokens:   tokens,
 			Included: included,
@@ -864,45 +983,10 @@ func (c *ContextAssembler) fitToBudget(req ContextRequest, sections []section) A
 		})
 	}
 
-	promptStr := prompt.String()
-	prefixStr := prefixPrompt.String()
-	prefixHash := PrefixHash(prefixStr)
-	result := AssembleResult{
-		Prompt:          promptStr,
-		PrefixPrompt:    prefixStr,
-		DeltaPrompt:     deltaPrompt.String(),
-		EstimatedTokens: estimateTokens(promptStr),
-		Trimmed:         trimmed,
-		Sections:        stats,
-		Context: TurnContext{
-			TurnNumber:      req.TurnNumber,
-			Mode:            req.Mode,
-			Budget:          c.limits.TokenBudget,
-			EstimatedTokens: estimateTokens(promptStr),
-			Sections:        reports,
-			Refs:            dedupeRefs(collectRefs(sections)),
-			WorkingSet:      req.WorkingSet,
-			Threads:         req.Threads,
-			SummaryVersion:  req.SummaryVersion,
-			PromptHash:      hashPrompt(promptStr),
-			PrefixHash:      prefixHash,
-			Strategy:        StrategyFullPrompt,
-		},
-	}
-
-	// The prompt is recorded here and nowhere else. Everything downstream refers
-	// to it by hash, so the trace holds one copy rather than one per call site.
-	c.logger = trace.OrNil(c.logger)
-	c.logger.Event("context.assembled", map[string]any{
-		"estimated_tokens": result.EstimatedTokens,
-		"budget":           budget,
-		"trimmed":          trimmed,
-		"recall_turns":     len(c.windowTurns(req)),
-		"sections":         stats,
-		"prompt":           result.Prompt,
-	})
-
-	return result
+	rendered.prompt = prompt.String()
+	rendered.prefix = prefixPrompt.String()
+	rendered.delta = deltaPrompt.String()
+	return rendered
 }
 
 func collectRefs(sections []section) []Ref {
