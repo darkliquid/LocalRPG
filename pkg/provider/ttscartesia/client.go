@@ -159,53 +159,101 @@ func parseCartesiaError(body []byte, statusCode int) error {
 	return fmt.Errorf("cartesia: unexpected status %d: %s", statusCode, strings.TrimSpace(string(body)))
 }
 
+// cartesiaOptions is the generation settings one synthesis runs with, resolved from the
+// voice profile: which voice, how fast and how loud it speaks, the emotion to read it in,
+// and its language.
+type cartesiaOptions struct {
+	voiceID  string
+	speed    float64
+	volume   float64
+	emotion  string
+	language string
+}
+
 // Synthesize generates linear PCM WAV audio bytes for the given text.
 func (c *CartesiaTTSClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
-	voiceID := cartesiaDefaultVoiceID
-	speed := 1.0
-	volume := 1.0
-	emotion := "neutral"
-	language := "en"
-
-	if voice != nil {
-		if strings.TrimSpace(voice.VoiceID) != "" {
-			voiceID = strings.TrimSpace(voice.VoiceID)
-		}
-		if voice.SpeechRate > 0 {
-			speed = voice.SpeechRate
-			if speed < 0.6 {
-				speed = 0.6
-			}
-			if speed > 1.5 {
-				speed = 1.5
-			}
-		}
-		if voice.Options != nil {
-			if v, ok := voice.Options["volume"]; ok {
-				if f, ok := toFloat(v); ok {
-					volume = f
-					if volume < 0.5 {
-						volume = 0.5
-					}
-					if volume > 2.0 {
-						volume = 2.0
-					}
-				}
-			}
-			if e, ok := voice.Options["emotion"].(string); ok && strings.TrimSpace(e) != "" {
-				emotion = strings.TrimSpace(e)
-			}
-			if l, ok := voice.Options["language"].(string); ok && strings.TrimSpace(l) != "" {
-				language = strings.TrimSpace(l)
-			}
-		}
+	payload, err := json.Marshal(cartesiaRequestBody(text, c.model, resolveCartesiaOptions(voice)))
+	if err != nil {
+		return nil, fmt.Errorf("cartesia: encode request: %w", err)
 	}
 
-	reqBody := map[string]any{
-		"model_id":   c.model,
+	resp, err := c.cartesiaPost(ctx, strings.TrimRight(c.baseURL, "/")+"/tts/bytes", payload)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("cartesia: read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseCartesiaError(bodyBytes, resp.StatusCode)
+	}
+
+	c.setLastUsage(text)
+	return bodyBytes, nil
+}
+
+// resolveCartesiaOptions reads the speech settings a voice profile asks for. Every one of
+// them is bounded here rather than by the caller: the provider accepts a range, and a
+// profile outside it would otherwise be a request that fails for a reason the voice table
+// cannot see.
+func resolveCartesiaOptions(voice *entity.VoiceConfig) cartesiaOptions {
+	opts := cartesiaOptions{
+		voiceID:  cartesiaDefaultVoiceID,
+		speed:    1.0,
+		volume:   1.0,
+		emotion:  "neutral",
+		language: "en",
+	}
+	if voice == nil {
+		return opts
+	}
+
+	if strings.TrimSpace(voice.VoiceID) != "" {
+		opts.voiceID = strings.TrimSpace(voice.VoiceID)
+	}
+	if voice.SpeechRate > 0 {
+		opts.speed = voice.SpeechRate
+		if opts.speed < 0.6 {
+			opts.speed = 0.6
+		}
+		if opts.speed > 1.5 {
+			opts.speed = 1.5
+		}
+	}
+	if voice.Options != nil {
+		if v, ok := voice.Options["volume"]; ok {
+			if f, ok := toFloat(v); ok {
+				opts.volume = f
+				if opts.volume < 0.5 {
+					opts.volume = 0.5
+				}
+				if opts.volume > 2.0 {
+					opts.volume = 2.0
+				}
+			}
+		}
+		if e, ok := voice.Options["emotion"].(string); ok && strings.TrimSpace(e) != "" {
+			opts.emotion = strings.TrimSpace(e)
+		}
+		if l, ok := voice.Options["language"].(string); ok && strings.TrimSpace(l) != "" {
+			opts.language = strings.TrimSpace(l)
+		}
+	}
+	return opts
+}
+
+// cartesiaRequestBody is the body the synthesis endpoint is sent. The output format is
+// fixed: what this application stores is linear PCM in a WAV container at 44.1kHz.
+func cartesiaRequestBody(text, model string, opts cartesiaOptions) map[string]any {
+	return map[string]any{
+		"model_id":   model,
 		"transcript": text,
 		"voice": map[string]any{
-			"id": voiceID,
+			"id": opts.voiceID,
 		},
 		"output_format": map[string]any{
 			"container":   "wav",
@@ -213,20 +261,18 @@ func (c *CartesiaTTSClient) Synthesize(ctx context.Context, text string, voice *
 			"sample_rate": 44100,
 		},
 		"generation_config": map[string]any{
-			"speed":   speed,
-			"volume":  volume,
-			"emotion": emotion,
+			"speed":   opts.speed,
+			"volume":  opts.volume,
+			"emotion": opts.emotion,
 		},
-		"language": language,
+		"language": opts.language,
 	}
+}
 
-	payload, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("cartesia: encode request: %w", err)
-	}
-
-	endpoint := strings.TrimRight(c.baseURL, "/") + "/tts/bytes"
-
+// cartesiaPost sends the request, waiting out a rate limit the provider asked for rather
+// than failing a turn over one. A 429 with no attempts left comes back as it arrived, so
+// the caller reports the provider's own error.
+func (c *CartesiaTTSClient) cartesiaPost(ctx context.Context, endpoint string, payload []byte) (*http.Response, error) {
 	var resp *http.Response
 	maxAttempts := 3
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -255,19 +301,7 @@ func (c *CartesiaTTSClient) Synthesize(ctx context.Context, text string, voice *
 		}
 		break
 	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("cartesia: read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseCartesiaError(bodyBytes, resp.StatusCode)
-	}
-
-	c.setLastUsage(text)
-	return bodyBytes, nil
+	return resp, nil
 }
 
 type cartesiaVoiceEntry struct {
@@ -291,99 +325,116 @@ type cartesiaVoiceListResponse struct {
 	NextPage string               `json:"next_page"`
 }
 
+// cartesiaProviderVoice is one catalogue entry as this application describes a voice: a
+// gender, a language, and the accent tags a search matches on.
+func cartesiaProviderVoice(item cartesiaVoiceEntry) media.ProviderVoice {
+	gender := normaliseGender(item.Gender)
+	desc := strings.TrimSpace(item.Tagline)
+	if item.Description != "" {
+		if desc != "" {
+			desc = desc + ": " + strings.TrimSpace(item.Description)
+		} else {
+			desc = strings.TrimSpace(item.Description)
+		}
+	}
+
+	lang := strings.TrimSpace(item.Language)
+	var tags []string
+	if gender != "" {
+		tags = append(tags, gender)
+	}
+	if len(item.Accents) > 0 {
+		if lang == "" && item.Accents[0].Locale != "" {
+			lang = item.Accents[0].Locale
+		}
+		for _, acc := range item.Accents {
+			if acc.Accent != "" {
+				tags = append(tags, strings.ToLower(acc.Accent))
+			}
+			if acc.Locale != "" {
+				tags = append(tags, strings.ToLower(acc.Locale))
+			}
+		}
+	}
+
+	return media.ProviderVoice{
+		ID:          item.ID,
+		Name:        item.Name,
+		Language:    lang,
+		Gender:      gender,
+		Description: desc,
+		PreviewURL:  item.PreviewFileURL,
+		Tags:        tags,
+	}
+}
+
 // ListVoices enumerates available voices from Cartesia's catalog.
 func (c *CartesiaTTSClient) ListVoices(ctx context.Context) ([]media.ProviderVoice, error) {
 	var voices []media.ProviderVoice
 	cursor := ""
 
 	for {
-		u, err := url.Parse(strings.TrimRight(c.baseURL, "/") + "/voices")
+		page, err := c.cartesiaVoicePage(ctx, cursor)
 		if err != nil {
-			return nil, fmt.Errorf("cartesia: parse url: %w", err)
-		}
-		q := u.Query()
-		q.Set("limit", "100")
-		q.Add("expand[]", "preview_file_url")
-		if cursor != "" {
-			q.Set("starting_after", cursor)
-		}
-		u.RawQuery = q.Encode()
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-		if err != nil {
-			return nil, fmt.Errorf("cartesia: create voices request: %w", err)
-		}
-		req.Header.Set("Cartesia-Version", cartesiaAPIVersion)
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-
-		resp, err := c.client.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("cartesia: voices request failed: %w", err)
+			return nil, err
 		}
 
-		bodyBytes, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return nil, fmt.Errorf("cartesia: read voices response: %w", err)
+		for _, item := range page.Data {
+			voices = append(voices, cartesiaProviderVoice(item))
 		}
 
-		if resp.StatusCode != http.StatusOK {
-			return nil, parseCartesiaError(bodyBytes, resp.StatusCode)
-		}
-
-		var listResp cartesiaVoiceListResponse
-		if err := json.Unmarshal(bodyBytes, &listResp); err != nil {
-			return nil, fmt.Errorf("cartesia: unmarshal voices response: %w", err)
-		}
-
-		for _, item := range listResp.Data {
-			gender := normaliseGender(item.Gender)
-			desc := strings.TrimSpace(item.Tagline)
-			if item.Description != "" {
-				if desc != "" {
-					desc = desc + ": " + strings.TrimSpace(item.Description)
-				} else {
-					desc = strings.TrimSpace(item.Description)
-				}
-			}
-
-			lang := strings.TrimSpace(item.Language)
-			var tags []string
-			if gender != "" {
-				tags = append(tags, gender)
-			}
-			if len(item.Accents) > 0 {
-				if lang == "" && item.Accents[0].Locale != "" {
-					lang = item.Accents[0].Locale
-				}
-				for _, acc := range item.Accents {
-					if acc.Accent != "" {
-						tags = append(tags, strings.ToLower(acc.Accent))
-					}
-					if acc.Locale != "" {
-						tags = append(tags, strings.ToLower(acc.Locale))
-					}
-				}
-			}
-
-			voices = append(voices, media.ProviderVoice{
-				ID:          item.ID,
-				Name:        item.Name,
-				Language:    lang,
-				Gender:      gender,
-				Description: desc,
-				PreviewURL:  item.PreviewFileURL,
-				Tags:        tags,
-			})
-		}
-
-		if !listResp.HasMore || listResp.NextPage == "" {
+		if !page.HasMore || page.NextPage == "" {
 			break
 		}
-		cursor = listResp.NextPage
+		cursor = page.NextPage
 	}
 
 	return voices, nil
+}
+
+// cartesiaVoicePage fetches one page of the voice catalogue, starting after cursor, which
+// is empty for the first page. The catalogue is paginated by the provider, so the caller
+// keeps asking until the page it gets says there is no more.
+func (c *CartesiaTTSClient) cartesiaVoicePage(ctx context.Context, cursor string) (*cartesiaVoiceListResponse, error) {
+	u, err := url.Parse(strings.TrimRight(c.baseURL, "/") + "/voices")
+	if err != nil {
+		return nil, fmt.Errorf("cartesia: parse url: %w", err)
+	}
+	q := u.Query()
+	q.Set("limit", "100")
+	q.Add("expand[]", "preview_file_url")
+	if cursor != "" {
+		q.Set("starting_after", cursor)
+	}
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("cartesia: create voices request: %w", err)
+	}
+	req.Header.Set("Cartesia-Version", cartesiaAPIVersion)
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("cartesia: voices request failed: %w", err)
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("cartesia: read voices response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseCartesiaError(bodyBytes, resp.StatusCode)
+	}
+
+	var listResp cartesiaVoiceListResponse
+	if err := json.Unmarshal(bodyBytes, &listResp); err != nil {
+		return nil, fmt.Errorf("cartesia: unmarshal voices response: %w", err)
+	}
+	return &listResp, nil
 }
 
 func normaliseGender(raw string) string {
