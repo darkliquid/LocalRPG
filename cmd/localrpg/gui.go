@@ -4,10 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -25,11 +27,11 @@ type guiConfig struct {
 	Headless   bool
 }
 
-func parseGUIConfig(args []string) (*guiConfig, error) {
+func parseGUIConfig(args []string, stderr io.Writer) (*guiConfig, error) {
 	fs := flag.NewFlagSet("gui", flag.ContinueOnError)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: localrpg gui [flags]")
-		fmt.Fprintln(os.Stderr, "Launch desktop GUI or browser app")
+		fmt.Fprintln(stderr, "Usage: localrpg gui [flags]")
+		fmt.Fprintln(stderr, "Launch desktop GUI or browser app")
 		fs.PrintDefaults()
 	}
 	port := fs.Int("port", 0, "Explicit TCP port to bind (opt-in web server)")
@@ -52,13 +54,20 @@ func parseGUIConfig(args []string) (*guiConfig, error) {
 }
 
 func handleGUICommand(args []string) {
-	cfg, err := parseGUIConfig(args)
+	code := runGUICommand(args, os.Stdout, os.Stderr)
+	if code != 0 {
+		os.Exit(code)
+	}
+}
+
+func runGUICommand(args []string, stdout, stderr io.Writer) int {
+	cfg, err := parseGUIConfig(args, stderr)
 	if err != nil {
 		if err == flag.ErrHelp {
-			return
+			return 0
 		}
-		fmt.Fprintf(os.Stderr, "Flag error: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Flag error: %v\n", err)
+		return 1
 	}
 
 	svc := gui.NewService(cfg.Dir)
@@ -70,9 +79,9 @@ func handleGUICommand(args []string) {
 		Version: Version,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error starting telemetry: %v\n", err)
+		fmt.Fprintf(stderr, "Error starting telemetry: %v\n", err)
 		svc.Close()
-		os.Exit(1)
+		return 1
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -84,17 +93,17 @@ func handleGUICommand(args []string) {
 	// collect it now in the background rather than making the user restart it.
 	svc.ResumePendingBatches(context.Background())
 
-	// os.Exit skips defers, so every exit path past this point drains the
-	// service's background work (narration warm-up, enrichment, retro-summary)
-	// before leaving.
-	shutdown := func(code int) {
+	// Every exit path past this point drains the service's background work
+	// (narration warm-up, enrichment, retro-summary) before leaving, which the
+	// deferred call below does now that the command returns a code instead of
+	// reaching the process directly.
+	defer func() {
 		svc.Close()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		_ = telemetryProvider.Shutdown(shutdownCtx)
 		cancel()
 		_ = storage.CloseGameStores()
-		os.Exit(code)
-	}
+	}()
 
 	// The resolver owns where caches live, so the sink follows it rather than
 	// duplicating the relative-path resolution the service already did. The
@@ -107,12 +116,12 @@ func handleGUICommand(args []string) {
 	// 1. Explicit TCP Web Mode
 	if cfg.WebMode {
 		addr := fmt.Sprintf("127.0.0.1:%d", cfg.Port)
-		fmt.Printf("Starting LocalRPG Web GUI on http://%s\n", addr)
+		fmt.Fprintf(stdout, "Starting LocalRPG Web GUI on http://%s\n", addr)
 		if err := http.ListenAndServe(addr, handler); err != nil {
-			fmt.Fprintf(os.Stderr, "Server failed: %v\n", err)
-			shutdown(1)
+			fmt.Fprintf(stderr, "Server failed: %v\n", err)
+			return 1
 		}
-		return
+		return 0
 	}
 
 	// 2. Explicit or Headless Unix Domain Socket Mode
@@ -125,8 +134,8 @@ func handleGUICommand(args []string) {
 
 		listener, err := gui.ListenUnix(sockPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Socket error: %v\n", err)
-			shutdown(1)
+			fmt.Fprintf(stderr, "Socket error: %v\n", err)
+			return 1
 		}
 		defer listener.Close()
 		defer os.Remove(sockPath)
@@ -134,23 +143,26 @@ func handleGUICommand(args []string) {
 		// Handle graceful shutdown signals
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		// The signal closes the listener, which is what unblocks Serve below. The
+		// flag tells that apart from a server failure, so a clean Ctrl-C is not
+		// reported as one; the deferred drain runs when this command returns.
+		var shuttingDown atomic.Bool
 		go func() {
 			<-sigChan
-			fmt.Println("\nShutting down LocalRPG GUI socket daemon...")
+			fmt.Fprintln(stdout, "\nShutting down LocalRPG GUI socket daemon...")
+			shuttingDown.Store(true)
 			_ = listener.Close()
 			_ = os.Remove(sockPath)
-			shutdown(0)
 		}()
-
-		fmt.Printf("LocalRPG GUI daemon listening on Unix domain socket: %s (0 TCP ports)\n", sockPath)
+		fmt.Fprintf(stdout, "LocalRPG GUI daemon listening on Unix domain socket: %s (0 TCP ports)\n", sockPath)
 		if !hasDisplay && !cfg.Headless {
-			fmt.Println("Note: No desktop display detected ($DISPLAY / $WAYLAND_DISPLAY unset).")
+			fmt.Fprintln(stdout, "Note: No desktop display detected ($DISPLAY / $WAYLAND_DISPLAY unset).")
 		}
-		if err := http.Serve(listener, handler); err != nil && err != http.ErrServerClosed {
-			fmt.Fprintf(os.Stderr, "Daemon failed: %v\n", err)
-			shutdown(1)
+		if err := http.Serve(listener, handler); err != nil && err != http.ErrServerClosed && !shuttingDown.Load() {
+			fmt.Fprintf(stderr, "Daemon failed: %v\n", err)
+			return 1
 		}
-		return
+		return 0
 	}
 
 	// 3. Default: Native Wails v3 Desktop Window (Zero-TCP)
@@ -246,9 +258,10 @@ func handleGUICommand(args []string) {
 	})
 
 	if err := app.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Wails application failed: %v\n", err)
-		shutdown(1)
+		fmt.Fprintf(stderr, "Wails application failed: %v\n", err)
+		return 1
 	}
+	return 0
 }
 
 // localRPGApplicationMenu is the native menu macOS shows in the global menu bar.

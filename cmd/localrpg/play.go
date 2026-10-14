@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,21 +26,32 @@ import (
 )
 
 func handlePlayCommand(args []string) {
+	code := runPlayCommand(args, os.Stdout, os.Stderr)
+	if code != 0 {
+		os.Exit(code)
+	}
+}
+
+func runPlayCommand(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Usage: localrpg play <game-id>")
-		os.Exit(1)
+		fmt.Fprintln(stderr, "Usage: localrpg play <game-id>")
+		return 1
 	}
 
 	cfgMgr := config.NewConfigManager()
-	cfg, _ := cfgMgr.Load()
+	cfg, err := cfgMgr.Load()
+	if err != nil {
+		fmt.Fprintf(stderr, "Error loading config: %v\n", err)
+		return 1
+	}
 
 	telemetryProvider, err := telemetry.New(context.Background(), cfg.Telemetry, telemetry.BuildInfo{
 		Version:    Version,
 		ConfigFile: cfgMgr.ActiveFilePath(),
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error starting telemetry: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error starting telemetry: %v\n", err)
+		return 1
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -55,21 +67,21 @@ func handlePlayCommand(args []string) {
 	manifestPath := filepath.Join(gameDir, "game.yaml")
 	manifest, err := core.LoadGameManifest(manifestPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading game manifest %q: %v\n", manifestPath, err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error loading game manifest %q: %v\n", manifestPath, err)
+		return 1
 	}
 
 	store, err := storage.OpenGameStore(resolver, gameID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening game database: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error opening game database: %v\n", err)
+		return 1
 	}
 
 	// Reindex from Markdown so the session reflects any edits made outside the TUI
 	syncer := storage.NewSyncer(store)
 	if _, err := syncer.Sync(filepath.Join(gameDir, "entities")); err != nil {
-		fmt.Fprintf(os.Stderr, "Error syncing entities: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error syncing entities: %v\n", err)
+		return 1
 	}
 
 	historyPath := filepath.Join(gameDir, "history.jsonl")
@@ -88,23 +100,23 @@ func handlePlayCommand(args []string) {
 		timeline.SetEmbeddingWorker(worker)
 	}
 	if err := timeline.EnsureIndexed(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error indexing turns: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error indexing turns: %v\n", err)
+		return 1
 	}
 
 	// A campaign written before player_name existed holds a display name in
 	// player:, which is repaired once here so the turn pipeline uses the real ID.
 	playerID := manifest.Player
 	if resolved, err := engine.RepairPlayerIdentity(resolver, store, manifest); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not reconcile player identity: %v\n", err)
+		fmt.Fprintf(stderr, "Warning: could not reconcile player identity: %v\n", err)
 	} else if resolved != "" {
 		playerID = resolved
 	}
 
 	startLocation, err := engine.ResolveStartLocation(resolver, store, manifest)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error resolving start location: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error resolving start location: %v\n", err)
+		return 1
 	}
 
 	bridge := rules.NewHostBridge(store, timeline, playerID)
@@ -119,8 +131,8 @@ func handlePlayCommand(args []string) {
 
 	router, err := harness.RouterFromConfigWithLogger(cfg, logger)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error building model router: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error building model router: %v\n", err)
+		return 1
 	}
 	router.SetChainPrice(pricing.RouterChainPrice(cfg, router))
 
@@ -172,7 +184,7 @@ func handlePlayCommand(args []string) {
 		if turns, err := history.LoadHistory(); err == nil && len(turns) == 0 {
 			orchestrator.SetSceneOnly(true)
 			if scene, err := orchestrator.ProcessAction(context.Background(), engine.OpeningMode, ""); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: could not establish the opening scene: %v\n", err)
+				fmt.Fprintf(stderr, "Warning: could not establish the opening scene: %v\n", err)
 			} else if scene != nil {
 				app.Seed([]engine.Turn{*scene})
 			}
@@ -182,7 +194,8 @@ func handlePlayCommand(args []string) {
 	p := tea.NewProgram(app, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error running TUI: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(stderr, "Error running TUI: %v\n", err)
+		return 1
 	}
+	return 0
 }

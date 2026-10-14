@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -16,25 +17,25 @@ import (
 
 // runTestSystem loads a system and its scenarios, runs them, and prints any
 // failures. It returns the process exit code: non-zero on any failure.
-func runTestSystem(cfg debugConfig) int {
+func runTestSystem(cfg debugConfig, stdout, stderr io.Writer) int {
 	sys, scenarios, err := loadSystemForTest(cfg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "test-system: %v\n", err)
+		fmt.Fprintf(stderr, "test-system: %v\n", err)
 		return 1
 	}
 	if len(scenarios) == 0 {
-		fmt.Printf("no scenarios for %s\n", sys.ID)
+		fmt.Fprintf(stdout, "no scenarios for %s\n", sys.ID)
 		return 0
 	}
 	failures := systemtest.RunAll(sys, scenarios)
 	if len(failures) == 0 {
-		fmt.Printf("%s: %d scenario(s) passed\n", sys.ID, len(scenarios))
+		fmt.Fprintf(stdout, "%s: %d scenario(s) passed\n", sys.ID, len(scenarios))
 		return 0
 	}
 	for _, f := range failures {
-		fmt.Printf("FAIL %s step %d: %s\n", f.Scenario, f.Step, f.Detail)
+		fmt.Fprintf(stdout, "FAIL %s step %d: %s\n", f.Scenario, f.Step, f.Detail)
 	}
-	fmt.Printf("%s: %d failure(s)\n", sys.ID, len(failures))
+	fmt.Fprintf(stdout, "%s: %d failure(s)\n", sys.ID, len(failures))
 	return 1
 }
 

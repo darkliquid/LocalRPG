@@ -2,6 +2,7 @@
 package main
 
 import (
+	"io"
 	"os/exec"
 	"strings"
 	"testing"
@@ -49,7 +50,7 @@ func TestParseGUIConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := parseGUIConfig(tt.args)
+			cfg, err := parseGUIConfig(tt.args, io.Discard)
 			if err != nil {
 				t.Fatalf("parseGUIConfig failed: %v", err)
 			}
