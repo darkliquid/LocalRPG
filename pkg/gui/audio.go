@@ -4,6 +4,7 @@ package gui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -93,6 +94,11 @@ func (s *Service) liveGrouping(cfg *config.Config) bool {
 
 // ErrAudioUnavailable is the scene package's sentinel, kept as an alias here so// the route and its tests read unchanged and there is only one value to compare.
 var ErrAudioUnavailable = scene.ErrAudioUnavailable
+
+// ErrNoBatchAPI means the configured TTS provider has no batch endpoint, so a
+// backfill cannot be submitted to it. It is ours to answer, and the message says
+// what to change.
+var ErrNoBatchAPI = errors.New("the configured TTS provider has no batch API")
 
 func (s *Service) addPortraitListener(gameID string, listener func(TurnEvent)) func() {
 	s.portraitMu.Lock()
@@ -815,7 +821,7 @@ func (s *Service) CancelTTSBatch(ctx context.Context, gameID, jobID string) erro
 	}
 	batchClient, ok := client.(media.BatchTTSClient)
 	if !ok {
-		return fmt.Errorf("the configured TTS provider has no batch API")
+		return ErrNoBatchAPI
 	}
 	if err := batchClient.CancelBatch(ctx, media.BatchJobHandle{ID: jobID}); err != nil {
 		return err
@@ -892,7 +898,7 @@ func (s *Service) ResumeTTSBatch(ctx context.Context, gameID, jobID string) (*TT
 	}
 	batchClient, ok := client.(media.BatchTTSClient)
 	if !ok {
-		return nil, fmt.Errorf("the configured TTS provider has no batch API")
+		return nil, ErrNoBatchAPI
 	}
 	store, err := s.store(gameID)
 	if err != nil {
@@ -939,7 +945,7 @@ func (s *Service) StartTTSBatch(ctx context.Context, gameID string, force bool) 
 	}
 	batchClient, ok := client.(media.BatchTTSClient)
 	if !ok {
-		return nil, fmt.Errorf("the configured TTS provider has no batch API")
+		return nil, ErrNoBatchAPI
 	}
 	store, err := s.store(gameID)
 	if err != nil {

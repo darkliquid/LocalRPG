@@ -17,7 +17,7 @@ func (s *Server) handleGameAssetRoute(w http.ResponseWriter, r *http.Request, ga
 	if r.Method == http.MethodGet {
 		filePath, contentType, err := s.service.GetGameAsset(gameID, action)
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.Header().Set("Content-Type", contentType)
@@ -38,7 +38,7 @@ func (s *Server) handleGameAssetRoute(w http.ResponseWriter, r *http.Request, ga
 		ext := filepath.Ext(header.Filename)
 		url, err := s.service.SaveGameAsset(gameID, action, data, ext)
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, map[string]string{"url": url})
@@ -46,7 +46,7 @@ func (s *Server) handleGameAssetRoute(w http.ResponseWriter, r *http.Request, ga
 	} else if r.Method == http.MethodDelete {
 		// Clearing the campaign's own artwork is how the world's is restored.
 		if err := s.service.DeleteGameAsset(gameID, action); err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -71,7 +71,7 @@ func (s *Server) handleGameGenerateAssetRoute(w http.ResponseWriter, r *http.Req
 		if writeGenerationFailure(w, err) {
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, map[string]string{"url": url})

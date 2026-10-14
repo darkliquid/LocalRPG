@@ -79,7 +79,7 @@ func (s *Server) handleGameTurnRoute(w http.ResponseWriter, r *http.Request, gam
 		}
 		data, contentType, err := s.service.GetTurnSceneImage(r.Context(), gameID, turnNumber)
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.Header().Set("Content-Type", contentType)
@@ -96,7 +96,7 @@ func (s *Server) handleGameTurnRoute(w http.ResponseWriter, r *http.Request, gam
 			return
 		}
 		if err := s.service.GenerateTurnSceneImage(r.Context(), gameID, turnNumber); err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusAccepted)
@@ -115,7 +115,7 @@ func (s *Server) handleGameTurnRoute(w http.ResponseWriter, r *http.Request, gam
 			if writeGenerationFailure(w, err) {
 				return
 			}
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -137,7 +137,7 @@ func (s *Server) handleGameTurnRoute(w http.ResponseWriter, r *http.Request, gam
 			if writeGenerationFailure(w, err) {
 				return
 			}
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -166,7 +166,7 @@ func (s *Server) handleGameTurnRoute(w http.ResponseWriter, r *http.Request, gam
 	case errors.Is(err, ErrAudioUnavailable):
 		w.WriteHeader(http.StatusNoContent)
 	case err != nil:
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 	default:
 		writeJSON(w, map[string]any{"audio_urls": clipURLs(clips)})
 	}

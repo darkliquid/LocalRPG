@@ -134,41 +134,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handler.ServeHTTP(w, r)
 }
 
-// writeGameError maps a campaign-lifecycle failure to a status. A turn in flight
-// is a conflict, a missing campaign is a 404, and anything else is a server
-// fault, which keeps the client from retrying a request that cannot succeed.
-func writeGameError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, ErrTurnInFlight):
-		w.Header().Set("Retry-After", "1")
-		http.Error(w, err.Error(), http.StatusConflict)
-	case errors.Is(err, ErrAdvancementRefused):
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	case errors.Is(err, ErrInvalidFolderPath):
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	case errors.Is(err, ErrDuplicateEntityID):
-		http.Error(w, err.Error(), http.StatusConflict)
-	case errors.Is(err, fs.ErrNotExist), errors.Is(err, os.ErrNotExist):
-		http.Error(w, err.Error(), http.StatusNotFound)
-	default:
-		var limited *harness.ErrRateLimitedUntil
-		if errors.As(err, &limited) {
-			seconds := int(limited.RetryAfter().Seconds()) + 1
-			w.Header().Set("Retry-After", strconv.Itoa(seconds))
-			writeJSONError(w, http.StatusTooManyRequests, limited.Error())
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
 // writeSaveError answers a failed save. A frontmatter failure carries the line and
 // column it happened on, so the editor can highlight it rather than showing a bare
 // status; anything else falls back to the shared error mapping.
-func writeSaveError(w http.ResponseWriter, err error, document string) {
+func (s *Server) writeSaveError(w http.ResponseWriter, err error, document string) {
 	var fe *entity.FrontmatterError
 	if !errors.As(err, &fe) {
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSONStatus(w, http.StatusUnprocessableEntity, map[string]any{
@@ -189,14 +161,14 @@ func (s *Server) handleSchemaRoutes(w http.ResponseWriter, r *http.Request) {
 	case "/api/schema/entity-frontmatter":
 		schema, err := s.service.GetEntityFrontmatterSchema(r.Context())
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, schema)
 	case "/api/schema/entity-types":
 		catalog, err := s.service.GetEntityTypeCatalog(r.Context())
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, catalog)
@@ -213,7 +185,7 @@ func (s *Server) handleFolderRoutes(w http.ResponseWriter, r *http.Request, enti
 	case http.MethodGet:
 		tree, err := s.service.ListFolders(entitiesDir)
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, tree)
@@ -225,7 +197,7 @@ func (s *Server) handleFolderRoutes(w http.ResponseWriter, r *http.Request, enti
 			return
 		}
 		if err := s.service.CreateFolder(entitiesDir, body.Path); err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, map[string]string{"path": strings.TrimSpace(body.Path)})
@@ -237,7 +209,7 @@ func (s *Server) handleFolderRoutes(w http.ResponseWriter, r *http.Request, enti
 			return
 		}
 		if err := s.service.MoveFolder(entitiesDir, body.From, body.Path); err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, map[string]string{"path": strings.TrimSpace(body.Path)})
@@ -245,7 +217,7 @@ func (s *Server) handleFolderRoutes(w http.ResponseWriter, r *http.Request, enti
 	case http.MethodDelete:
 		recursive := r.URL.Query().Get("recursive") == "true"
 		if err := s.service.DeleteFolder(entitiesDir, r.URL.Query().Get("path"), recursive); err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -264,7 +236,7 @@ func (s *Server) handleUsageRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	dto, err := s.service.GlobalUsage(r.Context())
 	if err != nil {
-		writeGameError(w, err)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, dto)
@@ -294,10 +266,10 @@ func (s *Server) handleOpenURLRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.service.OpenURL(req.URL); err != nil {
 		if errors.Is(err, errNoURLOpener) {
-			http.Error(w, err.Error(), http.StatusNotImplemented)
+			s.writeAPIError(w, err)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		s.writeAPIError(w, invalid(err))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -310,7 +282,7 @@ func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && (r.URL.Path == "/api/tts/batch" || r.URL.Path == "/api/tts/batch/"):
 		jobs, err := s.service.AllTTSBatchJobs(r.Context())
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, jobs)
@@ -321,7 +293,7 @@ func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := s.service.CancelTTSBatch(r.Context(), req.GameID, req.JobID); err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -332,7 +304,7 @@ func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := s.service.DeleteTTSBatch(r.Context(), req.GameID, req.JobID); err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -344,7 +316,7 @@ func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
 		}
 		removed, err := s.service.ClearTTSBatch(r.Context(), req.GameID)
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, map[string]int{"removed": removed})
@@ -356,7 +328,7 @@ func (s *Server) handleTTSBatchRoute(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.service.ResumeTTSBatch(r.Context(), req.GameID, req.JobID)
 		if err != nil {
-			writeGameError(w, err)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, job)
@@ -407,7 +379,7 @@ func (s *Server) handleGamesRoutes(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		games, err := s.service.ListGames(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, games)
@@ -419,7 +391,7 @@ func (s *Server) handleGamesRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		game, err := s.service.CreateGame(r.Context(), req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		writeJSONStatus(w, http.StatusCreated, game)
@@ -433,7 +405,7 @@ func (s *Server) handleSystemsRoutes(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		systems, err := s.service.ListSystems(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, systems)
@@ -445,7 +417,7 @@ func (s *Server) handleSystemsRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		sys, err := s.service.SaveSystem(r.Context(), req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		writeJSONStatus(w, http.StatusCreated, sys)
@@ -461,7 +433,7 @@ func (s *Server) handleReferenceSystemsRoute(w http.ResponseWriter, r *http.Requ
 	}
 	res, err := s.service.ListReferenceSystems(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, res)
@@ -479,7 +451,7 @@ func (s *Server) handleSystemTestRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := s.service.TestSystem(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		s.writeAPIError(w, invalid(err))
 		return
 	}
 	writeJSON(w, resp)
@@ -495,7 +467,7 @@ func (s *Server) handleSystemTestsRoute(w http.ResponseWriter, r *http.Request) 
 	case http.MethodGet:
 		resp, err := s.service.SystemScenarios(r.Context(), id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, resp)
@@ -507,12 +479,12 @@ func (s *Server) handleSystemTestsRoute(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		if err := s.service.SaveSystemScenario(r.Context(), id, scenario); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		resp, err := s.service.SystemScenarios(r.Context(), id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSONStatus(w, http.StatusCreated, resp)
@@ -520,10 +492,10 @@ func (s *Server) handleSystemTestsRoute(w http.ResponseWriter, r *http.Request) 
 	case http.MethodDelete:
 		if err := s.service.DeleteSystemScenario(r.Context(), id, r.URL.Query().Get("name")); err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
-				http.Error(w, err.Error(), http.StatusNotFound)
+				s.writeAPIError(w, err)
 				return
 			}
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -568,7 +540,7 @@ func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		sys, err := s.service.GetSystem(r.Context(), id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, sys)
@@ -581,7 +553,7 @@ func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {
 		req.ID = id
 		sys, err := s.service.SaveSystem(r.Context(), req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		writeJSON(w, sys)
@@ -589,15 +561,15 @@ func (s *Server) handleSystemRoutes(w http.ResponseWriter, r *http.Request) {
 		force := r.URL.Query().Get("force") == "true"
 		err := s.service.DeleteSystem(r.Context(), id, force)
 		if errors.Is(err, ErrSystemNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			s.writeAPIError(w, err)
 			return
 		}
 		if errors.Is(err, ErrSystemInUse) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			s.writeAPIError(w, err)
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -611,7 +583,7 @@ func (s *Server) handleWorldsRoutes(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		worlds, err := s.service.ListWorlds(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, worlds)
@@ -627,7 +599,7 @@ func (s *Server) handleWorldsRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		writeJSONStatus(w, http.StatusCreated, world)
@@ -661,7 +633,7 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 		case http.MethodGet:
 			ent, err := s.service.GetWorldEntity(r.Context(), worldID, entityID)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusNotFound)
+				s.writeAPIError(w, err)
 				return
 			}
 			writeJSON(w, ent)
@@ -680,13 +652,13 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 				content = obj.Markdown
 			}
 			if err := s.service.SaveWorldEntity(r.Context(), worldID, entityID, obj.Folder, content); err != nil {
-				writeGameError(w, err)
+				s.writeAPIError(w, err)
 				return
 			}
 			w.WriteHeader(http.StatusOK)
 		case http.MethodDelete:
 			if err := s.service.DeleteWorldEntity(r.Context(), worldID, entityID); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				s.writeAPIError(w, err)
 				return
 			}
 			w.WriteHeader(http.StatusOK)
@@ -725,7 +697,7 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			filePath, contentType, err := s.service.GetWorldAsset(worldID, action)
 			if err != nil {
-				writeGameError(w, err)
+				s.writeAPIError(w, err)
 				return
 			}
 			w.Header().Set("Content-Type", contentType)
@@ -746,7 +718,7 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 			ext := filepath.Ext(header.Filename)
 			url, err := s.service.SaveWorldAsset(worldID, action, data, ext)
 			if err != nil {
-				writeGameError(w, err)
+				s.writeAPIError(w, err)
 				return
 			}
 			writeJSON(w, map[string]string{"url": url})
@@ -771,7 +743,7 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 			if writeGenerationFailure(w, err) {
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, map[string]string{"url": url})
@@ -783,7 +755,7 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		world, err := s.service.GetWorld(r.Context(), worldID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, world)
@@ -796,11 +768,11 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 		req.ID = worldID
 		world, err := s.service.UpdateWorld(r.Context(), req)
 		if errors.Is(err, ErrWorldNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			s.writeAPIError(w, err)
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		writeJSON(w, world)
@@ -808,15 +780,15 @@ func (s *Server) handleWorldRoutes(w http.ResponseWriter, r *http.Request) {
 		force := r.URL.Query().Get("force") == "true"
 		err := s.service.DeleteWorld(r.Context(), worldID, force)
 		if errors.Is(err, ErrWorldNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			s.writeAPIError(w, err)
 			return
 		}
 		if errors.Is(err, ErrWorldInUse) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			s.writeAPIError(w, err)
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -830,7 +802,7 @@ func (s *Server) handleSettingsRoutes(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		settings, err := s.service.GetSettings(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, settings)
@@ -845,7 +817,7 @@ func (s *Server) handleSettingsRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		res, err := s.service.SaveSettings(r.Context(), req.Config)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		writeJSON(w, res)
@@ -869,7 +841,7 @@ func (s *Server) handleTestProviderRoute(w http.ResponseWriter, r *http.Request)
 
 	res, err := s.service.TestProvider(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, res)
@@ -891,7 +863,7 @@ func (s *Server) handleOfflinePresetRoute(w http.ResponseWriter, r *http.Request
 
 	res, err := s.service.ApplyOfflinePreset(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, res)
@@ -905,7 +877,7 @@ func (s *Server) handleOfflineReportRoute(w http.ResponseWriter, r *http.Request
 
 	res, err := s.service.CheckOffline(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, res)
@@ -921,7 +893,7 @@ func (s *Server) handleStylesRoute(w http.ResponseWriter, r *http.Request) {
 
 	res, err := s.service.ListStylePacks(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, res)
@@ -941,7 +913,7 @@ func (s *Server) handleTTSInspectRoute(w http.ResponseWriter, r *http.Request) {
 
 	res, err := s.service.InspectTTS(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, res)
@@ -961,7 +933,7 @@ func (s *Server) handleMediaInspectRoute(w http.ResponseWriter, r *http.Request)
 
 	res, err := s.service.InspectMedia(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, res)
@@ -974,7 +946,7 @@ func (s *Server) handleProviderCatalogRoute(w http.ResponseWriter, r *http.Reque
 	}
 	res, err := s.service.ListProviders(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, res)
@@ -994,7 +966,7 @@ func (s *Server) handleModelCatalogueRoute(w http.ResponseWriter, r *http.Reques
 
 	res, err := s.service.ListModels(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, res)
@@ -1014,7 +986,7 @@ func (s *Server) handleVoiceSearchRoute(w http.ResponseWriter, r *http.Request) 
 
 	res, err := s.service.SearchTTSVoices(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, res)
@@ -1069,7 +1041,7 @@ func (s *Server) handleSTTRoute(w http.ResponseWriter, r *http.Request) {
 		if writeGenerationFailure(w, err) {
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		s.writeAPIError(w, invalid(err))
 		return
 	}
 
@@ -1084,7 +1056,7 @@ func (s *Server) handleAudioRoutes(w http.ResponseWriter, r *http.Request) {
 	switch action {
 	case "status":
 		if r.Method != http.MethodGet {
-			http.NotFound(w, r)
+			methodNotAllowed(w, http.MethodGet)
 			return
 		}
 		writeJSON(w, AudioStatusDTO{
@@ -1115,7 +1087,7 @@ func (s *Server) handleAudioRoutes(w http.ResponseWriter, r *http.Request) {
 
 	case "stop":
 		if r.Method != http.MethodPost {
-			http.NotFound(w, r)
+			methodNotAllowed(w, http.MethodPost)
 			return
 		}
 		s.service.StopAudio()
@@ -1123,7 +1095,7 @@ func (s *Server) handleAudioRoutes(w http.ResponseWriter, r *http.Request) {
 
 	case "events":
 		if r.Method != http.MethodGet {
-			http.NotFound(w, r)
+			methodNotAllowed(w, http.MethodGet)
 			return
 		}
 		s.serveAudioEvents(w, r)
@@ -1182,7 +1154,7 @@ func (s *Server) serveClip(w http.ResponseWriter, r *http.Request, key string) {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 
@@ -1202,14 +1174,14 @@ func (s *Server) handleTraceRoute(w http.ResponseWriter, r *http.Request) {
 		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 		events, err := s.service.TraceEvents(limit, r.URL.Query().Get("game"))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, events)
 
 	case http.MethodDelete:
 		if err := s.service.ClearTrace(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -1246,10 +1218,10 @@ func (s *Server) handleTurnSubmit(w http.ResponseWriter, r *http.Request, gameID
 	switch {
 	case errors.Is(err, ErrTurnInFlight):
 		w.Header().Set("Retry-After", "1")
-		http.Error(w, err.Error(), http.StatusConflict)
+		s.writeAPIError(w, err)
 		return
 	case errors.Is(err, fs.ErrNotExist):
-		http.Error(w, err.Error(), http.StatusNotFound)
+		s.writeAPIError(w, err)
 		return
 	case err != nil:
 		var limited *harness.ErrRateLimitedUntil
@@ -1259,7 +1231,7 @@ func (s *Server) handleTurnSubmit(w http.ResponseWriter, r *http.Request, gameID
 			writeJSONError(w, http.StatusTooManyRequests, limited.Error())
 			return
 		}
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		s.writeAPIError(w, err)
 		return
 	}
 	defer session.Close()
@@ -1309,16 +1281,16 @@ func (s *Server) handleResolveCheck(w http.ResponseWriter, r *http.Request, game
 	switch {
 	case errors.Is(err, ErrTurnInFlight):
 		w.Header().Set("Retry-After", "1")
-		http.Error(w, err.Error(), http.StatusConflict)
+		s.writeAPIError(w, err)
 		return
 	case errors.Is(err, fs.ErrNotExist):
-		http.Error(w, err.Error(), http.StatusNotFound)
+		s.writeAPIError(w, err)
 		return
 	case errors.Is(err, ErrNoPendingCheck), errors.Is(err, ErrPendingCheckMismatch):
 		writeInvalidRequest(w, err.Error())
 		return
 	case err != nil:
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		s.writeAPIError(w, err)
 		return
 	}
 	defer session.Close()
@@ -1373,16 +1345,16 @@ func (s *Server) handleRenegotiate(w http.ResponseWriter, r *http.Request, gameI
 	result, err := s.service.Renegotiate(r.Context(), gameID, turnNumber, req)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
-		http.Error(w, err.Error(), http.StatusNotFound)
+		s.writeAPIError(w, err)
 		return
 	case errors.Is(err, ErrCheckResolved), errors.Is(err, ErrNegotiationLimit):
-		http.Error(w, err.Error(), http.StatusConflict)
+		s.writeAPIError(w, err)
 		return
 	case errors.Is(err, ErrNoPendingCheck), errors.Is(err, ErrPendingCheckMismatch), errors.Is(err, ErrInvalidCounter):
 		writeInvalidRequest(w, err.Error())
 		return
 	case err != nil:
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, result)
@@ -1432,10 +1404,10 @@ func (s *Server) handleModelsRoutes(w http.ResponseWriter, r *http.Request) {
 		modelID := parts[0]
 		if err := s.service.DownloadModel(context.WithoutCancel(r.Context()), modelID); err != nil {
 			if errors.Is(err, models.ErrDownloadActive) {
-				http.Error(w, err.Error(), http.StatusConflict)
+				s.writeAPIError(w, err)
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSONStatus(w, http.StatusAccepted, map[string]string{"status": "downloading"})
@@ -1493,13 +1465,13 @@ func (s *Server) handleExportRoutes(w http.ResponseWriter, r *http.Request) {
 		job, err := s.service.StartExport(r.Context(), req)
 		switch {
 		case errors.Is(err, ErrExportInFlight):
-			http.Error(w, err.Error(), http.StatusConflict)
+			s.writeAPIError(w, err)
 			return
 		case errors.Is(err, ErrExportFormat), errors.Is(err, ErrExportDirRequired):
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		case err != nil:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSONStatus(w, http.StatusAccepted, job)
@@ -1537,7 +1509,7 @@ func (s *Server) handleGenerateAssetPreview(w http.ResponseWriter, r *http.Reque
 		if writeGenerationFailure(w, err) {
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", contentType)
@@ -1566,7 +1538,7 @@ func (s *Server) handleDocsRoutes(w http.ResponseWriter, r *http.Request) {
 	if path == "" {
 		docs, err := s.service.GetDocsList(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		writeJSON(w, docs)
@@ -1579,7 +1551,7 @@ func (s *Server) handleDocsRoutes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "document not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	writeJSON(w, article)
@@ -1603,11 +1575,7 @@ func (s *Server) handleContentExportRoute(w http.ResponseWriter, r *http.Request
 	var buf bytes.Buffer
 	m, err := s.service.ExportContent(r.Context(), req.Type, req.ID, &buf)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 
@@ -1712,10 +1680,10 @@ func (s *Server) handleContentImportRoute(w http.ResponseWriter, r *http.Request
 	})
 	if err != nil {
 		if errors.Is(err, ErrContentConflict) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			s.writeAPIError(w, err)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		s.writeAPIError(w, invalid(err))
 		return
 	}
 

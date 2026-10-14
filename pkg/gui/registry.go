@@ -48,7 +48,7 @@ func (s *Service) ExportContent(ctx context.Context, typ, id string, w io.Writer
 	}
 
 	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
-		return content.Manifest{}, fmt.Errorf("content %s %q not found", typ, id)
+		return content.Manifest{}, fmt.Errorf("%w: content %s %q", ErrContentNotFound, typ, id)
 	}
 
 	return content.Pack(dir, typ, content.ManifestMeta{}, w)
@@ -56,6 +56,9 @@ func (s *Service) ExportContent(ctx context.Context, typ, id string, w io.Writer
 
 // ErrContentConflict reports an attempt to import content that already exists under refuse mode.
 var ErrContentConflict = errors.New("content already exists")
+
+// ErrContentNotFound reports content that is not in the registry.
+var ErrContentNotFound = errors.New("content not found")
 
 // ImportContent unpacks a package archive from r into a staging directory, validates its
 // structure, resolves conflicts according to onConflict ("refuse", "rename", "overwrite"),
@@ -351,7 +354,7 @@ func (s *Service) HandleRegistrySearch(w http.ResponseWriter, r *http.Request) {
 	client := s.registryClient()
 	results, err := client.Search(r.Context(), q)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	if results == nil {
@@ -395,10 +398,10 @@ func (s *Service) HandleRegistryInstall(w http.ResponseWriter, r *http.Request) 
 	m, err := client.Install(r.Context(), req.Ref, req.OnConflict)
 	if err != nil {
 		if errors.Is(err, ErrContentConflict) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			s.writeAPIError(w, err)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		s.writeAPIError(w, invalid(err))
 		return
 	}
 
@@ -424,7 +427,7 @@ func (s *Service) HandleRegistryUpdates(w http.ResponseWriter, r *http.Request) 
 	client := s.registryClient()
 	updates, err := client.Update(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.writeAPIError(w, err)
 		return
 	}
 	if updates == nil {
@@ -507,7 +510,7 @@ func (s *Service) HandleRegistrySources(w http.ResponseWriter, r *http.Request) 
 	case http.MethodGet:
 		sources, err := s.RegistrySources(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.writeAPIError(w, err)
 			return
 		}
 		if sources == nil {
@@ -525,11 +528,11 @@ func (s *Service) HandleRegistrySources(w http.ResponseWriter, r *http.Request) 
 		}
 		source, err := s.AddRegistrySource(r.Context(), req.URL)
 		if errors.Is(err, ErrRegistrySourceExists) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			s.writeAPIError(w, err)
 			return
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		writeJSONStatus(w, http.StatusCreated, source)
@@ -537,10 +540,10 @@ func (s *Service) HandleRegistrySources(w http.ResponseWriter, r *http.Request) 
 	case http.MethodDelete:
 		if err := s.RemoveRegistrySource(r.Context(), r.URL.Query().Get("url")); err != nil {
 			if errors.Is(err, ErrRegistrySourceNotFound) {
-				http.Error(w, err.Error(), http.StatusNotFound)
+				s.writeAPIError(w, err)
 				return
 			}
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			s.writeAPIError(w, invalid(err))
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
