@@ -1,6 +1,3 @@
-// Package ingest turns a folder of text or a set of URLs into a draft world.
-// Folder ingestion is entirely local; URL ingestion is a bounded, polite network
-// action the user opts into. Neither commits anything.
 package ingest
 
 import (

@@ -1,6 +1,3 @@
-// Package scene owns the shape of an exported campaign: the beats to play, how
-// long each lasts, and which art and audio belong to it. Every renderer reads
-// this model rather than deriving its own.
 package scene
 
 import (
