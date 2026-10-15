@@ -1,3 +1,4 @@
+import { useFailures } from '../context/FailuresContext';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlaybackEntry, TurnSegment } from '../types';
 import { clipKeyFromURL, segmentClipURLs, segmentIsGroupLeader } from '../lib/audio';
@@ -32,6 +33,7 @@ interface SegmentPlaybackOptions {
 // that is rejected is reported as `blocked` rather than swallowed: the caller can
 // then offer a Play control, and that click is the gesture that starts playback.
 export const useSegmentPlayback = (segments: TurnSegment[] | undefined, options: SegmentPlaybackOptions) => {
+  const { report } = useFailures();
   const { autoPlay, volume = 1, skipKeys, ledger, gameId, turnNumber } = options;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prefetchRef = useRef<HTMLAudioElement | null>(null);
@@ -127,10 +129,10 @@ export const useSegmentPlayback = (segments: TurnSegment[] | undefined, options:
         if (urls.length === 0) return;
         playUrl(urls[0], index);
       } catch (err) {
-        console.error('regenerate segment audio:', err);
+        report({ text: 'Could not regenerate the audio.', detail: err instanceof Error ? err.message : String(err) });
       }
     },
-    [gameId, turnNumber, playUrl],
+    [gameId, turnNumber, playUrl, report],
   );
 
   useEffect(() => {

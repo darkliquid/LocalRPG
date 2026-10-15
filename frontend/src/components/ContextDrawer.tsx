@@ -63,10 +63,13 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
     try {
       const [ctxData, wsData] = await Promise.all([
         APIClient.getTurnContext(selectedGameID).catch((e) => {
+          // The drawer renders its own 'nothing available yet' state for an empty context,
+          // so a failed read lands there rather than being reported twice.
           console.warn('getTurnContext failed:', e);
           return null;
         }),
         APIClient.getWorkingSet(selectedGameID).catch((e) => {
+          // As above: the working set's absence is already visible in the drawer.
           console.warn('getWorkingSet failed:', e);
           return [];
         }),
