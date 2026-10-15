@@ -79,8 +79,8 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
       if (!ctxData && (!wsData || wsData.length === 0)) {
         setError('No turn context or working set available yet for this campaign.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load turn context');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load turn context');
     } finally {
       setLoading(false);
     }

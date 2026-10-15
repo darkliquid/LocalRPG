@@ -111,8 +111,8 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
       setImportFile(null);
       setImportManifest(null);
       await loadData();
-    } catch (err: any) {
-      setImportError(err.message || 'Failed to import package');
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Failed to import package');
     } finally {
       setIsImporting(false);
     }

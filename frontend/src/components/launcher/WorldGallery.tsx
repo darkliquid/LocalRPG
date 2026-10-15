@@ -158,8 +158,8 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
       setDeleteTarget(null);
       setDeleteError(null);
       setCanForce(false);
-    } catch (err: any) {
-      const msg = err?.message || 'Failed to delete world';
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete world';
       setDeleteError(msg);
       if (msg.includes('in use') || msg.toLowerCase().includes('conflict')) {
         setCanForce(true);
