@@ -153,12 +153,15 @@ type section struct {
 	refs      []Ref
 }
 
+// ContextAssembler builds a turn's prompt from the sections and windows a request
+// names, and reports what the budget left out, so a thinner reply can be explained.
 type ContextAssembler struct {
 	store  *storage.Store
 	limits ContextLimits
 	logger trace.Logger
 }
 
+// NewContextAssembler builds an assembler that reads entities through store.
 func NewContextAssembler(store *storage.Store) *ContextAssembler {
 	return &ContextAssembler{store: store}
 }

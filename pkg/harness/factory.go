@@ -41,6 +41,8 @@ func (b *builtinEchoModelProvider) Stream(ctx context.Context, req GenerateReque
 	return nil
 }
 
+// NewModelProvider builds the provider a configuration names, which is the one place
+// the uniform type and builtin_name shape is turned into a concrete client.
 func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 	switch cfg.Type {
 	case "disabled":

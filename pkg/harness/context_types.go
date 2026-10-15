@@ -3,6 +3,8 @@ package harness
 // RefKind defines the type of reference tracked in prompt provenance.
 type RefKind string
 
+// What a context reference points at, which is what the working set weighs and
+// what a section reports having read.
 const (
 	RefEntity  RefKind = "entity"
 	RefTurn    RefKind = "turn"
@@ -30,6 +32,8 @@ type SectionReport struct {
 // ContextStrategy is how the assembled context reaches the provider.
 type ContextStrategy string
 
+// How a turn's prompt reaches a provider: the whole prompt, a cached prefix plus
+// the delta, or a continued server-side session.
 const (
 	StrategyFullPrompt    ContextStrategy = "full_prompt"
 	StrategyCachedPrefix  ContextStrategy = "cached_prefix"

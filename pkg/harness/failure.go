@@ -14,6 +14,8 @@ import (
 // frontend, so a failure is never described by an arbitrary string.
 type FailureCode string
 
+// The classes a generation failure falls into. The class is what the engine and a
+// client act on; the message beside it is for the reader.
 const (
 	FailureProviderUnavailable FailureCode = "provider_unavailable"
 	FailureProviderError       FailureCode = "provider_error"

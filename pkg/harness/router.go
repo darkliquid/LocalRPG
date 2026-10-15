@@ -12,6 +12,9 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
+// Router maps a role to a provider and holds the fallbacks, the backoff a failed
+// provider earned, and what a turn has cost. One router serves a process, so what it
+// learns about a provider is not forgotten between turns.
 type Router struct {
 	mu          sync.RWMutex
 	providers   map[string]ModelProvider
@@ -41,6 +44,7 @@ type RoleBuildError struct {
 	Err  error
 }
 
+// NewRouter builds an empty router. Providers and roles are registered through it.
 func NewRouter() *Router {
 	return &Router{
 		providers: make(map[string]ModelProvider),
@@ -108,6 +112,8 @@ func (r *Router) BuildErrors() []RoleBuildError {
 	return append([]RoleBuildError(nil), r.buildErrors...)
 }
 
+// RegisterProvider adds a provider under a key, so a role can name it and a fallback
+// can point at it.
 func (r *Router) RegisterProvider(p ModelProvider) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -165,12 +171,14 @@ func (r *Router) recordUsage(role string, u *Usage) {
 	rec.RecordUsage(role, *u)
 }
 
+// AssignRole points a role at a registered provider.
 func (r *Router) AssignRole(role, providerID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.roleMap[role] = providerID
 }
 
+// SetFallback names the roles to try, in order, when a role's own provider fails.
 func (r *Router) SetFallback(role, fallbackProviderID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -190,6 +198,8 @@ func (r *Router) FallbackForRole(role string) (ModelProvider, bool) {
 	return provider, ok
 }
 
+// GetProviderForRole returns the provider a role should use, walking its fallbacks in
+// order and skipping any that is backed off.
 func (r *Router) GetProviderForRole(role string) (ModelProvider, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -352,6 +362,8 @@ func (r *Router) GenerateForRole(ctx context.Context, role string, req GenerateR
 	}
 }
 
+// StreamForRole streams a role's reply, trying its fallbacks in order and recording
+// what each attempt did, so a caller can see what was tried.
 func (r *Router) StreamForRole(ctx context.Context, role string, req GenerateRequest, out chan<- StreamChunk) error {
 	providers, err := r.orderedProviders(role)
 	if err != nil {

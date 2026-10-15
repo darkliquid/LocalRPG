@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+// StreamChunk is one piece of a streamed reply: text, a tool call, the finish, or a
+// failure. A provider that reports what the call cost sets Usage on its last chunk.
 type StreamChunk struct {
 	Text         string
 	ToolCalls    []ToolCall
@@ -78,6 +80,8 @@ type GenerationOptions struct {
 	Stop        []string
 }
 
+// GenerateRequest is one call to a provider: the conversation, or the single prompt a
+// provider that only reads a string is given, plus the tools it may call.
 type GenerateRequest struct {
 	Prompt      string         `json:"prompt"`
 	System      string         `json:"system,omitempty"`
@@ -104,6 +108,7 @@ func (r GenerateRequest) PromptText() string {
 	return MessagesPrompt(r.Messages)
 }
 
+// GenerateResponse is a complete reply, for a caller that did not stream it.
 type GenerateResponse struct {
 	Text         string `json:"text"`
 	CachedTokens int    `json:"cached_tokens,omitempty"`
@@ -112,6 +117,8 @@ type GenerateResponse struct {
 	Usage *Usage
 }
 
+// ModelProvider is what every LLM backend implements, whatever sits underneath: a
+// built-in, a command-line tool, or an HTTP API.
 type ModelProvider interface {
 	ID() string
 	Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error)
@@ -123,6 +130,8 @@ type ToolCaller interface {
 	ToolCallerCapable() bool
 }
 
+// ProviderConfig is one provider a configuration declares: its type, whatever that
+// type needs, and the sampling parameters a role inherits from it.
 type ProviderConfig struct {
 	Type           string   `yaml:"type"` // "builtin", "cli", "http", "gemini", "disabled"
 	BuiltinName    string   `yaml:"builtin_name,omitempty"`
@@ -142,6 +151,8 @@ type ProviderConfig struct {
 	Instance string `yaml:"instance,omitempty"`
 }
 
+// RoleRoutingConfig is the roles one provider configuration routes, which is how the
+// provider catalogue presents a provider's reach.
 type RoleRoutingConfig struct {
 	Roles map[string]ProviderConfig `yaml:"roles"`
 }

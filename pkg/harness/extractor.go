@@ -17,6 +17,8 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
+// ExtractedEntity is one entity an extractor read out of a turn's narration: the
+// fields it found, and whether the turn changed how the entity looks.
 type ExtractedEntity struct {
 	ID                string `json:"id"`
 	Name              string `json:"name"`
@@ -49,6 +51,9 @@ type Extraction struct {
 	SceneBreak     *ExtractedSceneBreak `json:"scene_break,omitempty"`
 }
 
+// Extractor reads the entities and dialogue out of a turn's narration with a
+// model. It is only reached through the Timeline, which is what records what it
+// returns.
 type Extractor struct {
 	model         ModelProvider
 	voiceProfiles []config.VoiceProfile
@@ -58,6 +63,7 @@ type Extractor struct {
 	key           provider.Key
 }
 
+// NewExtractor builds an extractor around one model.
 func NewExtractor(model ModelProvider) *Extractor {
 	return &Extractor{model: model, id: model.ID()}
 }
@@ -67,6 +73,8 @@ func (e *Extractor) SetLogger(logger trace.Logger) {
 	e.logger = trace.OrNil(logger)
 }
 
+// SetVoiceProfiles gives the extractor the voices it may assign to the characters a
+// turn introduces.
 func (e *Extractor) SetVoiceProfiles(profiles []config.VoiceProfile) {
 	e.voiceProfiles = profiles
 }
@@ -162,6 +170,9 @@ func filterProfilesByGender(profiles []config.VoiceProfile, gender string) []con
 	return matched
 }
 
+// AssignVoiceProfile gives a character a voice when it has none: the profile its note
+// names, then the one its tags score highest, and otherwise a hash of its ID, so the
+// same character always sounds the same.
 func AssignVoiceProfile(ent *entity.Entity, profiles []config.VoiceProfile) {
 	if len(profiles) == 0 || ent == nil || !entity.IsCharacterType(ent.Type) || ent.Voice != nil {
 		return
