@@ -214,6 +214,9 @@ export class APIClient {
         const data = JSON.parse(event.data) as ModelStatus;
         onEvent(data);
       } catch (err) {
+        // A malformed frame is skipped so one bad event cannot end the stream, and this
+        // layer has no access to the UI: the events that did parse have already been
+        // delivered to the caller, which is the component that can explain a failure.
         console.error('Failed to parse model event:', err);
       }
     };
@@ -292,6 +295,8 @@ export class APIClient {
       try {
         onEvent(JSON.parse(event.data) as ExportEvent);
       } catch (err) {
+        // The same as the model stream: a frame that will not parse is skipped rather
+        // than ending an export that is otherwise progressing.
         console.error('Failed to parse export event:', err);
       }
     };

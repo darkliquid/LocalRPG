@@ -1,3 +1,4 @@
+import { useFailures } from '../context/FailuresContext';
 import React, { memo, useState } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -16,6 +17,7 @@ interface CodeBlockProps {
 }
 
 const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
+  const { report } = useFailures();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -24,7 +26,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy code:', err);
+      report({ text: 'Could not copy the code.', detail: err instanceof Error ? err.message : String(err) });
     }
   };
 

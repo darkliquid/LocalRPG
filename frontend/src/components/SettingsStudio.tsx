@@ -1,3 +1,4 @@
+import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { DebugPanel } from './DebugPanel';
 import { APIClient } from '../api/client';
@@ -55,6 +56,7 @@ const presetsToMap = <T,>(
 };
 
 export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSaved, activeGameID, onOpenDocs }) => {
+  const { report } = useFailures();
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [activeFilePath, setActiveFilePath] = useState<string>('');
   const [isOverride, setIsOverride] = useState(false);
@@ -104,7 +106,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
   } | null>(null);
   useEffect(() => {
     loadSettings();
-    APIClient.getModels().then(setModels).catch(console.error);
+    APIClient.getModels()
+      .then(setModels)
+      .catch((err) =>
+        report({ text: 'Could not load the model list.', detail: err instanceof Error ? err.message : String(err) }),
+      );
     const unsubscribe = APIClient.subscribeModelEvents((status) => {
       setModels((prev) => {
         const next = [...prev];
@@ -118,7 +124,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       });
     });
     return () => unsubscribe();
-  }, []);
+  }, [report]);
 
   useEffect(
     () => () => {

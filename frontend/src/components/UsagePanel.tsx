@@ -65,6 +65,7 @@ export const UsagePanel: React.FC<UsagePanelProps> = ({ activeGameID, onOpenDocs
         setUsage(res);
       }
     } catch (err) {
+      // Shown inline: the panel renders the error state set just below.
       console.error('Failed to load usage:', err);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
