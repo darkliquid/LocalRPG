@@ -138,6 +138,45 @@ The command bodies are phases by construction: parse, build what the command nee
 
 **Files:** `runGenerationLoop` (416, after RD-3), `stageEntities` (173), `InitGame` (161), `stream` (117), and the three in the 80s.
 
+Landed in two parts, because the first was its own proposal (RD-3, finding R-3).
+`stageEntities`, `InitGame`, `stream` and the three in the eighties came down below the budget in
+RD-4, RD-6 and RD-8's commits; `runGenerationLoop` was the last, and RD-3 left it as the only entry
+the gate still exempts.
+
+- [x] **Step 1: `beginGeneration`, `continueStoredSession`, `ensurePrefixCache`,
+  `startProviderSession`**
+
+  The preamble: the provider and the model name it reports, the session the previous turn left,
+  whether tools may be offered, the strategy and its step down from a server session, then the two
+  one-call paths a session offers. Each one-call path returns a reply or nil, so the entry point
+  reads as the alternatives in order.
+
+- [x] **Step 2: `runToolRounds`, `beginToolRound`, `generateRound`**
+
+  The round loop, its request, and one round's call. `beginToolRound` owns the tool specs and the
+  forced check; `generateRound` owns the parser reset, the repair retries and the failure it
+  returns.
+
+- [x] **Step 3: `repairMalformedReply`, `recordRoundError`, `recordRoundFailure`,
+  `consumeToolRound`**
+
+  The repair decision, the two ways a round fails, and what a reply means once it arrives: the
+  answer, a stray call, or calls to run.
+
+- [x] **Step 4: `dispatchToolCall`, `handleTurnTool`, `executeQueryTool`**
+
+  One call, through the turn's own tools or the query executor. The turn tools' `continue`s become
+  a returned decision, since a method cannot continue its caller's loop.
+
+- [x] **Step 5: The state value**
+
+  `generationRun` carries what the phases share, the way `turnRun` carries a turn's.
+
+- [x] **Step 6: Remove the exemption**
+
+  `pkg/systemtest/function_length_test.go` no longer exempts anything: `runGenerationLoop` is 22
+  lines and every phase below it is under sixty.
+
 ### Task 6: `pkg/harness`
 
 **Files:** `relevantHistory` (138), `fitToBudget` (108), `RouterFromConfigWithLogger` (100), `FormatMechanicsInstructions` (93).

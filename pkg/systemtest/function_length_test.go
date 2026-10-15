@@ -18,9 +18,7 @@ const maxFunctionLines = 80
 // mapped to the architectural rationale why each remains over eighty lines.
 // When an exempt function is refactored below eighty lines, its entry must be
 // removed so exemptions do not rot.
-var exemptFunctions = map[string]string{
-	"pkg/engine/orchestrator.go:runGenerationLoop": "Waiting on the pkg/engine batch of RD-11 (finding R-12): the generation loop's boundaries are a decision about provider rounds and tool calls, so it is worked down beside them rather than here.",
-}
+var exemptFunctions = map[string]string{}
 
 // TestFunctionLengthGate enforces that every non-test function in the repository
 // stays within the eighty-line budget, unless explicitly exempt with a recorded reason.
