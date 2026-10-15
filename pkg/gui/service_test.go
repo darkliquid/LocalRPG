@@ -876,6 +876,11 @@ func TestPrepareTurnAppliesTheRecallLimits(t *testing.T) {
 	}
 
 	svc := NewService(root)
+	// The regeneration runs detached, and the embedding worker writes into the
+	// campaign too, so the service is closed before the test's temporary
+	// directory is removed: Close cancels the background context and waits for
+	// both, which is what keeps the cleanup from racing a writer.
+	defer svc.Close()
 	paths := svc.GetResolver()
 	sysDir := paths.SystemDir("freeform")
 	if err := os.MkdirAll(sysDir, 0755); err != nil {
