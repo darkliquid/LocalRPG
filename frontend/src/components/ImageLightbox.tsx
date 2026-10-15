@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { EntityAvatar } from './EntityAvatar';
 
 interface ImageLightboxProps {
@@ -14,15 +15,11 @@ interface ImageLightboxProps {
 export const ImageLightbox: React.FC<ImageLightboxProps> = ({ src, alt, onClose, isOpen = true }) => {
   const { mounted, state } = useMountTransition(isOpen, 220);
 
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isOpen, onClose]);
+  // A lightbox keeps its own portal and its own entrance animation, so it takes
+  // the dialog behaviour rather than the shell: focus in, Tab trapped, Escape
+  // closing, focus returned to the thumbnail that opened it. Its window-level
+  // Escape listener is gone with it, because two handlers close it twice.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(isOpen, onClose);
 
   if (!mounted) return null;
 
@@ -39,6 +36,12 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({ src, alt, onClose,
         className={`relative max-w-[90vw] max-h-[90vh] flex items-center justify-center ${
           state === 'enter' ? 'anim-scale-in' : 'anim-scale-out'
         }`}
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={alt}
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
         onClick={(e) => e.stopPropagation()}
       >
         <EntityAvatar
