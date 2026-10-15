@@ -313,6 +313,7 @@ export interface TurnEvent {
     | 'audio_progress'
     | 'portrait'
     | 'scene_image'
+    | 'scene_image_pending'
     | 'step'
     | 'estimate'
     | 'draft'

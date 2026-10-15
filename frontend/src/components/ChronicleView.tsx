@@ -12,6 +12,13 @@ interface PendingAction {
   text: string;
 }
 
+// Why the server withheld a scene illustration. The reasons are the engine's own
+// vocabulary, so each one is written out rather than shown as it arrives.
+const SCENE_PENDING_REASONS: Record<string, string> = {
+  budget_exhausted: 'No illustration: this campaign has spent its image budget.',
+  awaiting_approval: 'No illustration: it is waiting for your approval.',
+};
+
 interface ChronicleViewProps {
   turns: Turn[];
   onWikilinkClick: (entityId: string) => void;
@@ -32,6 +39,9 @@ interface ChronicleViewProps {
   streamedSegments?: TurnSegment[];
   displayMode?: 'stage_directions' | 'hidden' | 'raw';
   turnAudioStatus?: Record<number, { state: TurnAudioState; message?: string }>;
+  // Why the server withheld an illustration for a turn, so the absence can be
+  // explained beside the generate button rather than left silent.
+  sceneImagePending?: Record<number, string>;
   segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
   characterPortraits?: Record<string, { url: string; hasCustom: boolean }>;
   segmentProgress?: Record<number, string>;
@@ -46,6 +56,7 @@ interface ChronicleViewProps {
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
+  sceneImagePending,
   turns,
   onWikilinkClick,
   autoPlay = false,
@@ -126,6 +137,14 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                     <img src={imageURL} alt="Scene illustration" className="w-full object-cover max-h-96" />
                   </button>
                 </div>
+              )}
+
+              {/* Why a beat has no illustration, when the server said. */}
+              {!imageURL && sceneImagePending?.[turn.turn_number] && (
+                <p className="my-2 text-xs font-sans text-stone-500">
+                  {SCENE_PENDING_REASONS[sceneImagePending[turn.turn_number]] ??
+                    `No illustration: ${sceneImagePending[turn.turn_number]}`}
+                </p>
               )}
 
               {/* On-demand illustration, when the policy skipped this beat. */}
