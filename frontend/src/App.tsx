@@ -96,6 +96,9 @@ export const App: React.FC = () => {
   const isDeviceOwner = playbackOwner === 'device' || (serverAudio && playbackOwner !== 'browser');
   const browserPlaybackEnabled = !isDeviceOwner && (config?.media.tts.auto_play ?? false);
   // Per-turn audio status: generating → playing → idle (or error)
+  // Why the server withheld an illustration for a turn, keyed by turn number. It is
+  // shown beside the generate button, so a turn with no picture says why.
+  const [sceneImagePending, setSceneImagePending] = useState<Record<number, string>>({});
   const [turnAudioStatus, setTurnAudioStatus] = useState<Record<number, { state: TurnAudioState; message?: string }>>(
     {},
   );
@@ -483,6 +486,11 @@ export const App: React.FC = () => {
           hasCustom: !!event.has_custom_portrait,
         },
       }));
+    } else if (event.type === 'scene_image_pending' && event.turn_number) {
+      // The server withheld an illustration and said why: the budget is spent, or
+      // the approval policy held it back. Nothing else carries that reason, so it
+      // is kept here for the chronicle to explain the absence with.
+      setSceneImagePending((prev) => ({ ...prev, [event.turn_number!]: event.message || '' }));
     } else if (event.type === 'scene_image' && event.turn_number && event.image_url) {
       setChronicle((prev) =>
         prev.map((turn) => (turn.turn_number === event.turn_number ? { ...turn, image_url: event.image_url } : turn)),
@@ -1142,6 +1150,7 @@ export const App: React.FC = () => {
                       pendingAction={pendingAction}
                       streamedSegments={streamedSegments}
                       displayMode={config?.media.tts.speech_cues?.display_mode}
+                      sceneImagePending={sceneImagePending}
                       turnAudioStatus={turnAudioStatus}
                       segmentAudioStatus={segmentAudioStatus}
                       characterPortraits={characterPortraits}
