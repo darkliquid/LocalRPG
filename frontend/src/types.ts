@@ -2,7 +2,7 @@ export interface PlayerState {
   id: string;
   name: string;
   type: string;
-  state: Record<string, any>;
+  state: Record<string, unknown>;
   appearance?: string;
   current_appearance?: string;
   voice?: VoiceProfile;
@@ -609,7 +609,7 @@ export interface EntityNote {
   name: string;
   type: string;
   markdown: string;
-  state: Record<string, any>;
+  state: Record<string, unknown>;
   backlinks: string[];
   history?: number[];
   folder?: string;
