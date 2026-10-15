@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Download, X, AlertCircle, Loader2, Film, Globe, Ban, FolderOpen } from 'lucide-react';
 import { APIClient } from '../api/client';
@@ -56,6 +57,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
   // overwritten the moment the next phase starts.
   const [messages, setMessages] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Its own header, so it takes the dialog behaviour rather than the shell: it
+  // declares itself, moves focus in and returns it, holds Tab, and closes on
+  // Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -139,7 +144,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
     progress && progress.total > 0 ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm anim-fade-in">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Export Story Replay"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm anim-fade-in"
+    >
       <div className="relative w-full max-w-xl bg-stone-900/95 border border-purple-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800">
           <div className="flex items-center gap-2">
