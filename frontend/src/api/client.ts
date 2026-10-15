@@ -581,10 +581,6 @@ export class APIClient {
     if (!res.ok) throw await errorFromResponse(res, 'clearTrace');
   }
 
-  async updateGameSettings(patch: GameSettingsPatch): Promise<void> {
-    return APIClient.updateGameSettings(this.gameID, patch);
-  }
-
   async advanceUnlock(unlockID: string): Promise<Advancement> {
     return APIClient.advanceUnlock(this.gameID, unlockID);
   }
@@ -1422,14 +1418,6 @@ export class APIClient {
     return res.json();
   }
 
-  async getTurnContext(): Promise<TurnContext> {
-    return APIClient.getTurnContext(this.gameID);
-  }
-
-  async getWorkingSet(): Promise<WorkingEntry[]> {
-    return APIClient.getWorkingSet(this.gameID);
-  }
-
   static async getGameUsage(gameID: string): Promise<Usage> {
     const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/usage`);
     if (!res.ok) throw await errorFromResponse(res, 'getGameUsage');
@@ -1458,10 +1446,6 @@ export class APIClient {
     const res = await fetch(`/api/docs/${encodeURIComponent(id)}`);
     if (!res.ok) throw new HTTPError(res.status, `getDocArticle: ${res.statusText}`);
     return res.json();
-  }
-
-  async getGameUsage(): Promise<Usage> {
-    return APIClient.getGameUsage(this.gameID);
   }
 
   static async exportContent(
