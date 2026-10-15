@@ -13,6 +13,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Session is one open campaign: the resolved paths it lives under, the manifests
+// that describe it, and the index its store holds. The durable record is the
+// files under Paths, so closing a session loses nothing that matters.
 type Session struct {
 	Paths    *core.PathResolver
 	Manifest *core.GameManifest
@@ -21,6 +24,9 @@ type Session struct {
 	Store    *storage.Store
 }
 
+// Close releases the campaign's store handle. A store a Pool handed out is
+// shared, so its Close is a no-op: closing one session never closes a database
+// another session is still reading.
 func (s *Session) Close() error {
 	if s.Store != nil {
 		return s.Store.Close()
@@ -42,6 +48,11 @@ type InitOptions struct {
 	OpeningPrompt   string
 }
 
+// InitGame creates a campaign and returns it open. It validates the three IDs
+// before writing anything, checks that the world's requirements suit the system,
+// copies the world's template entities into the campaign, opens and syncs the
+// index, pins the opening location, writes the player's note, and locks the
+// content versions so that a later change to the system or world is detectable.
 func InitGame(paths *core.PathResolver, opts InitOptions) (*Session, error) {
 	if err := validateInitIDs(opts); err != nil {
 		return nil, err

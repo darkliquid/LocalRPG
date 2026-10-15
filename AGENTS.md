@@ -23,6 +23,7 @@ mise run lint:staticcheck # staticcheck over every Go package, tests included
 mise run lint:frontend  # prettier --check and eslint over frontend/
 mise run lint:docs      # rumdl over the embedded help articles (pkg/gui/docs, .rumdl.toml)
 mise run lint:prose     # Vale over tracked prose and source comments (report only; STRICT=1 to gate)
+mise run lint:revive    # revive over the Go packages: undocumented exported symbols (report only)
 mise run lint:goreleaser # goreleaser check
 mise run lint:actions   # actionlint over .github/workflows
 mise run secrets:scan   # gitleaks over the full git history and staged changes
@@ -351,6 +352,32 @@ exit 2, and nothing after it installs. Separate entries with commas.
 `["styles"]`.** The committed vocabulary means `styles/` exists in a fresh clone, so
 keying the task on that directory would make mise treat the download as already done
 and Vale would run with no styles at all.
+
+## Undocumented exported symbols (revive)
+
+`mise run lint:revive` runs `revive` over every Go package with exactly one check
+enabled, `exported`, which asks for a doc comment on each exported type, function,
+method and constant block. `revive` is pinned in `mise.toml` like every other tool and
+configured by the checked-in `revive.toml`, which carries the reason for each choice —
+the stutter check is off, because it asks for `entity.Frontmatter` where the type's name
+is the Markdown block the file defines.
+
+**It is report-only, and it is not a dependency of `mise run lint`,** because the count
+is still large: **271 findings**, down from 336 now that `pkg/state`, `pkg/entity`,
+`pkg/storage`, `pkg/rules` and `pkg/engine` are documented (RD-5). `STRICT=1` makes it
+exit non-zero, which is how it becomes a gate once the count is near zero; the
+remaining packages, `pkg/gui` (65) and `pkg/provider` (51) first, are their own bead.
+
+A doc comment here answers what the symbol is for and the invariant a caller cannot see
+from the signature — that `state` paths are dot-separated, that `state.Raw` is a shallow
+copy, that a `storage.Store` a `Pool` handed out closes as a no-op. A comment that
+restates the signature is worse than none.
+
+```bash
+mise run lint:revive            # print every finding, exit 0
+STRICT=1 mise run lint:revive   # exit non-zero on findings
+mise run lint:revive | grep -c '^pkg/gui/'   # one package's share
+```
 
 ## Static analysis (CodeQL)
 

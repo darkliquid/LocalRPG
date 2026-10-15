@@ -10,6 +10,10 @@ import (
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
+// ActionResult is what an action hook returned: whether the system considers the
+// action to have worked, the system's own outcome label, a message for the
+// narration, and any roll it resolved. The engine carries the vocabulary
+// verbatim rather than interpreting it.
 type ActionResult struct {
 	Success bool           `json:"success"`
 	Outcome string         `json:"outcome,omitempty"`
@@ -24,6 +28,10 @@ type EntityWriter interface {
 	SaveEntity(ent *entity.Entity) error
 }
 
+// GameHostAPI is the surface a system's scripts are given: reading and writing
+// entity state, rolling dice, moving the party, injecting a director note, and
+// reading the declarative mechanics schema. Everything a script does to a
+// campaign travels through it, so a script cannot reach the disk by another path.
 type GameHostAPI interface {
 	Roll(notation string) (*RollResult, error)
 	GetStat(entityID string, path string) (any, error)
@@ -43,6 +51,10 @@ type GameHostAPI interface {
 	CheckConventions() core.CheckConventions
 }
 
+// DefaultHostBridge is the GameHostAPI a campaign runs with. It resolves an
+// entity by ID, keeps the turn's directives and logs in memory for the turn to
+// drain, and persists through the engine's own writer rather than a second
+// write path of its own.
 type DefaultHostBridge struct {
 	store      *storage.Store
 	writer     EntityWriter
@@ -65,10 +77,14 @@ func NewHostBridge(store *storage.Store, writer EntityWriter, playerID string) *
 	}
 }
 
+// Roll evaluates dice notation through the system-independent roller.
 func (h *DefaultHostBridge) Roll(notation string) (*RollResult, error) {
 	return EvaluateRoll(notation)
 }
 
+// GetStat reads a dot-separated path out of an entity's state. A missing entity,
+// an entity with no state, and a path that is not there all answer (nil, nil): a
+// script asking a question is not an error.
 func (h *DefaultHostBridge) GetStat(entityID string, path string) (any, error) {
 	ent, err := h.resolve(entityID)
 	if err != nil {
@@ -84,6 +100,9 @@ func (h *DefaultHostBridge) GetStat(entityID string, path string) (any, error) {
 	return val, nil
 }
 
+// SetStat writes a dot-separated path into an entity's state, giving the entity
+// an empty state first if it has none, and persists the note through the engine's
+// writer so the change survives a reindex.
 func (h *DefaultHostBridge) SetStat(entityID string, path string, value any) error {
 	ent, err := h.resolve(entityID)
 	if err != nil {
@@ -166,6 +185,8 @@ func (h *DefaultHostBridge) persist(ent *entity.Entity) error {
 	return h.store.SaveEntity(ent)
 }
 
+// GetEntity reads an entity out of the index, for a script that needs more of one
+// than a state path.
 func (h *DefaultHostBridge) GetEntity(entityID string) (*entity.Entity, error) {
 	return h.store.GetEntity(entityID)
 }
@@ -176,18 +197,28 @@ func (h *DefaultHostBridge) SaveEntity(ent *entity.Entity) error {
 	return h.persist(ent)
 }
 
+// InjectGMDirection queues a directive for the turn's prompt. The bridge collects
+// it and the orchestrator drains it before generation, so a hook's direction
+// reaches the model through the same path a /gm command does.
 func (h *DefaultHostBridge) InjectGMDirection(directive string) {
 	h.directives = append(h.directives, directive)
 }
 
+// GetDirectives returns every directive hooks have injected, including those
+// from earlier turns, because the bridge accumulates them for the life of the
+// campaign and the orchestrator drains the list rather than the turn's own
+// additions. It is the caller's slice, not a copy.
 func (h *DefaultHostBridge) GetDirectives() []string {
 	return h.directives
 }
 
+// Log records a message from a script, for the turn's diagnostics.
 func (h *DefaultHostBridge) Log(message string) {
 	h.logs = append(h.logs, message)
 }
 
+// GetLogs returns what scripts have logged so far. It is the caller's slice, not
+// a copy.
 func (h *DefaultHostBridge) GetLogs() []string {
 	return h.logs
 }

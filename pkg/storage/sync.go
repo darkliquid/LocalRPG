@@ -12,23 +12,29 @@ import (
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
 
+// SyncResult counts what one sync did, so a caller can log it or show it.
 type SyncResult struct {
 	Added     int
 	Updated   int
 	Unchanged int
 }
 
+// Syncer indexes a directory of notes into a Store. It hashes each file, so an
+// unchanged note costs a read and a changed one is re-indexed.
 type Syncer struct {
 	store *Store
 }
 
+// NewSyncer pairs a store with the walker that fills it.
 func NewSyncer(store *Store) *Syncer {
 	return &Syncer{store: store}
 }
 
 // Sync indexes every note under dir. The walk is recursive, because a note's
 // folder is a location the author chose; hidden directories and assets/ are not
-// note storage, so they are skipped whole.
+// note storage, so they are skipped whole. A note that will not parse is skipped
+// rather than fatal, because a missing entity is almost always a frontmatter typo
+// and one bad file must not stop the rest of the campaign from indexing.
 func (s *Syncer) Sync(dir string) (*SyncResult, error) {
 	res := &SyncResult{}
 

@@ -1,0 +1,20 @@
+# Configuration for `mise run lint:revive`.
+#
+# The task is report-only for now: the exported surface of the middle layers is
+# still undocumented, and a gate on hundreds of findings is a gate nobody keeps.
+# Run it with STRICT=1 to fail on findings, which is how it becomes a gate once
+# the count is near zero.
+#
+# Only the checks that earn their place are enabled. Everything else this
+# repository needs is staticcheck's, whose default check set `mise run
+# lint:staticcheck` already runs over every package, tests included.
+ignoreGeneratedHeader = false
+severity = "warning"
+confidence = 0.8
+
+[rule.exported]
+  # The stutter check asks for entity.Frontmatter in place of
+  # entity.EntityFrontmatter. The name is the Markdown frontmatter block the file
+  # defines, in the docs and in the on-disk format alike, so renaming it is an API
+  # change rather than a documentation one.
+  arguments = ["disableStutteringCheck"]

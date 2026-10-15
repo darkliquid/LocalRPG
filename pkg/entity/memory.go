@@ -18,6 +18,8 @@ const (
 // MemorySource records who authored a memory: the GM or the engine.
 type MemorySource string
 
+// Who wrote a memory, so a reader can tell what the GM narrated from what the
+// engine derived.
 const (
 	SourceGM     MemorySource = "gm"
 	SourceEngine MemorySource = "engine"

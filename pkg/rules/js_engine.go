@@ -13,6 +13,10 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
+// JSEngine runs a system's mechanics.js in one goja VM, behind a mutex so one
+// script executes at a time. Scripts register action handlers, check resolvers
+// and the turn's hooks, and the engine holds what they registered: nothing a
+// script does reaches the campaign except through the host API.
 type JSEngine struct {
 	mu              sync.Mutex
 	vm              *goja.Runtime
@@ -26,6 +30,9 @@ type JSEngine struct {
 	manifest        *core.SystemManifest
 }
 
+// NewJSEngine builds the runtime one campaign's scripts share and installs the
+// host bindings they call. The bridge is required, because every effect a script
+// has on the campaign travels through it.
 func NewJSEngine(bridge GameHostAPI) *JSEngine {
 	vm := goja.New()
 	engine := &JSEngine{
@@ -236,6 +243,9 @@ func (j *JSEngine) SetManifest(manifest *core.SystemManifest) {
 	}
 }
 
+// LoadScript runs a script in the engine's VM. Scripts load in order, so a
+// system's base mechanics run before a world's overrides for that system, and a
+// world can redefine a handler the system registered.
 func (j *JSEngine) LoadScript(script string) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -247,6 +257,11 @@ func (j *JSEngine) LoadScript(script string) error {
 	return nil
 }
 
+// ExecuteAction runs the handler a system registered for an action mode. A mode
+// with no handler answers (nil, nil), which is how the orchestrator tells "the
+// system has nothing to say about this action" from a failure. The handler's
+// returned object becomes an ActionResult, whose Data carries every field other
+// than success, outcome, message and roll.
 func (j *JSEngine) ExecuteAction(actionType string, ctx map[string]any) (*ActionResult, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -304,6 +319,8 @@ func (j *JSEngine) ExecuteAction(actionType string, ctx map[string]any) (*Action
 	return res, nil
 }
 
+// ExecuteTurnEnd runs the turnEnd hooks in the order they were registered. The
+// first hook to fail stops the rest and is returned.
 func (j *JSEngine) ExecuteTurnEnd(ctx map[string]any) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -316,6 +333,8 @@ func (j *JSEngine) ExecuteTurnEnd(ctx map[string]any) error {
 	return nil
 }
 
+// ExecuteWorldTick runs the worldTick hooks in the order they were registered,
+// which is how the living world advances on its own cadence.
 func (j *JSEngine) ExecuteWorldTick(ctx map[string]any) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()

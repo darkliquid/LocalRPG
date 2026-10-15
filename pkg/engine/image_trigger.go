@@ -51,6 +51,10 @@ func ShouldIllustrate(turn, prev Turn, cfg TriggerConfig) (bool, string) {
 	return false, ""
 }
 
+// MajorSceneChange applies the major-change policy: a scene break, a location
+// change, an extreme outcome, or a character the recent turns have not shown. It
+// reports the reason in a phrase, so the decision can be logged rather than only
+// obeyed.
 func MajorSceneChange(turn Turn, pastTurns []Turn, cfg TriggerConfig) (bool, string) {
 	if turn.SceneBreak {
 		return true, "scene break"

@@ -8,6 +8,11 @@ import (
 	"github.com/darkliquid/localrpg/pkg/storage"
 )
 
+// Tuning for the persistent working set: how fast an unreferenced entry decays,
+// the weight below which it is evicted, the weight one reference adds, how many
+// turns an entry may go untouched before it ages out, how many entries the set
+// keeps, and how many recent turns re-derivation replays when the index has no
+// working set of its own.
 const (
 	DefaultDecayFactor     = 0.8
 	DefaultWeightFloor     = 0.1

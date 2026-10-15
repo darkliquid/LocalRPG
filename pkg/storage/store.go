@@ -9,17 +9,26 @@ import (
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
 
+// Edge is one graph edge the index derived from a note: a source, a target, and
+// the relation between them.
 type Edge struct {
 	SourceID string
 	TargetID string
 	Relation string
 }
 
+// Store is a campaign's index: entities, the edges between them, memories, and
+// the turn tables, all derived from the Markdown notes and history.jsonl that are
+// the durable record. It is disposable, so losing the file costs a reindex and
+// nothing else, and it is never the thing a write is supposed to reach first.
 type Store struct {
 	db     *sql.DB
 	shared bool
 }
 
+// NewStore opens or creates the index at path and applies its schema. Prefer
+// storage.OpenGameStore or a Pool over calling this directly, so one process
+// holds one handle per database and a legacy file is retired on the way in.
 func NewStore(path string) (*Store, error) {
 	db, err := OpenDB(path)
 	if err != nil {
@@ -37,6 +46,8 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+// SaveEntity upserts an entity and the edges its note declares in one
+// transaction, so a reader never sees the entity without its links.
 func (s *Store) SaveEntity(e *entity.Entity) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -100,6 +111,10 @@ func (s *Store) SaveEntity(e *entity.Entity) error {
 	return tx.Commit()
 }
 
+// GetEntity reads one note's frontmatter, body, hash and folder back out of the
+// index, including the state the frontmatter carried. It reports sql.ErrNoRows
+// when the index has no such entity, which is the ordinary answer for a note that
+// has not been indexed yet.
 func (s *Store) GetEntity(id string) (*entity.Entity, error) {
 	query := `SELECT id, name, type, frontmatter_json, body, file_hash, folder FROM entities WHERE id = ?`
 	row := s.db.QueryRow(query, id)
@@ -197,6 +212,8 @@ func unmarshalEntityMeta(ent *entity.Entity, fmJSON string) error {
 	return nil
 }
 
+// GetEdgesFrom returns the edges whose source is sourceID: what this note points
+// at, according to its wikilinks and its location and faction fields.
 func (s *Store) GetEdgesFrom(sourceID string) ([]Edge, error) {
 	rows, err := s.db.Query(`SELECT source_id, target_id, relation FROM edges WHERE source_id = ?`, sourceID)
 	if err != nil {
@@ -215,6 +232,8 @@ func (s *Store) GetEdgesFrom(sourceID string) ([]Edge, error) {
 	return edges, nil
 }
 
+// GetEdgesTo returns the edges whose target is targetID: what points at this
+// note, which is how a place learns who is standing in it.
 func (s *Store) GetEdgesTo(targetID string) ([]Edge, error) {
 	rows, err := s.db.Query(`SELECT source_id, target_id, relation FROM edges WHERE target_id = ?`, targetID)
 	if err != nil {
