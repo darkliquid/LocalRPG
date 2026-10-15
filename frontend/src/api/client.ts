@@ -196,7 +196,7 @@ export class APIClient {
 
   static async getModels(): Promise<ModelStatus[]> {
     const res = await fetch('/api/models');
-    if (!res.ok) throw new Error(`getModels: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getModels');
     return res.json();
   }
 
@@ -204,7 +204,7 @@ export class APIClient {
     const res = await fetch(`/api/models/${id}/download`, {
       method: 'POST',
     });
-    if (!res.ok) throw new Error(`downloadModel: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'downloadModel');
   }
 
   static subscribeModelEvents(onEvent: (status: ModelStatus) => void): () => void {
@@ -225,7 +225,7 @@ export class APIClient {
 
   static async exportCapabilities(): Promise<ExportCapabilities> {
     const res = await fetch('/api/export/capabilities');
-    if (!res.ok) throw new Error(`exportCapabilities: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'exportCapabilities');
     return res.json();
   }
 
@@ -241,7 +241,7 @@ export class APIClient {
 
   static async cancelExport(gameID: string): Promise<void> {
     const res = await fetch(`/api/export/${encodeURIComponent(gameID)}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error(`cancelExport: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'cancelExport');
   }
 
   // startDirectoryChoice opens the desktop window's native folder picker and
@@ -305,25 +305,25 @@ export class APIClient {
 
   static async listGames(): Promise<GameSummary[]> {
     const res = await fetch('/api/games');
-    if (!res.ok) throw new Error(`listGames: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'listGames');
     return res.json();
   }
 
   static async listSystems(): Promise<SystemInfo[]> {
     const res = await fetch('/api/systems');
-    if (!res.ok) throw new Error(`listSystems: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'listSystems');
     return res.json();
   }
 
   static async listReferenceSystems(): Promise<ReferenceSystemsResponse> {
     const res = await fetch('/api/reference-systems');
-    if (!res.ok) throw new Error(`listReferenceSystems: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'listReferenceSystems');
     return res.json();
   }
 
   static async listSystemScenarios(id: string): Promise<SystemScenariosResponse> {
     const res = await fetch(`/api/system/tests/${encodeURIComponent(id)}`);
-    if (!res.ok) throw new Error(`listSystemScenarios: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'listSystemScenarios');
     return res.json();
   }
 
@@ -333,7 +333,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(scenario),
     });
-    if (!res.ok) throw new Error((await res.text()).trim() || `saveSystemScenario: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'saveSystemScenario');
     return res.json();
   }
 
@@ -342,7 +342,7 @@ export class APIClient {
     const res = await fetch(`/api/system/tests/${encodeURIComponent(id)}?${params.toString()}`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error((await res.text()).trim() || `deleteSystemScenario: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'deleteSystemScenario');
   }
 
   // generateTurnSceneImage asks the server to illustrate a turn that has no
@@ -361,13 +361,13 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new Error(`runSystemTest: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'runSystemTest');
     return res.json();
   }
 
   static async listWorlds(): Promise<WorldInfo[]> {
     const res = await fetch('/api/worlds');
-    if (!res.ok) throw new Error(`listWorlds: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'listWorlds');
     return res.json();
   }
 
@@ -386,7 +386,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(`createGame: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'createGame');
     return res.json();
   }
 
@@ -427,12 +427,12 @@ export class APIClient {
 
   static async deleteGame(gameID: string): Promise<void> {
     const res = await fetch(`/api/game/${gameID}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error(`deleteGame: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'deleteGame');
   }
 
   static async restartGame(gameID: string): Promise<GameSummary> {
     const res = await fetch(`/api/game/${gameID}/restart`, { method: 'POST' });
-    if (!res.ok) throw new Error(`restartGame: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'restartGame');
     return res.json();
   }
 
@@ -507,7 +507,7 @@ export class APIClient {
 
   static async audioStatus(): Promise<{ available: boolean; playing: boolean; owner?: string }> {
     const res = await fetch('/api/audio/status');
-    if (!res.ok) throw new Error(`audioStatus: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'audioStatus');
     return res.json();
   }
 
@@ -517,7 +517,7 @@ export class APIClient {
         ? `/api/game/${encodeURIComponent(gameID)}/turn/${turnNumber}/ledger`
         : `/api/game/${encodeURIComponent(gameID)}/audio/ledger`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`getPlaybackLedger: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getPlaybackLedger');
     return res.json();
   }
 
@@ -531,13 +531,13 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new Error(`mergePlaybackLedger: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'mergePlaybackLedger');
     return res.json();
   }
 
   static async stopAudio(): Promise<void> {
     const res = await fetch('/api/audio/stop', { method: 'POST' });
-    if (!res.ok) throw new Error(`stopAudio: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'stopAudio');
   }
 
   static async playTurnAudio(gameID: string, turnNumber: number, force = false): Promise<void> {
@@ -572,13 +572,13 @@ export class APIClient {
     const query = new URLSearchParams({ limit: String(limit) });
     if (gameID) query.set('game', gameID);
     const res = await fetch(`/api/trace?${query.toString()}`);
-    if (!res.ok) throw new Error(`traceEvents: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'traceEvents');
     return res.json();
   }
 
   static async clearTrace(): Promise<void> {
     const res = await fetch('/api/trace', { method: 'DELETE' });
-    if (!res.ok) throw new Error(`clearTrace: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'clearTrace');
   }
 
   async updateGameSettings(patch: GameSettingsPatch): Promise<void> {
@@ -595,7 +595,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ unlock_id: unlockID }),
     });
-    if (!res.ok) throw new Error(`advanceUnlock: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'advanceUnlock');
     const data = await res.json();
     return data.advancement as Advancement;
   }
@@ -606,12 +606,12 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     });
-    if (!res.ok) throw new Error(`updateGameSettings: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'updateGameSettings');
   }
 
   static async getSystem(id: string): Promise<SystemDetail> {
     const res = await fetch(`/api/system/${id}`);
-    if (!res.ok) throw new Error(`getSystem: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getSystem');
     return res.json();
   }
 
@@ -624,7 +624,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new Error(`saveSystem: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'saveSystem');
     return res.json();
   }
 
@@ -636,7 +636,7 @@ export class APIClient {
 
   static async getWorld(id: string): Promise<WorldDetail> {
     const res = await fetch(`/api/world/${id}`);
-    if (!res.ok) throw new Error(`getWorld: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getWorld');
     return res.json();
   }
 
@@ -679,7 +679,7 @@ export class APIClient {
 
   static async getWorldEntity(worldId: string, entityId: string): Promise<WorldEntityDetail> {
     const res = await fetch(`/api/world/${worldId}/entity/${entityId}`);
-    if (!res.ok) throw new Error(`getWorldEntity: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getWorldEntity');
     return res.json();
   }
 
@@ -689,19 +689,19 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ markdown, folder: folder ?? '' }),
     });
-    if (!res.ok) throw new Error((await res.text()).trim() || `saveWorldEntity: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'saveWorldEntity');
   }
 
   static async deleteWorldEntity(worldId: string, entityId: string): Promise<void> {
     const res = await fetch(`/api/world/${worldId}/entity/${entityId}`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error(`deleteWorldEntity: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'deleteWorldEntity');
   }
 
   static async listWorldFolders(worldId: string): Promise<FolderNode[]> {
     const res = await fetch(`/api/world/${worldId}/folders`);
-    if (!res.ok) throw new Error(`listWorldFolders: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'listWorldFolders');
     return res.json();
   }
 
@@ -711,7 +711,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),
     });
-    if (!res.ok) throw new Error((await res.text()).trim() || `createWorldFolder: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'createWorldFolder');
   }
 
   static async moveWorldFolder(worldId: string, from: string, to: string): Promise<void> {
@@ -720,7 +720,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, path: to }),
     });
-    if (!res.ok) throw new Error((await res.text()).trim() || `moveWorldFolder: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'moveWorldFolder');
   }
 
   static async deleteWorldFolder(worldId: string, path: string, recursive = false): Promise<void> {
@@ -728,7 +728,7 @@ export class APIClient {
     const res = await fetch(`/api/world/${worldId}/folders?${params.toString()}`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error((await res.text()).trim() || `deleteWorldFolder: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'deleteWorldFolder');
   }
 
   // generateWorld streams a world generation: a step event per pipeline stage
@@ -978,7 +978,7 @@ export class APIClient {
 
   static async getSettings(): Promise<SettingsResponse> {
     const res = await fetch('/api/settings');
-    if (!res.ok) throw new Error(`getSettings: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getSettings');
     return res.json();
   }
 
@@ -986,7 +986,7 @@ export class APIClient {
   // with the one in force and any reason it was ignored.
   static async getStylePacks(): Promise<StylePacks> {
     const res = await fetch('/api/styles');
-    if (!res.ok) throw new Error(`getStylePacks: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getStylePacks');
     return res.json();
   }
 
@@ -1014,7 +1014,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ config: cfg }),
     });
-    if (!res.ok) throw new Error(`saveSettings: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'saveSettings');
     return res.json();
   }
 
@@ -1024,13 +1024,13 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tts: tts || 'native-os' }),
     });
-    if (!res.ok) throw new Error((await res.text()).trim() || `applyOfflinePreset: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'applyOfflinePreset');
     return res.json();
   }
 
   static async checkOffline(): Promise<OfflineReportResponse> {
     const res = await fetch('/api/config/offline-report');
-    if (!res.ok) throw new Error(`checkOffline: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'checkOffline');
     return res.json();
   }
 
@@ -1043,7 +1043,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
     });
-    if (!res.ok) throw new Error(`openURL: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'openURL');
   }
 
   static async testProvider(req: TestProviderRequest): Promise<TestProviderResponse> {
@@ -1052,7 +1052,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new Error(`testProvider: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'testProvider');
     return res.json();
   }
 
@@ -1062,7 +1062,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new Error(`inspectTTS: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'inspectTTS');
     return res.json();
   }
 
@@ -1072,13 +1072,13 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ family }),
     });
-    if (!res.ok) throw new Error(`inspectMedia: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'inspectMedia');
     return res.json();
   }
 
   static async listProviders(): Promise<ProviderCatalog> {
     const res = await fetch('/api/providers');
-    if (!res.ok) throw new Error(`listProviders: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'listProviders');
     return res.json();
   }
 
@@ -1088,7 +1088,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: apiKey }),
     });
-    if (!res.ok) throw new Error(`listGeminiModels: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'listGeminiModels');
     return res.json();
   }
 
@@ -1098,7 +1098,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new Error(`searchTTSVoices: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'searchTTSVoices');
     return res.json();
   }
 
@@ -1277,43 +1277,43 @@ export class APIClient {
 
   async getChronicle(): Promise<Turn[]> {
     const res = await fetch(`/api/game/${this.gameID}/chronicle`);
-    if (!res.ok) throw new Error(`getChronicle: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getChronicle');
     return res.json();
   }
 
   async getRecap(): Promise<Recap> {
     const res = await fetch(`/api/game/${this.gameID}/recap`);
-    if (!res.ok) throw new Error(`getRecap: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getRecap');
     return res.json();
   }
 
   async listEntities(): Promise<EntitySummary[]> {
     const res = await fetch(`/api/game/${this.gameID}/entities`);
-    if (!res.ok) throw new Error(`listEntities: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'listEntities');
     return res.json();
   }
 
   async getEntityFrontmatterSchema(): Promise<FrontmatterSchema> {
     const res = await fetch('/api/schema/entity-frontmatter');
-    if (!res.ok) throw new Error(`getEntityFrontmatterSchema: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getEntityFrontmatterSchema');
     return res.json();
   }
 
   async getEntityTypes(): Promise<EntityTypeCatalog> {
     const res = await fetch('/api/schema/entity-types');
-    if (!res.ok) throw new Error(`getEntityTypes: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getEntityTypes');
     return res.json();
   }
 
   async getGraph(): Promise<GraphData> {
     const res = await fetch(`/api/game/${this.gameID}/graph`);
-    if (!res.ok) throw new Error(`getGraph: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getGraph');
     return res.json();
   }
 
   async getEntity(entityID: string): Promise<EntityNote> {
     const res = await fetch(`/api/game/${this.gameID}/entity/${entityID}`);
-    if (!res.ok) throw new Error(`getEntity: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getEntity');
     return res.json();
   }
 
@@ -1341,12 +1341,12 @@ export class APIClient {
 
   async deleteEntity(entityID: string): Promise<void> {
     const res = await fetch(`/api/game/${this.gameID}/entity/${entityID}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error((await res.text()).trim() || `deleteEntity: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'deleteEntity');
   }
 
   async listFolders(): Promise<FolderNode[]> {
     const res = await fetch(`/api/game/${this.gameID}/folders`);
-    if (!res.ok) throw new Error(`listFolders: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'listFolders');
     return res.json();
   }
 
@@ -1356,7 +1356,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),
     });
-    if (!res.ok) throw new Error((await res.text()).trim() || `createFolder: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'createFolder');
   }
 
   async moveFolder(from: string, to: string): Promise<void> {
@@ -1365,7 +1365,7 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, path: to }),
     });
-    if (!res.ok) throw new Error((await res.text()).trim() || `moveFolder: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'moveFolder');
   }
 
   async deleteFolder(path: string, recursive = false): Promise<void> {
@@ -1373,7 +1373,7 @@ export class APIClient {
     const res = await fetch(`/api/game/${this.gameID}/folders?${params.toString()}`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error((await res.text()).trim() || `deleteFolder: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'deleteFolder');
   }
 
   async mergeEntity(sourceID: string, intoID: string): Promise<EntityNote> {
@@ -1382,13 +1382,13 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ into: intoID, confirm: true }),
     });
-    if (!res.ok) throw new Error(`mergeEntity: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'mergeEntity');
     return res.json();
   }
 
   async getFindings(): Promise<{ addressed: AddressedFinding[] }> {
     const res = await fetch(`/api/game/${this.gameID}/findings`);
-    if (!res.ok) throw new Error(`getFindings: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getFindings');
     return res.json();
   }
 
@@ -1398,18 +1398,18 @@ export class APIClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ turn, rule }),
     });
-    if (!res.ok) throw new Error(`addressFinding: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'addressFinding');
   }
 
   static async getTurnContext(gameID: string): Promise<TurnContext> {
     const res = await fetch(`/api/game/${gameID}/context`);
-    if (!res.ok) throw new Error(`getTurnContext: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getTurnContext');
     return res.json();
   }
 
   static async getWorkingSet(gameID: string): Promise<WorkingEntry[]> {
     const res = await fetch(`/api/game/${gameID}/working-set`);
-    if (!res.ok) throw new Error(`getWorkingSet: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getWorkingSet');
     return res.json();
   }
 
@@ -1423,19 +1423,19 @@ export class APIClient {
 
   static async getGameUsage(gameID: string): Promise<Usage> {
     const res = await fetch(`/api/game/${encodeURIComponent(gameID)}/usage`);
-    if (!res.ok) throw new Error(`getGameUsage: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getGameUsage');
     return res.json();
   }
 
   static async getGlobalUsage(): Promise<Usage> {
     const res = await fetch('/api/usage');
-    if (!res.ok) throw new Error(`getGlobalUsage: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getGlobalUsage');
     return res.json();
   }
 
   static async getLimits(): Promise<LimitsDTO> {
     const res = await fetch('/api/limits');
-    if (!res.ok) throw new Error(`getLimits: ${res.statusText}`);
+    if (!res.ok) throw await errorFromResponse(res, 'getLimits');
     return res.json();
   }
 
