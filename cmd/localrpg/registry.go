@@ -182,7 +182,11 @@ func runRegistrySearch(args []string, stdout, stderr io.Writer) int {
 	}
 
 	mgr := config.NewConfigManager()
-	cfg, _ := mgr.Load()
+	cfg, err := mgr.Load()
+	if err != nil {
+		fmt.Fprintf(stderr, "Error loading configuration: %v\n", err)
+		return 1
+	}
 
 	resolver := registryResolver(cfg)
 
@@ -230,7 +234,11 @@ func runRegistryInstall(args []string, stdout, stderr io.Writer) int {
 	targetID, targetVersion := splitPackageSpec(positional[0])
 
 	mgr := config.NewConfigManager()
-	cfg, _ := mgr.Load()
+	cfg, err := mgr.Load()
+	if err != nil {
+		fmt.Fprintf(stderr, "Error loading configuration: %v\n", err)
+		return 1
+	}
 
 	resolver := registryResolver(cfg)
 
@@ -310,7 +318,11 @@ func findRegistryCandidate(client *registry.Client, targetID, targetVersion stri
 
 func runRegistryUpdate(args []string, stdout, stderr io.Writer) int {
 	mgr := config.NewConfigManager()
-	cfg, _ := mgr.Load()
+	cfg, err := mgr.Load()
+	if err != nil {
+		fmt.Fprintf(stderr, "Error loading configuration: %v\n", err)
+		return 1
+	}
 
 	resolver := registryResolver(cfg)
 

@@ -219,7 +219,11 @@ func runContentVerify(args []string, stdout, stderr io.Writer) int {
 	}
 
 	mgr := config.NewConfigManager()
-	cfg, _ := mgr.Load()
+	cfg, err := mgr.Load()
+	if err != nil {
+		fmt.Fprintf(stderr, "Error loading configuration: %v\n", err)
+		return 1
+	}
 
 	var trusted map[string]string
 	if cfg != nil {

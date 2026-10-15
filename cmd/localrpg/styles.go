@@ -25,7 +25,11 @@ func runStylesCommand(args []string, stdout, stderr io.Writer) int {
 	}
 
 	mgr := config.NewConfigManager()
-	cfg, _ := mgr.Load()
+	cfg, err := mgr.Load()
+	if err != nil {
+		fmt.Fprintf(stderr, "Error loading configuration: %v\n", err)
+		return 1
+	}
 
 	switch args[0] {
 	case "list":

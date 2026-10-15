@@ -3,6 +3,7 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/adrg/xdg"
@@ -104,5 +105,83 @@ func TestRevisionIncrementsOnSave(t *testing.T) {
 	}
 	if m.Revision() <= start {
 		t.Fatalf("Revision did not advance: start %d, now %d", start, m.Revision())
+	}
+}
+
+func TestConfigManagerReportsAMalformedUserConfig(t *testing.T) {
+	dir := t.TempDir()
+	userPath := filepath.Join(dir, "config.yaml")
+	// A tab cannot start a YAML token, so the document does not parse at all.
+	if err := os.WriteFile(userPath, []byte("agents:\n\tdefault_role: gm\n"), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	mgr := config.NewConfigManagerWithPaths(userPath, filepath.Join(dir, "localrpg.yaml"))
+	cfg, err := mgr.Load()
+	if err == nil {
+		t.Fatal("expected an error for a config file that does not parse")
+	}
+	if !strings.Contains(err.Error(), userPath) {
+		t.Errorf("error %q does not name the file %q", err, userPath)
+	}
+	if cfg == nil {
+		t.Fatal("expected a usable configuration alongside the error")
+	}
+
+	var carried bool
+	for _, warning := range mgr.Warnings() {
+		if strings.Contains(warning, userPath) {
+			carried = true
+		}
+	}
+	if !carried {
+		t.Errorf("Warnings %v do not carry the parse failure", mgr.Warnings())
+	}
+}
+
+func TestConfigManagerReportsAMalformedLocalOverride(t *testing.T) {
+	dir := t.TempDir()
+	userPath := filepath.Join(dir, "config.yaml")
+	localPath := filepath.Join(dir, "localrpg.yaml")
+	if err := os.WriteFile(userPath, []byte("agents:\n  default_role: custom\n"), 0644); err != nil {
+		t.Fatalf("write user config: %v", err)
+	}
+	if err := os.WriteFile(localPath, []byte("paths:\n\tloading\n"), 0644); err != nil {
+		t.Fatalf("write local override: %v", err)
+	}
+
+	mgr := config.NewConfigManagerWithPaths(userPath, localPath)
+	cfg, err := mgr.Load()
+	if err == nil {
+		t.Fatal("expected an error for a local override that does not parse")
+	}
+	if !strings.Contains(err.Error(), localPath) {
+		t.Errorf("error %q does not name the override %q", err, localPath)
+	}
+	if mgr.IsLocalOverride() {
+		t.Error("an override that did not parse must not mark itself as the active file")
+	}
+	if cfg.Agents.DefaultRole != "custom" {
+		t.Errorf("expected the user config to still apply, got default_role %q", cfg.Agents.DefaultRole)
+	}
+}
+
+func TestConfigManagerDoesNotHalfApplyAMalformedFile(t *testing.T) {
+	dir := t.TempDir()
+	userPath := filepath.Join(dir, "config.yaml")
+	// The first field decodes and the second is the wrong type, so a file read
+	// field by field leaves a configuration that is neither the file nor the
+	// defaults.
+	if err := os.WriteFile(userPath, []byte("agents:\n  default_role: custom\npaths: 42\n"), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	mgr := config.NewConfigManagerWithPaths(userPath, filepath.Join(dir, "localrpg.yaml"))
+	cfg, err := mgr.Load()
+	if err == nil {
+		t.Fatal("expected an error for a field of the wrong type")
+	}
+	if cfg.Agents.DefaultRole != "gm" {
+		t.Errorf("a file that did not parse was half applied: default_role is %q", cfg.Agents.DefaultRole)
 	}
 }
