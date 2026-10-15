@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Wand2, X } from 'lucide-react';
 import { APIClient } from '../api/client';
@@ -46,6 +47,7 @@ export const SystemGenerateDialog: React.FC<SystemGenerateDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [limits, setLimits] = useState<GenerationLimitsOverride | undefined>(undefined);
   const [limitCode, setLimitCode] = useState<string | null>(null);
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onCancel);
   const abortRef = useRef<AbortController | null>(null);
 
   const request = useMemo<SystemGenerateRequest>(
@@ -165,7 +167,15 @@ export const SystemGenerateDialog: React.FC<SystemGenerateDialogProps> = ({
   const costLabel = estimate ? (estimate.priced ? formatCost(estimate.cost_micros ?? 0) : 'unpriced') : '';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Generate a system"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+    >
       <div className="relative w-full max-w-xl overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
