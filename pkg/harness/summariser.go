@@ -52,10 +52,12 @@ type Summariser struct {
 	logger    trace.Logger
 }
 
+// NewSummariser builds a summariser around one model.
 func NewSummariser(provider ModelProvider) *Summariser {
 	return &Summariser{provider: provider, charLimit: defaultSummaryChars}
 }
 
+// SetLogger attaches a trace sink. A nil logger records nothing.
 func (s *Summariser) SetLogger(logger trace.Logger) {
 	s.logger = trace.OrNil(logger)
 }

@@ -39,10 +39,14 @@ type UsageContext struct {
 	turn int
 }
 
+// NewUsageContext returns a context that reports what a campaign's turns cost to
+// sink.
 func NewUsageContext(sink UsageSink, gameID string) *UsageContext {
 	return &UsageContext{sink: sink, gameID: gameID}
 }
 
+// SetTurn records which turn is running, so usage recorded during it is attributed
+// to that turn rather than to the campaign as a whole.
 func (c *UsageContext) SetTurn(turn int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

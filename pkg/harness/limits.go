@@ -28,6 +28,8 @@ type LimitRegistry struct {
 	funds  map[LimitKey]string
 }
 
+// NewLimitRegistry starts an empty registry: no provider is backed off, and none
+// has failed for want of funds.
 func NewLimitRegistry() *LimitRegistry {
 	return &LimitRegistry{blocks: map[LimitKey]time.Time{}, funds: map[LimitKey]string{}}
 }
@@ -81,18 +83,24 @@ func limitKeys(providerKey string) []string {
 	return []string{string(parsed)}
 }
 
+// Clear removes a provider's backoff, for when it answers again or the user asks
+// to retry now.
 func (r *LimitRegistry) Clear(providerKey, role string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.blocks, LimitKey{providerKey, role})
 }
 
+// RecordFundsFailure remembers why a provider was refused for funds, so a client
+// can explain an outage that is really a bill.
 func (r *LimitRegistry) RecordFundsFailure(providerKey, role, message string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.funds[LimitKey{providerKey, role}] = message
 }
 
+// ClearFundsFailure forgets a provider's funds failure, which a call that succeeds
+// does on its way through.
 func (r *LimitRegistry) ClearFundsFailure(providerKey, role string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
