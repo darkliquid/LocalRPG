@@ -976,6 +976,15 @@ export class APIClient {
     return res.json();
   }
 
+  // getEntityFrontmatterSchema fetches the schema the entity editor completes
+  // against. The Go struct generates it, so it depends on no campaign and changes
+  // only when the app is rebuilt; the editor caches it for the session.
+  static async getEntityFrontmatterSchema(): Promise<FrontmatterSchema> {
+    const res = await fetch('/api/schema/entity-frontmatter');
+    if (!res.ok) throw await errorFromResponse(res, 'getEntityFrontmatterSchema');
+    return res.json();
+  }
+
   static async getSettings(): Promise<SettingsResponse> {
     const res = await fetch('/api/settings');
     if (!res.ok) throw await errorFromResponse(res, 'getSettings');
