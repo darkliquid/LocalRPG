@@ -2204,13 +2204,76 @@ func (o *TurnOrchestrator) generateRequest(ctx context.Context, req harness.Gene
 	return result, primaryFailure
 }
 
+// generationRun is the state of one generation call: the provider it talks to, the
+// strategy it settled on, the conversation the rounds build, and what they have
+// produced. beginGeneration creates it, the phases below read and write it, and it
+// is discarded when the call returns.
+type generationRun struct {
+	ctx      context.Context
+	assembly *harness.AssembleResult
+	onChunk  func(string) error
+
+	gmDirective     string
+	engagement      string
+	resolvedPending *harness.CheckResult
+
+	provider      harness.ModelProvider
+	modelName     string
+	turnNum       int
+	canCallTools  bool
+	storedSession *harness.ProviderSession
+
+	// The conversation, carried between rounds: what the model has been told, what
+	// the turn has looked up, the checks it resolved, and the failures the rounds
+	// recorded along the way.
+	contextPrompt string
+	messages      []harness.Message
+	provenance    []ToolCallRecord
+	checks        []harness.CheckResult
+	attempts      []harness.Attempt
+	withdrawn     bool
+}
+
 // runGenerationLoop runs the turn as a bounded conversation. It offers tools only
 // while the role can call them, the rounds are not spent, and the conversation is
 // within budget; otherwise the model is told tools are unavailable and asked to
 // answer. The result is the last reply that carried no tool calls. With no
 // executor attached the loop makes exactly one call, shaped as it was before
 // tools existed, so nothing changes for a provider that cannot call them.
+//
+// It reads as the phases of one generation call: what provider it is talking to and
+// under what strategy, whether a session from the previous turn can answer it in
+// one call, whether a session can be started for it, and then the rounds.
 func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harness.AssembleResult, gmDirective string, resolvedPending *harness.CheckResult, engagement string, onChunk func(string) error) (streamResult, error) {
+	run, err := o.beginGeneration(ctx, assembly, gmDirective, engagement, resolvedPending, onChunk)
+	if err != nil {
+		return streamResult{}, err
+	}
+
+	if result, err := o.continueStoredSession(run); err != nil {
+		return streamResult{}, err
+	} else if result != nil {
+		return *result, nil
+	}
+
+	o.ensurePrefixCache(run)
+
+	if result, err := o.startProviderSession(run); err != nil {
+		return streamResult{}, err
+	} else if result != nil {
+		return *result, nil
+	}
+
+	return o.runToolRounds(run)
+}
+
+// beginGeneration resolves what the call is made with: the provider and the model
+// name it reports, which turn this is and the session the previous turn left, and
+// whether the role may be offered tools at all. It also settles the context
+// strategy, which is stepped down from a server session whenever tools are in
+// play, because a session and a tool conversation cannot both be the shape of the
+// request.
+func (o *TurnOrchestrator) beginGeneration(ctx context.Context, assembly *harness.AssembleResult, gmDirective, engagement string, resolvedPending *harness.CheckResult, onChunk func(string) error) (*generationRun, error) {
 	contextPrompt := assembly.Prompt
 	if gmDirective != "" {
 		contextPrompt = gmDirective + "\n\n" + contextPrompt
@@ -2218,7 +2281,7 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 
 	provider, err := o.router.GetProviderForRole(config.RoleGM)
 	if err != nil {
-		return streamResult{}, err
+		return nil, err
 	}
 
 	caps := harness.Describe(provider)
@@ -2254,385 +2317,506 @@ func (o *TurnOrchestrator) runGenerationLoop(ctx context.Context, assembly *harn
 	}
 	assembly.Context.Strategy = strategy
 
-	// Server session strategy: try ContinueSession when tools are not offered
-	if !canCallTools && strategy == harness.StrategyServerSession {
-		if sessProvider, ok := provider.(harness.SessionProvider); ok && storedSession != nil {
-			deltaPrompt := assembly.DeltaPrompt
-			if gmDirective != "" {
-				deltaPrompt = gmDirective + "\n\n" + deltaPrompt
-			}
-			deltaReq := harness.GenerateRequest{
-				Prompt: deltaPrompt,
-				System: o.rulesPrompt,
-			}
-			handle := &harness.SessionHandle{
-				ID:          storedSession.ID,
-				ThroughTurn: storedSession.ThroughTurn,
-			}
-			resp, err := sessProvider.ContinueSession(ctx, handle, deltaReq)
-			if err == nil {
-				if onChunk != nil && resp.Text != "" {
-					if err := onChunk(resp.Text); err != nil {
-						return streamResult{}, fmt.Errorf("%w: %w", errStreamListener, err)
-					}
-				}
-				assembly.Context.CachedTokens = resp.CachedTokens
-				newID := resp.SessionID
-				if newID == "" {
-					newID = storedSession.ID
-				}
-				assembly.Context.Session = &harness.ProviderSession{
-					Provider:    provider.ID(),
-					ID:          newID,
-					ThroughTurn: turnNum,
-					Model:       modelName,
-					PrefixHash:  assembly.Context.PrefixHash,
-				}
-				return streamResult{Text: resp.Text}, nil
-			}
-			// Session continuation failed: fallback to full_prompt
-			o.logger.Event("context.session_fallback", map[string]any{
-				"error":    err.Error(),
-				"from":     string(harness.StrategyServerSession),
-				"fallback": string(harness.StrategyFullPrompt),
-			})
-			assembly.Context.Strategy = harness.StrategyFullPrompt
-		}
-	}
+	return &generationRun{
+		ctx:             ctx,
+		assembly:        assembly,
+		onChunk:         onChunk,
+		gmDirective:     gmDirective,
+		engagement:      engagement,
+		resolvedPending: resolvedPending,
+		provider:        provider,
+		modelName:       modelName,
+		turnNum:         turnNum,
+		canCallTools:    canCallTools,
+		storedSession:   storedSession,
+		contextPrompt:   contextPrompt,
+	}, nil
+}
 
-	// Cached prefix strategy: ensure cache
-	if strategy == harness.StrategyCachedPrefix {
-		if cacher, ok := provider.(harness.ContextCacher); ok {
-			_, err := cacher.EnsureCache(ctx, assembly.PrefixPrompt, 1*time.Hour)
-			if err != nil {
-				o.logger.Event("context.cache_fallback", map[string]any{
-					"error":    err.Error(),
-					"fallback": string(harness.StrategyFullPrompt),
-				})
-				assembly.Context.Strategy = harness.StrategyFullPrompt
+// continueStoredSession answers the turn in the session the previous turn left,
+// which is one call instead of a whole prompt. It returns the reply when the
+// session answered, and nil when the turn takes the ordinary path; a continuation
+// that fails is not fatal, because the strategy falls back to the full prompt.
+func (o *TurnOrchestrator) continueStoredSession(run *generationRun) (*streamResult, error) {
+	if run.canCallTools || run.assembly.Context.Strategy != harness.StrategyServerSession {
+		return nil, nil
+	}
+	sessProvider, ok := run.provider.(harness.SessionProvider)
+	if !ok || run.storedSession == nil {
+		return nil, nil
+	}
+	deltaPrompt := run.assembly.DeltaPrompt
+	if run.gmDirective != "" {
+		deltaPrompt = run.gmDirective + "\n\n" + deltaPrompt
+	}
+	deltaReq := harness.GenerateRequest{
+		Prompt: deltaPrompt,
+		System: o.rulesPrompt,
+	}
+	handle := &harness.SessionHandle{
+		ID:          run.storedSession.ID,
+		ThroughTurn: run.storedSession.ThroughTurn,
+	}
+	resp, err := sessProvider.ContinueSession(run.ctx, handle, deltaReq)
+	if err == nil {
+		if run.onChunk != nil && resp.Text != "" {
+			if err := run.onChunk(resp.Text); err != nil {
+				return nil, fmt.Errorf("%w: %w", errStreamListener, err)
 			}
 		}
+		run.assembly.Context.CachedTokens = resp.CachedTokens
+		newID := resp.SessionID
+		if newID == "" {
+			newID = run.storedSession.ID
+		}
+		run.assembly.Context.Session = &harness.ProviderSession{
+			Provider:    run.provider.ID(),
+			ID:          newID,
+			ThroughTurn: run.turnNum,
+			Model:       run.modelName,
+			PrefixHash:  run.assembly.Context.PrefixHash,
+		}
+		return &streamResult{Text: resp.Text}, nil
 	}
+	// Session continuation failed: fallback to full_prompt
+	o.logger.Event("context.session_fallback", map[string]any{
+		"error":    err.Error(),
+		"from":     string(harness.StrategyServerSession),
+		"fallback": string(harness.StrategyFullPrompt),
+	})
+	run.assembly.Context.Strategy = harness.StrategyFullPrompt
+	return nil, nil
+}
 
-	// If provider supports sessions, try StartSession when starting or falling back (only when tools are not offered)
-	if !canCallTools {
-		if sessProvider, ok := provider.(harness.SessionProvider); ok {
-			fullReq := harness.GenerateRequest{
-				Prompt: contextPrompt,
-				System: o.rulesPrompt,
-			}
-			handle, err := sessProvider.StartSession(ctx, fullReq)
-			if err == nil && handle != nil {
-				text := ""
-				if handle.Response != nil {
-					text = handle.Response.Text
-					if onChunk != nil && text != "" {
-						if err := onChunk(text); err != nil {
-							return streamResult{}, fmt.Errorf("%w: %w", errStreamListener, err)
-						}
-					}
-				}
-				assembly.Context.CachedTokens = handle.CachedTokens
-				assembly.Context.Session = &harness.ProviderSession{
-					Provider:    provider.ID(),
-					ID:          handle.ID,
-					ThroughTurn: turnNum,
-					Model:       modelName,
-					PrefixHash:  assembly.Context.PrefixHash,
-				}
-				if text != "" {
-					return streamResult{Text: text}, nil
-				}
+// ensurePrefixCache uploads the prefix once for a provider that caches it, since
+// reusing it is the point of the strategy. A failure is not fatal: the strategy
+// falls back to the full prompt.
+func (o *TurnOrchestrator) ensurePrefixCache(run *generationRun) {
+	if run.assembly.Context.Strategy != harness.StrategyCachedPrefix {
+		return
+	}
+	cacher, ok := run.provider.(harness.ContextCacher)
+	if !ok {
+		return
+	}
+	if _, err := cacher.EnsureCache(run.ctx, run.assembly.PrefixPrompt, 1*time.Hour); err != nil {
+		o.logger.Event("context.cache_fallback", map[string]any{
+			"error":    err.Error(),
+			"fallback": string(harness.StrategyFullPrompt),
+		})
+		run.assembly.Context.Strategy = harness.StrategyFullPrompt
+	}
+}
+
+// startProviderSession opens a session for the turn, when the provider keeps one
+// and tools are not in play, and returns the reply when the session answered in
+// the same call. A session that opened but said nothing falls through to the
+// ordinary path.
+func (o *TurnOrchestrator) startProviderSession(run *generationRun) (*streamResult, error) {
+	if run.canCallTools {
+		return nil, nil
+	}
+	sessProvider, ok := run.provider.(harness.SessionProvider)
+	if !ok {
+		return nil, nil
+	}
+	fullReq := harness.GenerateRequest{
+		Prompt: run.contextPrompt,
+		System: o.rulesPrompt,
+	}
+	handle, err := sessProvider.StartSession(run.ctx, fullReq)
+	if err != nil || handle == nil {
+		return nil, nil
+	}
+	text := ""
+	if handle.Response != nil {
+		text = handle.Response.Text
+		if run.onChunk != nil && text != "" {
+			if err := run.onChunk(text); err != nil {
+				return nil, fmt.Errorf("%w: %w", errStreamListener, err)
 			}
 		}
 	}
+	run.assembly.Context.CachedTokens = handle.CachedTokens
+	run.assembly.Context.Session = &harness.ProviderSession{
+		Provider:    run.provider.ID(),
+		ID:          handle.ID,
+		ThroughTurn: run.turnNum,
+		Model:       run.modelName,
+		PrefixHash:  run.assembly.Context.PrefixHash,
+	}
+	if text != "" {
+		return &streamResult{Text: text}, nil
+	}
+	return nil, nil
+}
 
+// runToolRounds runs the turn's rounds of the conversation. Tools are offered
+// while the role can call them, the rounds are not spent, and the conversation is
+// within budget; otherwise the model is told they are unavailable and asked to
+// answer. The result is the last reply that carried no tool calls.
+func (o *TurnOrchestrator) runToolRounds(run *generationRun) (streamResult, error) {
 	// One user turn carrying the assembled context keeps the request identical to
 	// the single-prompt path for a provider that ignores messages.
-	messages := []harness.Message{{Role: "user", Content: contextPrompt}}
+	run.messages = []harness.Message{{Role: "user", Content: run.contextPrompt}}
 
-	var provenance []ToolCallRecord
-	var checks []harness.CheckResult
-	var recordedAttempts []harness.Attempt
-	if resolvedPending != nil {
-		checks = append(checks, *resolvedPending)
+	if run.resolvedPending != nil {
+		run.checks = append(run.checks, *run.resolvedPending)
 	}
-	withdrawn := false
 
 	for round := 0; round <= o.toolRoundCap(); round++ {
-		offerTools := canCallTools && round < o.toolRoundCap() && !withdrawn && !o.overBudget(messages)
+		offerTools, request := o.beginToolRound(run, round)
 
-		// Prompt is kept for a caller or provider that only reads a string: it is
-		// the assembled context, exactly as the single-prompt path sent it, so
-		// existing behaviour and tests are unchanged. A provider that can call
-		// tools reads Messages instead.
-		request := harness.GenerateRequest{Messages: messages, Prompt: contextPrompt}
-		if offerTools {
-			mode := engagement
-			if mode == "" {
-				mode = "auto"
-			}
-			request.Tools = append(harness.ToolSpecs(), harness.TurnToolSpecsFor(mode)...)
-		}
-		if round == 0 && o.forceToolChoice && resolvedPending == nil {
-			// Force a tool call when the provider can, otherwise nudge the prompt.
-			if offerTools {
-				request.ToolChoice = "required"
-			} else {
-				contextPrompt = forceCheckNudge + "\n\n" + contextPrompt
-				request.Prompt = contextPrompt
-				if len(messages) > 0 {
-					last := &messages[len(messages)-1]
-					last.Content = strings.TrimSpace(last.Content + "\n\n" + forceCheckNudge)
-				}
-			}
-		}
-		o.logger.Event("tool.round", map[string]any{
-			"round":               round,
-			"offered":             offerTools,
-			"conversation_tokens": conversationTokens(messages),
-			"budget":              o.contextBudget(),
-		})
-
-		roundCtx, roundSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "provider.generate",
+		roundCtx, roundSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(run.ctx, "provider.generate",
 			oteltrace.WithAttributes(
 				attribute.String("localrpg.role", config.RoleGM),
-				attribute.String("provider.id", provider.ID()),
-				attribute.String("turn.assembled_prompt", contextPrompt),
+				attribute.String("provider.id", run.provider.ID()),
+				attribute.String("turn.assembled_prompt", run.contextPrompt),
 				attribute.Int("localrpg.round", round),
 				attribute.Bool("localrpg.tools_offered", offerTools),
 			),
 		)
-		var result streamResult
-		var genErr error
-		repairAttempts := 0
-		maxRepairs := o.completionMaxRepairAttempts()
-		genReq := request
 
-		for {
-			roundStarted := time.Now()
-			// Each round's prose is provisional until the round is chosen: only the
-			// last round becomes the turn. Resetting the parser discards a round that
-			// narrated before calling a tool, so the finalised segments match the
-			// recorded narration.
-			if o.parser != nil {
-				o.parser.Reset()
-			}
-			result, genErr = o.generateRequest(roundCtx, genReq, onChunk)
-			roundDuration := float64(time.Since(roundStarted).Milliseconds())
-			roundAttributes := otelmetric.WithAttributes(
-				attribute.String("localrpg.role", config.RoleGM),
-				attribute.Int("localrpg.round", round),
-			)
-			roundSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
-
-			// Check if reply is malformed (empty stream or malformed reply)
-			isMalformed := (result.Failure != nil && result.Failure.Code == harness.FailureEmptyResponse) ||
-				(genErr == nil && classifyReply(result, turnstream.RepairReport{}) == ProblemMalformed)
-
-			if isMalformed && repairAttempts < maxRepairs {
-				detail := "empty response"
-				if result.Failure != nil && result.Failure.Message != "" {
-					detail = result.Failure.Message
-				}
-				recordedAttempts = append(recordedAttempts, harness.Attempt{
-					Role:     config.RoleGM,
-					Provider: provider.ID(),
-					Code:     harness.FailureParseError,
-					Detail:   detail,
-				})
-				repairAttempts++
-				nudge := repairInstruction(ProblemMalformed, detail)
-				messages = append(messages, harness.Message{Role: "user", Content: nudge})
-				genReq.Messages = messages
-				if strings.TrimSpace(genReq.Prompt) != "" {
-					genReq.Prompt = genReq.Prompt + "\n\n" + nudge
-				}
-				continue
-			}
-
-			if genErr != nil {
-				code := harness.ClassifyProviderError(genErr)
-				if result.Failure != nil && result.Failure.Code != "" {
-					code = result.Failure.Code
-				}
-				if len(recordedAttempts) > 0 && result.Failure != nil {
-					result.Failure.Attempts = append(recordedAttempts, result.Failure.Attempts...)
-				}
-				engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
-					attribute.String("localrpg.role", config.RoleGM),
-					attribute.String("error.kind", string(code)),
-					attribute.String("gen_ai.system", provider.ID()),
-				))
-				engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
-				roundSpan.SetAttributes(
-					attribute.String("turn.failure_code", string(code)),
-					attribute.String("localrpg.generation.failure_code", string(code)),
-				)
-				roundSpan.RecordError(genErr)
-				roundSpan.SetStatus(codes.Error, string(code))
-				roundSpan.End()
-				return result, genErr
-			}
-			engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
-			if result.Failure != nil {
-				if len(recordedAttempts) > 0 {
-					result.Failure.Attempts = append(recordedAttempts, result.Failure.Attempts...)
-				}
-				engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
-					attribute.String("localrpg.role", config.RoleGM),
-					attribute.String("error.kind", string(result.Failure.Code)),
-					attribute.String("gen_ai.system", provider.ID()),
-				))
-				roundSpan.SetAttributes(
-					attribute.String("turn.failure_code", string(result.Failure.Code)),
-					attribute.String("turn.failure_message", result.Failure.Message),
-					attribute.String("localrpg.generation.failure_code", string(result.Failure.Code)),
-				)
-				roundSpan.RecordError(result.Failure)
-				roundSpan.SetStatus(codes.Error, string(result.Failure.Code))
-				roundSpan.End()
-				return result, result.Failure
-			}
-			break
+		result, err := o.generateRound(run, roundCtx, roundSpan, request, round)
+		if err != nil {
+			return result, err
 		}
-		roundSpan.End()
-
-		// A reply carrying calls while tools were not offered is a protocol quirk:
-		// its text is the answer, and the calls are dropped and traced.
-		if len(result.ToolCalls) > 0 && !offerTools {
-			o.logger.Event("tool.stray", map[string]any{"round": round, "calls": len(result.ToolCalls)})
-			result.ToolCalls = nil
-			result.Provenance = provenance
-			result.Checks = checks
+		if o.consumeToolRound(run, round, offerTools, &result) {
 			return result, nil
-		}
-		if len(result.ToolCalls) == 0 {
-			result.Provenance = provenance
-			result.Checks = checks
-			return result, nil
-		}
-
-		// Prose in a tool round is the model thinking out loud, and its order
-		// relative to the result is undefined, so it is discarded and traced.
-		if strings.TrimSpace(result.Text) != "" {
-			o.logger.Event("tool.prose_discarded", map[string]any{
-				"round": round,
-				"chars": len([]rune(result.Text)),
-			})
-		}
-
-		messages = append(messages, harness.Message{Role: "assistant", ToolCalls: result.ToolCalls})
-		for _, call := range result.ToolCalls {
-			trace.LogEvent(ctx, o.logger, "tool.call", map[string]any{
-				"round":           round,
-				"name":            call.Name,
-				"arguments":       call.Arguments,
-				"arguments_chars": len([]rune(call.Arguments)),
-			})
-			o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "running"})
-
-			// Turn tools are handled here, not by the query executor: a check
-			// resolves through the rules layer and feeds its result back, and a
-			// submission ends the loop.
-			if harness.IsTurnTool(call.Name) {
-				switch call.Name {
-				case "request_check":
-					req, parseErr := harness.ParseCheckRequest(call.Arguments)
-					if parseErr != nil {
-						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
-						continue
-					}
-					resolved, resolveErr := o.resolveCheck(ctx, *req, nil)
-					if resolveErr != nil {
-						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + resolveErr.Error()})
-						continue
-					}
-					// The GM references this id in its segments, so it must be stable
-					// and known to the model: the tool call id it chose serves that.
-					if call.ID != "" {
-						resolved.CheckID = call.ID
-					}
-					resolved.Actor = req.Actor
-					resolved.Target = req.Target
-					checks = append(checks, *resolved)
-					encoded, err := json.Marshal(resolved)
-					if err != nil {
-						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: failed to encode check result: " + err.Error()})
-						continue
-					}
-					messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: string(encoded)})
-					o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "done", Summary: resolved.Outcome})
-					continue
-				case "propose_check":
-					if o.mechanicsEngagement != config.EngagementAsk {
-						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: propose_check is only available when mechanics are set to ask"})
-						continue
-					}
-					req, parseErr := harness.ParseCheckRequest(call.Arguments)
-					if parseErr != nil {
-						messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
-						continue
-					}
-					result.PendingCheck = &harness.PendingCheck{Ref: call.ID, Request: *req, ProposedBy: harness.ProposedByGM}
-					result.Provenance = provenance
-					result.ToolCalls = nil
-					return result, nil
-				default:
-					messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: unsupported turn tool " + call.Name})
-					continue
-				}
-			}
-
-			if !offerTools {
-				o.logger.Event("tool.stray", map[string]any{"round": round, "call": call.Name})
-				continue
-			}
-
-			started := time.Now()
-			toolCtx, toolSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "tool.call",
-				oteltrace.WithAttributes(
-					attribute.String("localrpg.tool.name", call.Name),
-					attribute.Int("localrpg.round", round),
-				),
-			)
-			output, ok := o.toolExecutor.Execute(toolCtx, call)
-			toolSpan.SetAttributes(attribute.Bool("localrpg.tool.ok", ok), attribute.Int("localrpg.tool.bytes", len(output)))
-			if !ok {
-				toolSpan.SetStatus(codes.Error, "tool execution failed")
-			}
-			toolSpan.End()
-			engineMetrics().toolDuration.Record(context.Background(), float64(time.Since(started).Milliseconds()),
-				otelmetric.WithAttributes(
-					attribute.String("localrpg.tool.name", call.Name),
-					attribute.Bool("localrpg.tool.ok", ok),
-				))
-			trace.LogEvent(ctx, o.logger, "tool.result", map[string]any{
-				"name":        call.Name,
-				"ok":          ok,
-				"bytes":       len(output),
-				"duration_ms": time.Since(started).Milliseconds(),
-				"result":      output,
-			})
-			o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "done", Summary: toolSummary(ok, output)})
-
-			provenance = append(provenance, ToolCallRecord{Name: call.Name, ResultChars: len([]rune(output))})
-			messages = append(messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: output})
-		}
-
-		// After the final allowed round, or once the budget is crossed, tools are
-		// withdrawn and the model is told so as a readable result rather than a
-		// silent stop it would retry.
-		if round+1 >= o.toolRoundCap() || o.overBudget(messages) {
-			withdrawn = true
-			messages = append(messages, harness.Message{
-				Role:    "tool",
-				Content: "Tools are no longer available for this turn. Complete the turn now by providing your narration as text.",
-			})
 		}
 	}
 
 	return streamResult{}, fmt.Errorf("tool loop ended without an answer")
+}
+
+// beginToolRound builds one round's request: whether tools are offered at all, and
+// the tool specs and forced choice that go with them. The prompt is kept for a
+// caller or provider that only reads a string, since it is the assembled context
+// exactly as the single-prompt path sent it; a provider that can call tools reads
+// Messages instead.
+func (o *TurnOrchestrator) beginToolRound(run *generationRun, round int) (bool, harness.GenerateRequest) {
+	offerTools := run.canCallTools && round < o.toolRoundCap() && !run.withdrawn && !o.overBudget(run.messages)
+
+	request := harness.GenerateRequest{Messages: run.messages, Prompt: run.contextPrompt}
+	if offerTools {
+		mode := run.engagement
+		if mode == "" {
+			mode = "auto"
+		}
+		request.Tools = append(harness.ToolSpecs(), harness.TurnToolSpecsFor(mode)...)
+	}
+	if round == 0 && o.forceToolChoice && run.resolvedPending == nil {
+		// Force a tool call when the provider can, otherwise nudge the prompt.
+		if offerTools {
+			request.ToolChoice = "required"
+		} else {
+			run.contextPrompt = forceCheckNudge + "\n\n" + run.contextPrompt
+			request.Prompt = run.contextPrompt
+			if len(run.messages) > 0 {
+				last := &run.messages[len(run.messages)-1]
+				last.Content = strings.TrimSpace(last.Content + "\n\n" + forceCheckNudge)
+			}
+		}
+	}
+	o.logger.Event("tool.round", map[string]any{
+		"round":               round,
+		"offered":             offerTools,
+		"conversation_tokens": conversationTokens(run.messages),
+		"budget":              o.contextBudget(),
+	})
+	return offerTools, request
+}
+
+// generateRound makes one round's call, asking again with a repair instruction
+// while the reply is malformed or empty and the repairs are not spent. It returns
+// the reply the round settled on, or the failure that ended it; the round's span is
+// ended either way.
+func (o *TurnOrchestrator) generateRound(run *generationRun, roundCtx context.Context, roundSpan oteltrace.Span, request harness.GenerateRequest, round int) (streamResult, error) {
+	var result streamResult
+	var genErr error
+	repairAttempts := 0
+	maxRepairs := o.completionMaxRepairAttempts()
+	genReq := request
+
+	for {
+		roundStarted := time.Now()
+		// Each round's prose is provisional until the round is chosen: only the
+		// last round becomes the turn. Resetting the parser discards a round that
+		// narrated before calling a tool, so the finalised segments match the
+		// recorded narration.
+		if o.parser != nil {
+			o.parser.Reset()
+		}
+		result, genErr = o.generateRequest(roundCtx, genReq, run.onChunk)
+		roundDuration := float64(time.Since(roundStarted).Milliseconds())
+		roundAttributes := otelmetric.WithAttributes(
+			attribute.String("localrpg.role", config.RoleGM),
+			attribute.Int("localrpg.round", round),
+		)
+		roundSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
+
+		if o.repairMalformedReply(run, &genReq, result, genErr, repairAttempts, maxRepairs) {
+			repairAttempts++
+			continue
+		}
+
+		if genErr != nil {
+			o.recordRoundError(run, roundSpan, roundDuration, roundAttributes, genErr, result)
+			return result, genErr
+		}
+		engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
+		if result.Failure != nil {
+			o.recordRoundFailure(run, roundSpan, result)
+			return result, result.Failure
+		}
+		break
+	}
+	roundSpan.End()
+	return result, nil
+}
+
+// repairMalformedReply reports whether a malformed or empty reply should be asked
+// for again, recording the attempt and appending the repair instruction to the
+// conversation and the request when it should be. A reply is malformed when the
+// provider called it an empty response, or when the parser cannot make sense of it.
+func (o *TurnOrchestrator) repairMalformedReply(run *generationRun, genReq *harness.GenerateRequest, result streamResult, genErr error, repairAttempts, maxRepairs int) bool {
+	isMalformed := (result.Failure != nil && result.Failure.Code == harness.FailureEmptyResponse) ||
+		(genErr == nil && classifyReply(result, turnstream.RepairReport{}) == ProblemMalformed)
+	if !isMalformed || repairAttempts >= maxRepairs {
+		return false
+	}
+
+	detail := "empty response"
+	if result.Failure != nil && result.Failure.Message != "" {
+		detail = result.Failure.Message
+	}
+	run.attempts = append(run.attempts, harness.Attempt{
+		Role:     config.RoleGM,
+		Provider: run.provider.ID(),
+		Code:     harness.FailureParseError,
+		Detail:   detail,
+	})
+	nudge := repairInstruction(ProblemMalformed, detail)
+	run.messages = append(run.messages, harness.Message{Role: "user", Content: nudge})
+	genReq.Messages = run.messages
+	if strings.TrimSpace(genReq.Prompt) != "" {
+		genReq.Prompt = genReq.Prompt + "\n\n" + nudge
+	}
+	return true
+}
+
+// recordRoundError reports the error that ended a round, and ends the round's span.
+// The code is the provider's own when its failure carries one, and the classified
+// error otherwise.
+func (o *TurnOrchestrator) recordRoundError(run *generationRun, roundSpan oteltrace.Span, roundDuration float64, roundAttributes otelmetric.RecordOption, genErr error, result streamResult) {
+	code := harness.ClassifyProviderError(genErr)
+	if result.Failure != nil && result.Failure.Code != "" {
+		code = result.Failure.Code
+	}
+	if len(run.attempts) > 0 && result.Failure != nil {
+		result.Failure.Attempts = append(run.attempts, result.Failure.Attempts...)
+	}
+	engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
+		attribute.String("localrpg.role", config.RoleGM),
+		attribute.String("error.kind", string(code)),
+		attribute.String("gen_ai.system", run.provider.ID()),
+	))
+	engineMetrics().providerDuration.Record(context.Background(), roundDuration, roundAttributes)
+	roundSpan.SetAttributes(
+		attribute.String("turn.failure_code", string(code)),
+		attribute.String("localrpg.generation.failure_code", string(code)),
+	)
+	roundSpan.RecordError(genErr)
+	roundSpan.SetStatus(codes.Error, string(code))
+	roundSpan.End()
+}
+
+// recordRoundFailure reports the provider failure a round returned, and ends the
+// round's span. The failure carries the provider's own code, which is more
+// specific than the class the engine would derive.
+func (o *TurnOrchestrator) recordRoundFailure(run *generationRun, roundSpan oteltrace.Span, result streamResult) {
+	failure := result.Failure
+	if len(run.attempts) > 0 {
+		failure.Attempts = append(run.attempts, failure.Attempts...)
+	}
+	engineMetrics().providerErrors.Add(context.Background(), 1, otelmetric.WithAttributes(
+		attribute.String("localrpg.role", config.RoleGM),
+		attribute.String("error.kind", string(failure.Code)),
+		attribute.String("gen_ai.system", run.provider.ID()),
+	))
+	roundSpan.SetAttributes(
+		attribute.String("turn.failure_code", string(failure.Code)),
+		attribute.String("turn.failure_message", failure.Message),
+		attribute.String("localrpg.generation.failure_code", string(failure.Code)),
+	)
+	roundSpan.RecordError(failure)
+	roundSpan.SetStatus(codes.Error, string(failure.Code))
+	roundSpan.End()
+}
+
+// consumeToolRound decides what a round's reply means: the turn's answer, a stray
+// call made while tools were withdrawn, or calls to run before the next round. It
+// reports whether the turn is finished, having written what the turn carries into
+// result.
+func (o *TurnOrchestrator) consumeToolRound(run *generationRun, round int, offerTools bool, result *streamResult) bool {
+	// A reply carrying calls while tools were not offered is a protocol quirk:
+	// its text is the answer, and the calls are dropped and traced.
+	if len(result.ToolCalls) > 0 && !offerTools {
+		o.logger.Event("tool.stray", map[string]any{"round": round, "calls": len(result.ToolCalls)})
+		result.ToolCalls = nil
+		result.Provenance = run.provenance
+		result.Checks = run.checks
+		return true
+	}
+	if len(result.ToolCalls) == 0 {
+		result.Provenance = run.provenance
+		result.Checks = run.checks
+		return true
+	}
+
+	// Prose in a tool round is the model thinking out loud, and its order
+	// relative to the result is undefined, so it is discarded and traced.
+	if strings.TrimSpace(result.Text) != "" {
+		o.logger.Event("tool.prose_discarded", map[string]any{
+			"round": round,
+			"chars": len([]rune(result.Text)),
+		})
+	}
+
+	run.messages = append(run.messages, harness.Message{Role: "assistant", ToolCalls: result.ToolCalls})
+	for _, call := range result.ToolCalls {
+		trace.LogEvent(run.ctx, o.logger, "tool.call", map[string]any{
+			"round":           round,
+			"name":            call.Name,
+			"arguments":       call.Arguments,
+			"arguments_chars": len([]rune(call.Arguments)),
+		})
+		o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "running"})
+		if o.dispatchToolCall(run, round, offerTools, call, result) {
+			return true
+		}
+	}
+
+	// After the final allowed round, or once the budget is crossed, tools are
+	// withdrawn and the model is told so as a readable result rather than a
+	// silent stop it would retry.
+	if round+1 >= o.toolRoundCap() || o.overBudget(run.messages) {
+		run.withdrawn = true
+		run.messages = append(run.messages, harness.Message{
+			Role:    "tool",
+			Content: "Tools are no longer available for this turn. Complete the turn now by providing your narration as text.",
+		})
+	}
+	return false
+}
+
+// dispatchToolCall runs one call and feeds its result back into the conversation.
+// It reports whether the turn ends here, which a check the GM proposes does.
+func (o *TurnOrchestrator) dispatchToolCall(run *generationRun, round int, offerTools bool, call harness.ToolCall, result *streamResult) bool {
+	// Turn tools are handled here, not by the query executor: a check resolves
+	// through the rules layer and feeds its result back, and a submission ends the
+	// loop.
+	if handled, stop := o.handleTurnTool(run, round, call, result); handled {
+		return stop
+	}
+
+	if !offerTools {
+		o.logger.Event("tool.stray", map[string]any{"round": round, "call": call.Name})
+		return false
+	}
+
+	o.executeQueryTool(run, round, call)
+	return false
+}
+
+// handleTurnTool runs one of the tools the turn owns rather than the query layer:
+// a check the rules layer resolves and reports back, or a check the GM proposes and
+// the player rolls. It reports whether the call was one of them, and whether the
+// turn ends on it.
+func (o *TurnOrchestrator) handleTurnTool(run *generationRun, round int, call harness.ToolCall, result *streamResult) (handled, stop bool) {
+	if !harness.IsTurnTool(call.Name) {
+		return false, false
+	}
+	switch call.Name {
+	case "request_check":
+		req, parseErr := harness.ParseCheckRequest(call.Arguments)
+		if parseErr != nil {
+			run.messages = append(run.messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
+			return true, false
+		}
+		resolved, resolveErr := o.resolveCheck(run.ctx, *req, nil)
+		if resolveErr != nil {
+			run.messages = append(run.messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + resolveErr.Error()})
+			return true, false
+		}
+		// The GM references this id in its segments, so it must be stable
+		// and known to the model: the tool call id it chose serves that.
+		if call.ID != "" {
+			resolved.CheckID = call.ID
+		}
+		resolved.Actor = req.Actor
+		resolved.Target = req.Target
+		run.checks = append(run.checks, *resolved)
+		encoded, err := json.Marshal(resolved)
+		if err != nil {
+			run.messages = append(run.messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: failed to encode check result: " + err.Error()})
+			return true, false
+		}
+		run.messages = append(run.messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: string(encoded)})
+		o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "done", Summary: resolved.Outcome})
+		return true, false
+	case "propose_check":
+		if o.mechanicsEngagement != config.EngagementAsk {
+			run.messages = append(run.messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: propose_check is only available when mechanics are set to ask"})
+			return true, false
+		}
+		req, parseErr := harness.ParseCheckRequest(call.Arguments)
+		if parseErr != nil {
+			run.messages = append(run.messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: " + parseErr.Error()})
+			return true, false
+		}
+		result.PendingCheck = &harness.PendingCheck{Ref: call.ID, Request: *req, ProposedBy: harness.ProposedByGM}
+		result.Provenance = run.provenance
+		result.ToolCalls = nil
+		return true, true
+	default:
+		run.messages = append(run.messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: "error: unsupported turn tool " + call.Name})
+		return true, false
+	}
+}
+
+// executeQueryTool runs one query call through the executor, records what it cost
+// on the trace and the metrics, and feeds its output back into the conversation.
+func (o *TurnOrchestrator) executeQueryTool(run *generationRun, round int, call harness.ToolCall) {
+	started := time.Now()
+	toolCtx, toolSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(run.ctx, "tool.call",
+		oteltrace.WithAttributes(
+			attribute.String("localrpg.tool.name", call.Name),
+			attribute.Int("localrpg.round", round),
+		),
+	)
+	output, ok := o.toolExecutor.Execute(toolCtx, call)
+	toolSpan.SetAttributes(attribute.Bool("localrpg.tool.ok", ok), attribute.Int("localrpg.tool.bytes", len(output)))
+	if !ok {
+		toolSpan.SetStatus(codes.Error, "tool execution failed")
+	}
+	toolSpan.End()
+	engineMetrics().toolDuration.Record(context.Background(), float64(time.Since(started).Milliseconds()),
+		otelmetric.WithAttributes(
+			attribute.String("localrpg.tool.name", call.Name),
+			attribute.Bool("localrpg.tool.ok", ok),
+		))
+	trace.LogEvent(run.ctx, o.logger, "tool.result", map[string]any{
+		"name":        call.Name,
+		"ok":          ok,
+		"bytes":       len(output),
+		"duration_ms": time.Since(started).Milliseconds(),
+		"result":      output,
+	})
+	o.notifyTool(ToolActivity{Round: round, Name: call.Name, Status: "done", Summary: toolSummary(ok, output)})
+
+	run.provenance = append(run.provenance, ToolCallRecord{Name: call.Name, ResultChars: len([]rune(output))})
+	run.messages = append(run.messages, harness.Message{Role: "tool", ToolCallID: call.ID, Content: output})
 }
 
 // notifyTool reports activity if a client asked to see it.
