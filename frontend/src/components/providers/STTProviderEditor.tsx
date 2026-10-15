@@ -1,3 +1,4 @@
+import type { TestProviderRequest } from '../../types';
 import React from 'react';
 import { AlertCircle, CheckCircle, Mic, Zap } from 'lucide-react';
 import type { STTConfig, TestProviderResponse } from '../../types';
@@ -9,7 +10,11 @@ interface STTProviderEditorProps {
   presets: Record<string, { label: string; description: string; config: STTConfig; tier?: string; caveat?: string }>;
   webSpeechAvailable: boolean;
   cartesiaSharedKey: boolean;
-  onTest: (category: 'llm' | 'tts' | 'stt' | 'image', provider: unknown, testPrompt?: string) => void;
+  onTest: (
+    category: 'llm' | 'tts' | 'stt' | 'image',
+    provider: TestProviderRequest['provider'],
+    testPrompt?: string,
+  ) => void;
   testingCategory: string | null;
   testResult: { category: string; res: TestProviderResponse } | null;
 }
@@ -76,7 +81,7 @@ export const STTProviderEditor: React.FC<STTProviderEditorProps> = ({
             } else {
               onChange({
                 ...(entry || { type: 'disabled' }),
-                type: val as any,
+                type: val as NonNullable<typeof entry>['type'],
                 builtin_name: undefined,
               });
             }

@@ -1,3 +1,4 @@
+import type { TestProviderRequest } from '../../types';
 import React, { useMemo, useState } from 'react';
 import { Mic, Sparkles, Volume2 } from 'lucide-react';
 import type {
@@ -30,7 +31,11 @@ interface MediaPanelProps {
   sttPresets: PresetMap<STTConfig>;
   imagePresets: PresetMap<ImageConfig>;
   models: ModelStatus[];
-  handleTestProvider: (category: 'llm' | 'tts' | 'stt' | 'image', provider: unknown, testPrompt?: string) => void;
+  handleTestProvider: (
+    category: 'llm' | 'tts' | 'stt' | 'image',
+    provider: TestProviderRequest['provider'],
+    testPrompt?: string,
+  ) => void;
   testingCategory: string | null;
   testResult: { category: string; res: TestProviderResponse } | null;
   setMissingModelPrompt: (prompt: { id: string; name: string; sizeBytes: number } | null) => void;

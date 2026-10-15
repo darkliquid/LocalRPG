@@ -1,3 +1,4 @@
+import type { TestProviderRequest } from '../types';
 import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { DebugPanel } from './DebugPanel';
@@ -196,7 +197,11 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     }
   };
 
-  const handleTestProvider = async (category: 'llm' | 'tts' | 'stt' | 'image', provider: any, testPrompt?: string) => {
+  const handleTestProvider = async (
+    category: 'llm' | 'tts' | 'stt' | 'image',
+    provider: TestProviderRequest['provider'],
+    testPrompt?: string,
+  ) => {
     if (category === 'tts') {
       const isTargetKokoro =
         provider?.type === 'builtin' &&

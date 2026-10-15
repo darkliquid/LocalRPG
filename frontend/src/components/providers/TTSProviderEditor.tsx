@@ -1,3 +1,4 @@
+import type { TestProviderRequest } from '../../types';
 import React from 'react';
 import { AlertCircle, CheckCircle, Play, Plus, RotateCcw, Sparkles, Trash2, Users, Volume2 } from 'lucide-react';
 import type {
@@ -34,7 +35,11 @@ interface TTSProviderEditorProps {
   previewText: string;
   onPreviewTextChange: (text: string) => void;
   onOpenVoiceCatalog: () => void;
-  onTest: (category: 'llm' | 'tts' | 'stt' | 'image', provider: unknown, testPrompt?: string) => void;
+  onTest: (
+    category: 'llm' | 'tts' | 'stt' | 'image',
+    provider: TestProviderRequest['provider'],
+    testPrompt?: string,
+  ) => void;
   testingCategory: string | null;
   testResult: { category: string; res: TestProviderResponse } | null;
   onMissingModel: (prompt: { id: string; name: string; sizeBytes: number }) => void;
@@ -588,7 +593,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                   speech_cues: {
                     ...entry.speech_cues,
                     enabled: entry.speech_cues?.enabled ?? true,
-                    display_mode: e.target.value as any,
+                    display_mode: e.target.value as NonNullable<(typeof entry)['speech_cues']>['display_mode'],
                   },
                 })
               }

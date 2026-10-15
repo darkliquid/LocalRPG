@@ -1,3 +1,4 @@
+import type { TestProviderRequest } from '../../types';
 import React from 'react';
 import { AlertCircle, CheckCircle, Sparkles, Zap } from 'lucide-react';
 import type { ImageConfig, TestProviderResponse } from '../../types';
@@ -8,7 +9,11 @@ interface ImageProviderEditorProps {
   onChange: (next: ImageConfig) => void;
   presets: Record<string, { label: string; description: string; config: ImageConfig; tier?: string; caveat?: string }>;
   geminiSharedKey: boolean;
-  onTest: (category: 'llm' | 'tts' | 'stt' | 'image', provider: unknown, testPrompt?: string) => void;
+  onTest: (
+    category: 'llm' | 'tts' | 'stt' | 'image',
+    provider: TestProviderRequest['provider'],
+    testPrompt?: string,
+  ) => void;
   testingCategory: string | null;
   testResult: { category: string; res: TestProviderResponse } | null;
 }
