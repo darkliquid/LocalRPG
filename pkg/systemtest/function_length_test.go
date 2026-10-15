@@ -19,8 +19,7 @@ const maxFunctionLines = 80
 // When an exempt function is refactored below eighty lines, its entry must be
 // removed so exemptions do not rot.
 var exemptFunctions = map[string]string{
-	"pkg/engine/orchestrator.go:ProcessActionStream": "Waiting on RD-3 (finding R-3 / #170): splitting the turn orchestrator is an architectural decision about turn phases rather than length.",
-	"pkg/engine/orchestrator.go:runGenerationLoop":   "Waiting on RD-3 (finding R-3 / #170): shares orchestrator boundaries with ProcessActionStream and lands after RD-3.",
+	"pkg/engine/orchestrator.go:runGenerationLoop": "Waiting on the pkg/engine batch of RD-11 (finding R-12): the generation loop's boundaries are a decision about provider rounds and tool calls, so it is worked down beside them rather than here.",
 }
 
 // TestFunctionLengthGate enforces that every non-test function in the repository
