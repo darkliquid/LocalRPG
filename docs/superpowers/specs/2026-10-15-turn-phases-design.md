@@ -224,8 +224,12 @@ decision the three `break`s used to make, which is what lets the loop body be a 
   `turnstream_integration_test.go`, `pending_check_test.go`, `roll_mode_test.go`,
   `replace_turn_test.go`, `orchestrator_failure_test.go`, `orchestrator_metrics_test.go`,
   `orchestrator_telemetry_test.go` and `orchestrator_timeline_test.go`.
-- **Measured coverage is unchanged.** `pkg/engine` statement coverage is 81.4% before the
-  extraction and 82.1% after it: the same statements, reached by the same tests.
+- **No path stopped running.** Measured by comparing the two profiles function by function rather
+  than by their statement totals: no function in `pkg/engine` that was fully covered before the
+  extraction lost that afterwards. The statement total moved from 82.1% to 81.5% in the same
+  comparison, and that number is not evidence of anything: a block's statement count is repeated
+  once per code range the block produces, so moving a comment moves the total without changing a
+  statement. `mise run coverage:diff` (`scripts/coverage-diff.sh`) is the check.
 - **A phase with no coverage gets one**, added with the extraction rather than after it.
 - **The gate proves the length.** `TestFunctionLengthGate` fails if `ProcessActionStream` is
   still over eighty lines once its exemption is gone, and fails again if an exemption is left
