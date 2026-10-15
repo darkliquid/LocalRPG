@@ -1,3 +1,4 @@
+import type { TestProviderRequest } from '../../types';
 import React from 'react';
 import { AlertCircle, CheckCircle, Zap } from 'lucide-react';
 import type { AgentRoleConfig, AppConfig, TestProviderResponse } from '../../types';
@@ -35,7 +36,11 @@ interface LLMRoleEditorProps {
   fetchingGeminiModels: boolean;
   geminiModelError: string | null;
   fetchGeminiModels: () => void;
-  onTest: (category: 'llm' | 'tts' | 'stt' | 'image', provider: unknown, testPrompt?: string) => void;
+  onTest: (
+    category: 'llm' | 'tts' | 'stt' | 'image',
+    provider: TestProviderRequest['provider'],
+    testPrompt?: string,
+  ) => void;
   testingCategory: string | null;
   testResult: { category: string; res: TestProviderResponse } | null;
 }

@@ -1,3 +1,4 @@
+import type { TestProviderRequest } from '../../types';
 import React, { useEffect, useState } from 'react';
 import { Cpu, Layers, Sliders, Users } from 'lucide-react';
 import type { AgentRoleConfig, AppConfig, ProviderDescriptor, TestProviderResponse } from '../../types';
@@ -57,7 +58,11 @@ interface AgentsPanelProps {
   agentPresets: PresetMap<AgentRoleConfig>;
   llmDescriptors: ProviderDescriptor[];
   tierCaveats: Record<string, string>;
-  handleTestProvider: (category: 'llm' | 'tts' | 'stt' | 'image', provider: unknown, testPrompt?: string) => void;
+  handleTestProvider: (
+    category: 'llm' | 'tts' | 'stt' | 'image',
+    provider: TestProviderRequest['provider'],
+    testPrompt?: string,
+  ) => void;
   testingCategory: string | null;
   testResult: { category: string; res: TestProviderResponse } | null;
 }
@@ -219,7 +224,7 @@ export const AgentsPanel: React.FC<AgentsPanelProps> = ({
               <span className="text-xs text-stone-400">Role:</span>
               <select
                 value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value as any)}
+                onChange={(e) => setSelectedRole(e.target.value)}
                 className="bg-stone-950 border border-stone-800 rounded-lg pl-2.5 pr-7 py-1 text-xs text-purple-300 font-mono focus:outline-none cursor-pointer"
               >
                 {roleNames.map((role) => (

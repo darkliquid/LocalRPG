@@ -78,10 +78,10 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      // The remaining uses are RPC payloads the Go side owns. FE-8 tracks them,
-      // so warn, rather than fail a build over a decision this proposal does not
-      // own.
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // FE-8 cleared this: the frontend has no explicit any left, so it fails a
+      // build rather than joining a list. The test block below still turns it
+      // off, where a fixture may deliberately hold a shape it does not use.
+      '@typescript-eslint/no-explicit-any': 'error',
       // This reports the same unlabelled form controls as
       // label-has-associated-control, from the control's side instead of the
       // label's: the two together gave 258 findings for one class of defect
