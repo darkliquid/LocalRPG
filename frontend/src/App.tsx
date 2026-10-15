@@ -14,6 +14,7 @@ import {
   AudioProgressEvent,
   PlaybackEntry,
 } from './types';
+import { FailuresRegion, useFailures } from './context/FailuresContext';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
@@ -99,6 +100,7 @@ export const App: React.FC = () => {
   // Why the server withheld an illustration for a turn, keyed by turn number. It is
   // shown beside the generate button, so a turn with no picture says why.
   const [sceneImagePending, setSceneImagePending] = useState<Record<number, string>>({});
+  const { report } = useFailures();
   const [turnAudioStatus, setTurnAudioStatus] = useState<Record<number, { state: TurnAudioState; message?: string }>>(
     {},
   );
@@ -162,6 +164,8 @@ export const App: React.FC = () => {
         });
       }
     } catch (err) {
+      // A background poll of the rate-limit chip: a stale header is not something the
+      // player can act on, so the console keeps the record and the region stays quiet.
       console.error('Failed to poll limits:', err);
     }
   }, []);
@@ -559,7 +563,7 @@ export const App: React.FC = () => {
         });
         fetchLimits();
       }
-      console.error('turn failed:', event.message);
+      report({ text: 'The turn failed.', detail: event.message });
     }
   };
 
@@ -589,7 +593,7 @@ export const App: React.FC = () => {
     try {
       await post(handleTurnEvent, controller.signal);
     } catch (err) {
-      console.error('turn failed:', err);
+      report({ text: 'The turn failed.', detail: err instanceof Error ? err.message : String(err) });
       setTurnError(err instanceof Error ? err.message : String(err));
     } finally {
       if (abortRef.current === controller) {
@@ -676,7 +680,10 @@ export const App: React.FC = () => {
     try {
       await APIClient.generateTurnSceneImage(activeGameID, turnNumber);
     } catch (err) {
-      console.error('generate image:', err);
+      report({
+        text: 'Could not generate the illustration.',
+        detail: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 
@@ -689,7 +696,7 @@ export const App: React.FC = () => {
       await APIClient.updateGameSettings(activeGameID, { opening_prompt: prompt });
       setGameState((prev) => (prev ? { ...prev, opening_prompt: prompt } : prev));
     } catch (err) {
-      console.error('save opening prompt:', err);
+      report({ text: 'Could not save the opening prompt.', detail: err instanceof Error ? err.message : String(err) });
     }
     await handleActionSubmit('Opening', '');
   };
@@ -823,7 +830,7 @@ export const App: React.FC = () => {
       setSelectedEntity(merged);
       refreshCorpus();
     } catch (err) {
-      console.error('merge failed:', err);
+      report({ text: 'Could not merge the notes.', detail: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -866,7 +873,7 @@ export const App: React.FC = () => {
         refreshCorpus();
       }
     } catch (err) {
-      console.error('quick create entity failed:', err);
+      report({ text: 'Could not create the entity.', detail: err instanceof Error ? err.message : String(err) });
     } finally {
       setModalEntity(null);
     }
@@ -888,7 +895,7 @@ export const App: React.FC = () => {
       setSelectedEntity(await client.getEntity(id));
       setActiveDrawer('codex');
     } catch (err) {
-      console.error('wizard create entity failed:', err);
+      report({ text: 'Could not create the entity.', detail: err instanceof Error ? err.message : String(err) });
     } finally {
       setWizardEntity(null);
       setModalEntity(null);
@@ -922,6 +929,8 @@ export const App: React.FC = () => {
 
   return (
     <div className="relative flex flex-col h-screen overflow-hidden text-stone-200">
+      {/* The one place a failure is shown, above the app's chrome. */}
+      <FailuresRegion />
       {/* Full-window atmospheric background layer */}
       <div
         id="app-bg"
