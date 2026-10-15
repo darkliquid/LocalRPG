@@ -96,7 +96,12 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
             <h3 className="text-lg font-semibold text-stone-100 font-sans">Enable Voice Narration</h3>
           </div>
           {!downloading && (
-            <button onClick={onClose} className="text-stone-400 hover:text-stone-200 p-1 transition cursor-pointer">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="text-stone-400 hover:text-stone-200 p-1 transition cursor-pointer"
+            >
               <X className="w-5 h-5" />
             </button>
           )}
