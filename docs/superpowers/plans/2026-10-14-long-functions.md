@@ -85,6 +85,8 @@ func main() {
 
 **Baseline: 72.** Everything below is measured against that, and `ProcessActionStream` (RD-3's) is in the count but not in the work.
 
+**The coverage ratio is not the proof; the function set is.** These batches leaned on the statement-coverage percentage as their evidence that no path had been quietly disabled, and that number does not say what it looks like: a block's statement count is repeated once per code range the block produces, so a comment or a blank line inside a block inflates the total without a statement changing — one batch's before-and-after moved 32 statements in a single file for that reason alone. Argue a batch with `mise run test` (it must pass unchanged) and `mise run coverage:diff BEFORE.prof AFTER.prof`, which compares the *functions* that were fully covered before the batch and are not after: no comment, blank line or expression layout can make a function lose that, so a name in its output is a block that stopped running. `scripts/coverage-diff.sh` carries the reasoning; `AGENTS.md` carries it where the floors are described.
+
 ---
 
 ### Task 1: `pkg/content` (this batch)

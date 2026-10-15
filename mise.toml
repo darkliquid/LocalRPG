@@ -56,6 +56,14 @@ run = "bash scripts/check-coverage.sh"
 description = "Run the Go tests without the coverage check"
 run = "go test -v -count=1 ./..."
 
+[tasks."coverage:diff"]
+description = "Compare two coverage profiles by function, not by their statement totals"
+# The statement totals move with layout: a block's statement count is repeated once
+# per code range the block produces, and a comment splits a block into another
+# range. What does not move is which functions were fully covered, so that is what
+# is compared. See the script for the full reasoning.
+run = "bash scripts/coverage-diff.sh"
+
 [tasks."test:e2e"]
 description = "Run the end-to-end browser suite (skips without a browser)"
 run = "go test -v -count=1 -tags e2e ./pkg/e2e/..."
