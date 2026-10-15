@@ -241,10 +241,25 @@ export const App: React.FC = () => {
         setCampaignStatus('ready');
       })
       .catch(handleGameStateFailure);
-    client.getGraph().then(setGraph).catch(console.error);
-    client.listEntities().then(setEntities).catch(console.error);
-    client.getRecap().then(setRecap).catch(console.error);
-  }, [client, handleGameStateFailure]);
+    client
+      .getGraph()
+      .then(setGraph)
+      .catch((err) =>
+        report({ text: 'Could not load the entity graph.', detail: err instanceof Error ? err.message : String(err) }),
+      );
+    client
+      .listEntities()
+      .then(setEntities)
+      .catch((err) =>
+        report({ text: 'Could not load the entity list.', detail: err instanceof Error ? err.message : String(err) }),
+      );
+    client
+      .getRecap()
+      .then(setRecap)
+      .catch((err) =>
+        report({ text: 'Could not load the recap.', detail: err instanceof Error ? err.message : String(err) }),
+      );
+  }, [report, client, handleGameStateFailure]);
 
   // A spend applies through the API and then refreshes the corpus, so the
   // drawer and the notification dot both reflect the new balance.
@@ -312,7 +327,12 @@ export const App: React.FC = () => {
       return;
     }
     setDismissedContentWarnings(false);
-    client.getChronicle().then(setChronicle).catch(console.error);
+    client
+      .getChronicle()
+      .then(setChronicle)
+      .catch((err) =>
+        report({ text: 'Could not load the chronicle.', detail: err instanceof Error ? err.message : String(err) }),
+      );
     client
       .getFindings()
       .then((res) => {
@@ -320,7 +340,7 @@ export const App: React.FC = () => {
       })
       .catch(console.error);
     refreshCorpus();
-  }, [client, refreshCorpus]);
+  }, [report, client, refreshCorpus]);
 
   useEffect(() => {
     if (chronicle.length === 0) return;
@@ -903,7 +923,12 @@ export const App: React.FC = () => {
   };
 
   const handleAddress = (turnNumber: number) => {
-    client?.addressFinding(turnNumber, 'continuity').catch(console.error);
+    client?.addressFinding(turnNumber, 'continuity').catch((err) =>
+      report({
+        text: 'Could not address the continuity note.',
+        detail: err instanceof Error ? err.message : String(err),
+      }),
+    );
     setAddressed((prev) => new Set(prev).add(turnNumber));
   };
 
