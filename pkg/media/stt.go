@@ -9,14 +9,18 @@ import (
 	"github.com/darkliquid/localrpg/pkg/harness"
 )
 
+// STTClient is what every transcription backend implements.
 type STTClient interface {
 	Transcribe(ctx context.Context, audioData []byte) (string, error)
 }
 
+// STTProvider wraps a client with what a transcription needs around it: the cache
+// its result lands in and the usage it reports.
 type STTProvider struct {
 	client STTClient
 }
 
+// NewSTTProvider wraps a transcription client.
 func NewSTTProvider(client STTClient) *STTProvider {
 	return &STTProvider{client: client}
 }

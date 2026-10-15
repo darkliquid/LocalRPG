@@ -26,14 +26,18 @@ func NewBuiltinHashProjectionProvider(dims int) *BuiltinHashProjectionProvider {
 	}
 }
 
+// ID is the built-in provider's fixed id.
 func (p *BuiltinHashProjectionProvider) ID() string {
 	return p.id
 }
 
+// Dimensions is the width the hash projection produces.
 func (p *BuiltinHashProjectionProvider) Dimensions() int {
 	return p.dimensions
 }
 
+// Embed projects each text onto a fixed-width vector by hashing it, which needs no
+// model and no network, so search works on a machine with neither.
 func (p *BuiltinHashProjectionProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	res := make([][]float32, len(texts))
 	for i, text := range texts {

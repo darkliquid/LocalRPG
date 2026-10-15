@@ -12,6 +12,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
+// ErrProviderDisabled reports use of a provider whose configuration disables it.
 var ErrProviderDisabled = errors.New("provider is disabled")
 
 // Disabled implementations
@@ -60,6 +61,8 @@ func (e *echoImageClient) GenerateImage(ctx context.Context, prompt string) ([]b
 	return []byte("fake-image-bytes-for-" + prompt), nil
 }
 
+// NewTTSClient builds the speech client a configuration names, which is where the
+// uniform type and builtin_name shape becomes a concrete client.
 func NewTTSClient(cfg config.TTSConfig) (TTSClient, error) {
 	return NewTTSClientWithSharedKey(cfg, "")
 }
@@ -83,6 +86,7 @@ func NewTTSClientWithSharedKey(cfg config.TTSConfig, sharedKey string) (TTSClien
 	}
 }
 
+// NewSTTClient builds the transcription client a configuration names.
 func NewSTTClient(cfg config.STTConfig) (STTClient, error) {
 	return NewSTTClientWithSharedKey(cfg, "")
 }
@@ -149,6 +153,8 @@ func NewSceneImageClient(cfg config.ImageConfig) (ImageClient, error) {
 	return NewSceneImageClientWithSharedKey(cfg, "")
 }
 
+// NewSceneImageClientWithSharedKey builds the client for scene illustrations, which
+// may fall back to a key shared with another purpose.
 func NewSceneImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string, logger ...trace.Logger) (ImageClient, error) {
 	primary, err := NewImageClientWithSharedKey(cfg, sharedKey)
 	if err != nil {
@@ -169,10 +175,13 @@ func NewSceneImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string, 
 	return &fallbackImageClient{primary: primary, fallback: fallback, logger: sink}, nil
 }
 
+// NewImageClient builds the image client a configuration names.
 func NewImageClient(cfg config.ImageConfig) (ImageClient, error) {
 	return NewImageClientWithSharedKey(cfg, "")
 }
 
+// NewImageClientWithSharedKey is NewImageClient with a fallback key, for a provider
+// whose credential is shared with another purpose.
 func NewImageClientWithSharedKey(cfg config.ImageConfig, sharedKey string) (ImageClient, error) {
 	// Registry-first when pkg/provider/all was imported; inline otherwise.
 	if key, ok := ImageKeyFor(cfg); ok {

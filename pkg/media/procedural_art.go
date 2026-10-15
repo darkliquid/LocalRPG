@@ -7,6 +7,8 @@ import "context"
 // cache key stays valid.
 type proceduralArtClient struct{}
 
+// NewProceduralArtClient builds the image client that draws its own SVG, which needs
+// no model, no GPU and no network.
 func NewProceduralArtClient() ImageClient {
 	return &proceduralArtClient{}
 }

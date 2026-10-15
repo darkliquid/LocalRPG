@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// ErrGeminiImageAPIKeyRequired reports Gemini image generation configured without a
+// key. The message names the three places one can come from.
 var ErrGeminiImageAPIKeyRequired = errors.New("gemini: an API key is required for image generation; set media.image.api_key, providers.gemini.api_key, or GEMINI_API_KEY")
 
 // ResolveGeminiImageAPIKey resolves the API key prioritizing the image config override,
