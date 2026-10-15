@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FolderPlus, FolderTree, MoveRight, Pencil, Trash2 } from 'lucide-react';
 import type { FolderNode } from '../types';
+import { Modal } from './Modal';
 
 // flattenFolders turns the tree into the list a destination picker needs, with the
 // root first because moving a note back to the top level is the common case.
@@ -27,7 +28,9 @@ interface DialogShellProps {
 }
 
 // DialogShell keeps every dialog in the tree the same shape as the rest of the
-// app's dialogs, so the folder tools do not look like a different application.
+// app's dialogs, so the folder tools do not look like a different application —
+// and it is now the modal shell itself, which is what gives its four dialogs the
+// dialog semantics, the focus and Escape that none of them had.
 const DialogShell: React.FC<DialogShellProps> = ({
   title,
   icon,
@@ -37,18 +40,15 @@ const DialogShell: React.FC<DialogShellProps> = ({
   children,
   destructive,
 }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
+  <Modal open onClose={onCancel} title={title} className="max-w-md">
     <form
-      className="w-full max-w-md bg-stone-900 border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4"
+      className="space-y-4"
       onSubmit={(ev) => {
         ev.preventDefault();
         onSubmit();
       }}
     >
-      <div className={`flex items-center gap-2 ${destructive ? 'text-red-300' : 'text-purple-300'}`}>
-        {icon}
-        <h3 className="font-sans text-sm font-bold text-white">{title}</h3>
-      </div>
+      <div className={`flex items-center gap-2 ${destructive ? 'text-red-300' : 'text-purple-300'}`}>{icon}</div>
       {children}
       <div className="flex justify-end gap-2">
         <button
@@ -68,7 +68,7 @@ const DialogShell: React.FC<DialogShellProps> = ({
         </button>
       </div>
     </form>
-  </div>
+  </Modal>
 );
 
 export interface FolderNameDialogProps {
