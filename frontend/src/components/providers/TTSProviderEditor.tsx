@@ -231,7 +231,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                 options: undefined,
               });
             } else {
-              onChange({ ...entry, type: val as any, builtin_name: undefined, options: undefined });
+              onChange({ ...entry, type: val as (typeof entry)['type'], builtin_name: undefined, options: undefined });
             }
           }}
           className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"

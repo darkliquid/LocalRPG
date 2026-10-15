@@ -97,7 +97,7 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
         <label className="text-xs font-sans uppercase text-stone-300">Image Provider Type</label>
         <select
           value={entry.type}
-          onChange={(e) => onChange({ ...entry, type: e.target.value as any })}
+          onChange={(e) => onChange({ ...entry, type: e.target.value as (typeof entry)['type'] })}
           className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
         >
           <option value="disabled">Disabled</option>
