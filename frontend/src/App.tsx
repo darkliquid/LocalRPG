@@ -441,6 +441,9 @@ export const App: React.FC = () => {
             clearInterval(interval);
           }
         })
+        // A poll that retries on its own interval while portraits are generated: a failed
+        // attempt is not the player's to act on, and the portrait it waits for is simply not
+        // there yet, which the screen already shows.
         .catch(console.error);
     }, 3000);
 
@@ -468,7 +471,7 @@ export const App: React.FC = () => {
       setSelectedEntity(ent);
       setActiveDrawer('codex');
     } catch (err) {
-      console.error(err);
+      report({ text: 'Could not open the entity.', detail: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -547,7 +550,12 @@ export const App: React.FC = () => {
         APIClient.mergePlaybackLedger(activeGameID, {
           turn: event.turn.turn_number,
           entries: offsets,
-        }).catch(console.error);
+        }).catch((err) =>
+          report({
+            text: 'Could not save your playback position.',
+            detail: err instanceof Error ? err.message : String(err),
+          }),
+        );
       }
       const turn = event.turn;
       setChronicle((prev) => [...prev, turn]);
