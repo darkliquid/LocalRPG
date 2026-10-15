@@ -1,3 +1,4 @@
+import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useCallback, Suspense, lazy, useRef } from 'react';
 import { APIClient } from '../api/client';
 import { GameSummary, SystemInfo, WorldInfo, CreateGameRequest, ContentManifestInfo } from '../types';
@@ -41,6 +42,7 @@ interface LauncherHubProps {
 }
 
 export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDocs }) => {
+  const { report } = useFailures();
   const [games, setGames] = useState<GameSummary[]>([]);
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
@@ -86,7 +88,10 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
       setImportFile(file);
       setImportManifest(manifest);
     } catch (err) {
-      console.error('Failed to read package manifest:', err);
+      report({
+        text: 'Could not read the package manifest.',
+        detail: err instanceof Error ? err.message : String(err),
+      });
       setImportFile(file);
       setImportManifest({
         id: file.name.replace(/\.lrpgpack$/, ''),
@@ -147,9 +152,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
         return nextWorking?.id || gList[0]?.id || null;
       });
     } catch (err) {
-      console.error('Failed to load launcher data:', err);
+      report({ text: 'Could not load the launcher.', detail: err instanceof Error ? err.message : String(err) });
     }
-  }, []);
+  }, [report]);
 
   useEffect(() => {
     loadData();
@@ -174,16 +179,26 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
     try {
       const newGame = await APIClient.createGame(data);
       if (bannerFile) {
-        await APIClient.uploadGameAsset(newGame.id, 'banner', bannerFile).catch(console.error);
+        await APIClient.uploadGameAsset(newGame.id, 'banner', bannerFile).catch((err) =>
+          report({
+            text: 'The campaign was created, but its banner could not be uploaded.',
+            detail: err instanceof Error ? err.message : String(err),
+          }),
+        );
       }
       if (iconFile) {
-        await APIClient.uploadGameAsset(newGame.id, 'icon', iconFile).catch(console.error);
+        await APIClient.uploadGameAsset(newGame.id, 'icon', iconFile).catch((err) =>
+          report({
+            text: 'The campaign was created, but its icon could not be uploaded.',
+            detail: err instanceof Error ? err.message : String(err),
+          }),
+        );
       }
       await loadData();
       setSelectedGameID(newGame.id);
       setCreatingWorld(null);
     } catch (err) {
-      console.error('Failed to create campaign:', err);
+      report({ text: 'Could not create the campaign.', detail: err instanceof Error ? err.message : String(err) });
     } finally {
       setIsCreatingGame(false);
     }
