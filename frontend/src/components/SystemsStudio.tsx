@@ -1,3 +1,4 @@
+import { errorMessage } from '../lib/errors';
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient } from '../api/client';
 import {
@@ -122,7 +123,6 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
   const reportGenerationError = (failure: GenerationFailure) =>
     setToast({ type: 'error', message: formatGenerationError(failure) });
-  const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Unexpected error');
 
   const handleDraftProduced = (generatedDraft: SystemDraftInfo) => {
     setShowGenerateDialog(false);
