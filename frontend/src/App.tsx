@@ -197,7 +197,9 @@ export const App: React.FC = () => {
         setConfig(res.config);
         setAppVersion(res.app_version);
       })
-      .catch(console.error);
+      .catch((err) =>
+        report({ text: 'Could not load the settings.', detail: err instanceof Error ? err.message : String(err) }),
+      );
     APIClient.audioStatus()
       .then((status) => {
         setServerAudio(status.available);
@@ -213,7 +215,7 @@ export const App: React.FC = () => {
         setServerAudio(false);
         setPlaybackOwner('browser');
       });
-  }, []);
+  }, [report]);
 
   const handleGameStateFailure = useCallback((err: unknown) => {
     if (err instanceof HTTPError && err.status === 404) {
@@ -338,7 +340,9 @@ export const App: React.FC = () => {
       .then((res) => {
         setAddressed(new Set(res.addressed.map((a) => a.turn)));
       })
-      .catch(console.error);
+      .catch((err) =>
+        report({ text: 'Could not load the campaign.', detail: err instanceof Error ? err.message : String(err) }),
+      );
     refreshCorpus();
   }, [report, client, refreshCorpus]);
 
@@ -812,7 +816,9 @@ export const App: React.FC = () => {
   };
 
   const handleStopAudio = () => {
-    APIClient.stopAudio().catch(console.error);
+    APIClient.stopAudio().catch((err) =>
+      report({ text: 'Could not stop the audio.', detail: err instanceof Error ? err.message : String(err) }),
+    );
     // Close every in-flight playback subscription and reset what is playing.
     for (const [key, close] of Object.entries(audioPollingRef.current)) {
       close();
@@ -1329,7 +1335,15 @@ export const App: React.FC = () => {
                   recap={recap || undefined}
                   idleTurns={config?.agents.thread_idle_turns ?? 10}
                   onRefreshRecap={() => {
-                    client?.getRecap().then(setRecap).catch(console.error);
+                    client
+                      ?.getRecap()
+                      .then(setRecap)
+                      .catch((err) =>
+                        report({
+                          text: 'Could not load the recap.',
+                          detail: err instanceof Error ? err.message : String(err),
+                        }),
+                      );
                   }}
                 />
               )}
@@ -1359,7 +1373,12 @@ export const App: React.FC = () => {
                         onSaved={() =>
                           APIClient.getSettings()
                             .then((res) => setConfig(res.config))
-                            .catch(console.error)
+                            .catch((err) =>
+                              report({
+                                text: 'Could not load the settings.',
+                                detail: err instanceof Error ? err.message : String(err),
+                              }),
+                            )
                         }
                       />
                     </Suspense>
