@@ -645,7 +645,165 @@ func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, world
 // A non-nil error from onChunk aborts before anything is recorded, which is how a
 // client that has disconnected stops generation rather than letting it finish into
 // nothing.
+//
+// It reads as the phases of a turn: the prologue, the command if the input was
+// one, what kind of turn this is, the prompt, a check left pending by an earlier
+// turn, the streamed generation and its roll continuations, the reply's
+// finalisation, then the turn's script, its records and the art it queued. Each
+// phase is a method below, in this order.
 func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, actionInput string, onChunk func(text string) error) (*Turn, error) {
+	run, err := o.beginTurn(ctx, mode, actionInput)
+	if err != nil {
+		return nil, err
+	}
+	defer run.finish()
+
+	if turn, handled, err := o.handleSlashCommand(run.ctx, run); handled || err != nil {
+		return turn, err
+	}
+
+	if err := o.resolveTurnMode(run); err != nil {
+		return nil, err
+	}
+	o.gatherTurnContext(run)
+	if err := o.assembleTurnPrompt(run.ctx, run); err != nil {
+		return nil, err
+	}
+	o.resolvePendingCheckBeforeGeneration(run.ctx, run)
+	o.installStreamObservers(run, onChunk)
+	o.beginRollLoop(run)
+	if err := o.runRollContinuationLoop(run.ctx, run); err != nil {
+		return nil, err
+	}
+	if err := o.finaliseNarration(run.ctx, run); err != nil {
+		return nil, err
+	}
+
+	o.buildTurn(run)
+	o.startTurnExtraction(run.ctx, run)
+	o.applyTurnRecords(run)
+	o.assembleTurnSegments(run)
+	o.annotateTurnSegments(run)
+	o.checkTurnContinuity(run.ctx, run)
+	if err := o.applyProposedMove(run); err != nil {
+		return nil, err
+	}
+	if err := o.recordTurn(run.ctx, run); err != nil {
+		return nil, err
+	}
+	o.enqueueSceneArt(run)
+	o.enqueuePortraitVersions(run)
+	return &run.turn, nil
+}
+
+// turnRun is the state of one turn in flight. beginTurn creates it, the phases
+// of ProcessActionStream read and write it, and it is discarded when the turn
+// returns. Its fields are what used to be one function's locals, named: an
+// orchestrator field that outlives a turn (the parser, the roster, the logger)
+// stays on the orchestrator rather than appearing here.
+type turnRun struct {
+	ctx       context.Context
+	mode      string
+	input     string
+	pastTurns []Turn
+	turnNum   int
+	sceneOnly bool
+
+	turnSpan     oteltrace.Span
+	finaliseSpan oteltrace.Span
+	started      time.Time
+	outcome      string
+
+	// Mode resolution: what this turn is, and what the model is told to do.
+	isOpening        bool
+	isCorrection     bool
+	rollRes          *rules.RollResult
+	gmDirective      string
+	pendingCheck     *harness.PendingCheck
+	generationPrompt string
+
+	// Context assembly.
+	locationID          string
+	assembly            harness.AssembleResult
+	recent              []harness.RecentTurn
+	summary             string
+	summaryVersion      int
+	threads             []string
+	workingSet          WorkingSet
+	workingSetSelection []harness.Ref
+	canCallTools        bool
+	echoAction          bool
+	openingScene        string
+	openingHooks        bool
+
+	// A check the GM proposed on an earlier turn, resolved before generation.
+	resolvedPending      *harness.CheckResult
+	validationEngagement string
+	resolvedRef          string
+	continuationOf       int
+
+	// Generation: the streamed reply, the script it produced, and the rolls it
+	// resolved along the way.
+	onChunk         func(string) error
+	result          streamResult
+	collected       []turnstream.Event
+	collectedCount  int
+	rollResults     []harness.CheckResult
+	rollAnchors     []rollAnchor
+	narrationParts  []string
+	endedOnRoll     bool
+	cause           CutCause
+	narration       string
+	recovery        RecoveryOutcome
+	stillIncomplete bool
+
+	// The turn being built, and what the extractor found for it.
+	turn           Turn
+	personae       []harness.PersonaDecl
+	memories       []harness.MemoryDecl
+	stateChanges   []harness.StateChangeDecl
+	moveRef        string
+	extraction     harness.Extraction
+	extractionDone chan struct{}
+	extractionErr  error
+}
+
+// rollAnchor records where a resolved roll's check belongs in the turn's script:
+// at the first segment the continuation produced, so the dice render where the
+// roll happened rather than leading the turn.
+type rollAnchor struct {
+	segmentIndex int
+	checkID      string
+}
+
+// maxRollContinuations bounds the roll-continuation loop, so a model that keeps
+// rolling cannot run forever.
+const maxRollContinuations = 3
+
+// finish ends the turn's spans and records its duration and completion metrics,
+// in the order the entry point's defers ran in when this was one function.
+func (r *turnRun) finish() {
+	if r.finaliseSpan != nil {
+		r.finaliseSpan.End()
+	}
+	r.turnSpan.SetAttributes(attribute.String("turn.outcome", r.outcome))
+	metrics := engineMetrics()
+	attributes := otelmetric.WithAttributes(
+		attribute.String("turn.mode", r.mode),
+		attribute.String("turn.outcome", r.outcome),
+	)
+	metrics.turnDuration.Record(context.Background(), float64(time.Since(r.started).Milliseconds()), attributes)
+	metrics.turnCompleted.Add(context.Background(), 1, otelmetric.WithAttributes(
+		attribute.String("turn.mode", r.mode),
+		attribute.String("turn.outcome", r.outcome),
+	))
+	r.turnSpan.End()
+}
+
+// beginTurn loads the campaign's history, works out which turn this is, sets the
+// engagement cadence floor, and starts the turn's span. It returns the state the
+// turn's phases share.
+func (o *TurnOrchestrator) beginTurn(ctx context.Context, mode, actionInput string) (*turnRun, error) {
 	pastTurns, err := o.timeline.history.LoadHistory()
 	if err != nil {
 		return nil, fmt.Errorf("load history: %w", err)
@@ -671,176 +829,198 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		"input_chars": len([]rune(actionInput)),
 	})
 
-	ctx, turnSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "turn",
+	spanCtx, turnSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "turn",
 		oteltrace.WithAttributes(
 			attribute.String("game.id", o.gameID()),
 			attribute.Int("turn.number", turnNum),
 			attribute.String("turn.mode", mode),
 		),
 	)
-	defer turnSpan.End()
-	turnStarted := time.Now()
 
-	var rollRes *rules.RollResult
-	var outcome string
-	var gmDirective string
-	var pendingCheck *harness.PendingCheck
-	generationPrompt := actionInput
+	return &turnRun{
+		ctx:              spanCtx,
+		mode:             mode,
+		input:            actionInput,
+		pastTurns:        pastTurns,
+		turnNum:          turnNum,
+		sceneOnly:        sceneOnly,
+		turnSpan:         turnSpan,
+		started:          time.Now(),
+		generationPrompt: actionInput,
+	}, nil
+}
 
-	// The outcome is only known later, so it is attached at return along with
-	// the turn's duration and completion metrics.
-	defer func() {
-		turnSpan.SetAttributes(attribute.String("turn.outcome", outcome))
-		metrics := engineMetrics()
-		attributes := otelmetric.WithAttributes(
-			attribute.String("turn.mode", mode),
-			attribute.String("turn.outcome", outcome),
-		)
-		metrics.turnDuration.Record(context.Background(), float64(time.Since(turnStarted).Milliseconds()), attributes)
-		metrics.turnCompleted.Add(context.Background(), 1, otelmetric.WithAttributes(
-			attribute.String("turn.mode", mode),
-			attribute.String("turn.outcome", outcome),
-		))
-	}()
-
-	// Handle /undo command
-	if strings.HasPrefix(strings.TrimSpace(actionInput), "/undo") {
-		if len(pastTurns) == 0 {
-			return nil, fmt.Errorf("no turns to undo")
-		}
-		if err := o.timeline.RewindToTurn(len(pastTurns) - 1); err != nil {
-			return nil, fmt.Errorf("undo failed: %w", err)
-		}
-		return &Turn{
-			Number:    len(pastTurns) - 1,
-			Timestamp: time.Now(),
-			Mode:      "System",
-			Input:     "/undo",
-			Narration: "Undid previous turn.",
-		}, nil
+// handleSlashCommand answers an input that is a command rather than an action:
+// /undo, /recap or /go. It reports whether the input was one, so the caller can
+// return the command's own turn without playing one.
+func (o *TurnOrchestrator) handleSlashCommand(ctx context.Context, run *turnRun) (*Turn, bool, error) {
+	trimmed := strings.TrimSpace(run.input)
+	switch {
+	case strings.HasPrefix(trimmed, "/undo"):
+		turn, err := o.handleUndo(run)
+		return turn, true, err
+	case strings.HasPrefix(trimmed, "/recap"):
+		turn, err := o.handleRecap(ctx, run)
+		return turn, true, err
+	case strings.HasPrefix(trimmed, "/go "):
+		turn, err := o.handleGo(ctx, run)
+		return turn, true, err
 	}
+	return nil, false, nil
+}
 
-	// /recap answers "where were we?". A stale summary is brought up to date first,
-	// because asking for a recap is asking about the present tense and a summary can
-	// be a cadence behind. The regeneration is the same path a turn uses, so a
-	// failure leaves the old summary in place rather than failing the command.
-	if strings.HasPrefix(strings.TrimSpace(actionInput), "/recap") {
-		chronicle := Chronicle{}
-		if o.chronicler != nil {
-			if due, err := o.chronicler.Due(o.gameID()); err == nil && due {
-				if _, err := o.chronicler.Regenerate(ctx, o.gameID()); err != nil {
-					o.logger = trace.OrNil(o.logger)
-					o.logger.Event("provider.error", map[string]any{"role": "summariser", "error": err.Error()})
-				}
+// handleUndo rewinds the campaign by one turn.
+func (o *TurnOrchestrator) handleUndo(run *turnRun) (*Turn, error) {
+	if len(run.pastTurns) == 0 {
+		return nil, fmt.Errorf("no turns to undo")
+	}
+	if err := o.timeline.RewindToTurn(len(run.pastTurns) - 1); err != nil {
+		return nil, fmt.Errorf("undo failed: %w", err)
+	}
+	return &Turn{
+		Number:    len(run.pastTurns) - 1,
+		Timestamp: time.Now(),
+		Mode:      "System",
+		Input:     "/undo",
+		Narration: "Undid previous turn.",
+	}, nil
+}
+
+// handleRecap answers "where were we?". A stale summary is brought up to date
+// first, because asking for a recap is asking about the present tense and a
+// summary can be a cadence behind. The regeneration is the same path a turn
+// uses, so a failure leaves the old summary in place rather than failing the
+// command.
+func (o *TurnOrchestrator) handleRecap(ctx context.Context, run *turnRun) (*Turn, error) {
+	chronicle := Chronicle{}
+	if o.chronicler != nil {
+		if due, err := o.chronicler.Due(o.gameID()); err == nil && due {
+			if _, err := o.chronicler.Regenerate(ctx, o.gameID()); err != nil {
+				o.logger = trace.OrNil(o.logger)
+				o.logger.Event("provider.error", map[string]any{"role": "summariser", "error": err.Error()})
 			}
-			chronicle, _ = o.chronicler.Recap(o.gameID())
 		}
-
-		narration := "This campaign has not turned far enough for a recap yet."
-		if strings.TrimSpace(chronicle.Summary) != "" {
-			narration = fmt.Sprintf("## Story So Far (through turn %d)\n\n%s", chronicle.ThroughTurn, chronicle.Summary)
-		}
-
-		return &Turn{
-			Number:    turnNum,
-			Timestamp: time.Now(),
-			Mode:      "System",
-			Input:     "/recap",
-			Narration: narration,
-		}, nil
+		chronicle, _ = o.chronicler.Recap(o.gameID())
 	}
 
-	// Handle /go command: an explicit move, recorded as its own system turn.
-	if strings.HasPrefix(strings.TrimSpace(actionInput), "/go ") {
-		target := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(actionInput), "/go "))
-
-		ent := findLocationByRef(o.store, target)
-		if ent == nil {
-			return nil, fmt.Errorf("unknown location %q", target)
-		}
-
-		if err := o.timeline.SetPlayerLocation(o.playerID, ent.ID); err != nil {
-			return nil, fmt.Errorf("move failed: %w", err)
-		}
-
-		// The player is a party to their own move, so the move records them the way
-		// every generated turn does.
-		moveEntities := make([]entity.Mention, 0, 2)
-		if o.playerID != "" {
-			moveEntities = append(moveEntities, entity.Mention{ID: o.playerID, Kind: entity.MentionPlayer})
-		}
-		moveEntities = append(moveEntities, entity.Mention{ID: ent.ID, Kind: entity.MentionLocation})
-
-		move := Turn{
-			Number:    turnNum,
-			Timestamp: time.Now(),
-			Mode:      "System",
-			Input:     actionInput,
-			Narration: fmt.Sprintf("You make your way to %s.", ent.Name),
-			Location:  ent.ID,
-			Entities:  moveEntities,
-		}
-		if err := o.timeline.RecordTurnContext(ctx, &move, nil); err != nil {
-			return nil, fmt.Errorf("record move: %w", err)
-		}
-		return &move, nil
+	narration := "This campaign has not turned far enough for a recap yet."
+	if strings.TrimSpace(chronicle.Summary) != "" {
+		narration = fmt.Sprintf("## Story So Far (through turn %d)\n\n%s", chronicle.ThroughTurn, chronicle.Summary)
 	}
 
-	// The opening turn establishes the campaign before the player acts. It is only
-	// meaningful as turn one, so a later attempt is refused rather than silently
-	// rewriting the scene the party is already standing in.
-	isOpening := strings.EqualFold(mode, OpeningMode)
+	return &Turn{
+		Number:    run.turnNum,
+		Timestamp: time.Now(),
+		Mode:      "System",
+		Input:     "/recap",
+		Narration: narration,
+	}, nil
+}
+
+// handleGo is an explicit move, recorded as its own system turn.
+func (o *TurnOrchestrator) handleGo(ctx context.Context, run *turnRun) (*Turn, error) {
+	target := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(run.input), "/go "))
+
+	ent := findLocationByRef(o.store, target)
+	if ent == nil {
+		return nil, fmt.Errorf("unknown location %q", target)
+	}
+
+	if err := o.timeline.SetPlayerLocation(o.playerID, ent.ID); err != nil {
+		return nil, fmt.Errorf("move failed: %w", err)
+	}
+
+	// The player is a party to their own move, so the move records them the way
+	// every generated turn does.
+	moveEntities := make([]entity.Mention, 0, 2)
+	if o.playerID != "" {
+		moveEntities = append(moveEntities, entity.Mention{ID: o.playerID, Kind: entity.MentionPlayer})
+	}
+	moveEntities = append(moveEntities, entity.Mention{ID: ent.ID, Kind: entity.MentionLocation})
+
+	move := Turn{
+		Number:    run.turnNum,
+		Timestamp: time.Now(),
+		Mode:      "System",
+		Input:     run.input,
+		Narration: fmt.Sprintf("You make your way to %s.", ent.Name),
+		Location:  ent.ID,
+		Entities:  moveEntities,
+	}
+	if err := o.timeline.RecordTurnContext(ctx, &move, nil); err != nil {
+		return nil, fmt.Errorf("record move: %w", err)
+	}
+	return &move, nil
+}
+
+// resolveTurnMode decides what kind of turn this is. The opening turn
+// establishes the campaign before the player acts, and is only meaningful as
+// turn one, so a later attempt is refused rather than silently rewriting the
+// scene the party is already standing in. A correction carries a director note;
+// a player's Roll asks for a check; anything else runs through the mechanics
+// hook if one is loaded.
+func (o *TurnOrchestrator) resolveTurnMode(run *turnRun) error {
+	isOpening := strings.EqualFold(run.mode, OpeningMode)
 	if isOpening {
-		if len(pastTurns) > 0 {
-			return nil, fmt.Errorf("the campaign has already begun")
+		if len(run.pastTurns) > 0 {
+			return fmt.Errorf("the campaign has already begun")
 		}
-		mode = OpeningMode
+		run.mode = OpeningMode
 		// The scene is the turn's frame, not the player's action: handing it over
 		// as the action made the GM respond to it instead of restating it.
-		generationPrompt = ""
+		run.generationPrompt = ""
 	}
+	run.isOpening = isOpening
 
 	// Handle /gm director note or mode
-	isCorrection := !isOpening && (mode == "GM" || strings.HasPrefix(actionInput, "/gm "))
+	isCorrection := !isOpening && (run.mode == "GM" || strings.HasPrefix(run.input, "/gm "))
+	run.isCorrection = isCorrection
 	if isCorrection {
-		directiveText := strings.TrimPrefix(actionInput, "/gm ")
-		gmDirective = fmt.Sprintf("[DIRECTOR CORRECTION DIRECTIVE: %s]", directiveText)
-	} else if !isOpening && strings.EqualFold(mode, "Roll") && o.mechanicsEngagement != "off" && o.pendingCheckRef == "" {
+		directiveText := strings.TrimPrefix(run.input, "/gm ")
+		run.gmDirective = fmt.Sprintf("[DIRECTOR CORRECTION DIRECTIVE: %s]", directiveText)
+	} else if !isOpening && strings.EqualFold(run.mode, "Roll") && o.mechanicsEngagement != config.EngagementOff && o.pendingCheckRef == "" {
 		// A player-initiated roll is a check the player resolves: the turn ends on
 		// a pending check, so the roll card can present the stakes. A Roll that
 		// carries a pending ref is resolving an existing check, not asking for a
 		// new one, so it falls through to the resolution path.
-		req := o.playerRollRequest(actionInput)
-		pendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum, 0), Request: req, ProposedBy: harness.ProposedByPlayer}
-		gmDirective = fmt.Sprintf("[PLAYER ROLL REQUESTED: %s]", strings.TrimSpace(actionInput))
+		req := o.playerRollRequest(run.input)
+		run.pendingCheck = &harness.PendingCheck{Ref: rollRef(run.turnNum, 0), Request: req, ProposedBy: harness.ProposedByPlayer}
+		run.gmDirective = fmt.Sprintf("[PLAYER ROLL REQUESTED: %s]", strings.TrimSpace(run.input))
 	} else if !isOpening && o.rulesEngine != nil {
 		// Run action through mechanics hook if available
-		res, err := o.rulesEngine.ExecuteAction(strings.ToLower(mode), map[string]any{
-			"action": actionInput,
+		res, err := o.rulesEngine.ExecuteAction(strings.ToLower(run.mode), map[string]any{
+			"action": run.input,
 			"player": o.playerID,
 		})
 		if err == nil && res != nil {
-			rollRes = res.Roll
-			outcome = res.Outcome
+			run.rollRes = res.Roll
+			run.outcome = res.Outcome
 			if res.Message != "" {
-				gmDirective = fmt.Sprintf("[MECHANICS RESULT: %s]", res.Message)
+				run.gmDirective = fmt.Sprintf("[MECHANICS RESULT: %s]", res.Message)
 			}
 		}
 	}
+	return nil
+}
 
+// gatherTurnContext collects everything the prompt is built from: where the turn
+// happens, the world's own advance, a window of recent turns, long memory, open
+// threads and the working set, plus the decisions about tool calls and echoing
+// the action that shape the request.
+func (o *TurnOrchestrator) gatherTurnContext(run *turnRun) {
 	// Where this turn happens: read from the player's own note, which is the single
 	// source of truth, never from a value pinned at campaign open.
-	locationID := o.currentLocation()
+	run.locationID = o.currentLocation()
 
 	// The living world advances on its own cadence, before the prompt is built,
 	// so a tick's injected directive reaches the turn that triggered it.
-	o.runWorldTick(turnNum, locationID)
+	o.runWorldTick(run.turnNum, run.locationID)
 
 	// Assemble context with system rules, world lore prompts, and a window of
 	// recent turns, which is what keeps the narrator in the same conversation.
-	recent := make([]harness.RecentTurn, 0, len(pastTurns))
-	for _, turn := range pastTurns {
-		recent = append(recent, harness.RecentTurn{
+	run.recent = make([]harness.RecentTurn, 0, len(run.pastTurns))
+	for _, turn := range run.pastTurns {
+		run.recent = append(run.recent, harness.RecentTurn{
 			Number:    turn.Number,
 			Mode:      turn.Mode,
 			Input:     turn.Input,
@@ -850,35 +1030,32 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	// Long memory is a recollection, not canon, so it is injected as one and canon
 	// wins wherever they disagree.
-	summary := ""
-	summaryVersion := 0
 	if o.chronicler != nil {
 		if chronicle, err := o.chronicler.Recap(o.gameID()); err == nil {
-			summary = chronicle.Summary
-			summaryVersion = chronicle.ThroughTurn
+			run.summary = chronicle.Summary
+			run.summaryVersion = chronicle.ThroughTurn
 		}
 	}
 
 	// Open threads are canon, so they are built whether or not anything in the scene
 	// touches them: a thread the party has walked away from is the one most likely to
 	// be forgotten.
-	threads := make([]string, 0)
-	if open, err := OpenThreads(o.store, turnNum); err == nil {
+	run.threads = make([]string, 0)
+	if open, err := OpenThreads(o.store, run.turnNum); err == nil {
 		for index, thread := range open {
 			if index == o.threadsCap() {
 				break
 			}
-			threads = append(threads, fmt.Sprintf("%s (%s, last advanced %d turns ago)", thread.Name, thread.Status, thread.Idle))
+			run.threads = append(run.threads, fmt.Sprintf("%s (%s, last advanced %d turns ago)", thread.Name, thread.Status, thread.Idle))
 		}
 	}
 
-	var workingSet WorkingSet
 	if o.store != nil {
 		if records, err := o.store.LoadWorkingSet(); err == nil && len(records) > 0 {
-			workingSet.FromStorageRecords(records)
+			run.workingSet.FromStorageRecords(records)
 		}
 	}
-	workingSetSelection := workingSet.Select(8)
+	run.workingSetSelection = run.workingSet.Select(8)
 
 	isCaller := false
 	if gmProvider, err := o.router.GetProviderForRole(config.RoleGM); err == nil && gmProvider != nil {
@@ -886,55 +1063,59 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			isCaller = caller.ToolCallerCapable()
 		}
 	}
-	canCallTools := o.offersTools(isCaller)
+	run.canCallTools = o.offersTools(isCaller)
 
-	echoAction := o.actionEcho &&
-		!isOpening && !isCorrection &&
-		!strings.EqualFold(mode, "Roll") &&
-		!strings.EqualFold(mode, "Say") &&
-		strings.TrimSpace(actionInput) != ""
+	run.echoAction = o.actionEcho &&
+		!run.isOpening && !run.isCorrection &&
+		!strings.EqualFold(run.mode, "Roll") &&
+		!strings.EqualFold(run.mode, "Say") &&
+		strings.TrimSpace(run.input) != ""
 
 	// The opening turn restates the campaign's scene. A quiet scene turn suppresses
 	// the hooks only when there is a scene to restate; without one the turn still
 	// establishes a scene from the world.
-	openingScene := ""
-	openingHooks := false
-	if isOpening {
-		openingScene = o.openingPrompt
-		openingHooks = !sceneOnly || strings.TrimSpace(openingScene) == ""
+	if run.isOpening {
+		run.openingScene = o.openingPrompt
+		run.openingHooks = !run.sceneOnly || strings.TrimSpace(run.openingScene) == ""
 	}
+}
 
+// assembleTurnPrompt builds the request from the gathered context, gives the
+// turn-begin hook its chance to act, and folds any directive a hook injected
+// into the turn's instruction to the model.
+func (o *TurnOrchestrator) assembleTurnPrompt(ctx context.Context, run *turnRun) error {
 	assembly, err := o.assembler.Assemble(harness.ContextRequest{
 		Context:          ctx,
-		LocationID:       locationID,
+		LocationID:       run.locationID,
 		PlayerID:         o.playerID,
-		Action:           generationPrompt,
-		OpeningScene:     openingScene,
-		OpeningHooks:     openingHooks,
+		Action:           run.generationPrompt,
+		OpeningScene:     run.openingScene,
+		OpeningHooks:     run.openingHooks,
 		PlayerName:       o.playerDisplayName(),
-		ActionEcho:       echoAction,
+		ActionEcho:       run.echoAction,
 		RulesPrompt:      o.rulesPrompt,
 		LorePrompt:       o.lorePrompt,
 		MechanicsPrompt:  o.mechanicsInstruction(),
 		Profiles:         o.timeline.VoiceProfiles(),
-		OmitVoiceCatalog: canCallTools,
-		Recent:           recent,
-		TurnNumber:       turnNum,
-		Mode:             mode,
-		Summary:          summary,
-		SummaryVersion:   summaryVersion,
-		WorkingSet:       workingSetSelection,
-		Threads:          threads,
+		OmitVoiceCatalog: run.canCallTools,
+		Recent:           run.recent,
+		TurnNumber:       run.turnNum,
+		Mode:             run.mode,
+		Summary:          run.summary,
+		SummaryVersion:   run.summaryVersion,
+		WorkingSet:       run.workingSetSelection,
+		Threads:          run.threads,
 		SpeechCues:       o.speechCues,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("assemble context: %w", err)
+		return fmt.Errorf("assemble context: %w", err)
 	}
+	run.assembly = assembly
 
 	if o.rulesEngine != nil {
 		if err := o.rulesEngine.ExecuteTurnBegin(map[string]any{
-			"turn":     turnNum,
-			"location": locationID,
+			"turn":     run.turnNum,
+			"location": run.locationID,
 		}); err != nil {
 			o.logger.Event("turn.begin_hook_error", map[string]any{"error": err.Error()})
 		}
@@ -943,53 +1124,62 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// Directives hooks injected (onAction, onWorldTick, onTurnBegin) reach the
 	// prompt here. Without draining them, injectGMDirection had no effect.
 	if directives := o.drainDirectives(); len(directives) > 0 {
-		gmDirective = applyDirectives(gmDirective, directives)
-		if o.worldTickDue(turnNum) {
+		run.gmDirective = applyDirectives(run.gmDirective, directives)
+		if o.worldTickDue(run.turnNum) {
 			o.worldTick = strings.Join(directives, "\n")
 		}
 	}
+	return nil
+}
 
-	turnSpan.SetAttributes(attribute.String("turn.assembled_prompt", assembly.Prompt))
-	// A pending GM-proposed check is resolved here, before generation, so the
-	// model narrates its outcome rather than proposing it again.
-	var resolvedPending *harness.CheckResult
-	validationEngagement := o.mechanicsEngagement
-	resolvedRef := ""
-	continuationOf := 0
-	if o.pendingCheckRef != "" {
-		resolvedRef = o.pendingCheckRef
-		continuationOf = findPendingTurn(pastTurns, o.pendingCheckRef)
-		if pending := findPendingCheck(pastTurns, o.pendingCheckRef); pending != nil {
-			// A roll a previous attempt already resolved is reused, so a retried
-			// request cannot change the outcome the player already saw.
-			resolved := findResolvedCheck(pastTurns, o.pendingCheckRef)
-			if resolved == nil {
-				if fresh, resolveErr := o.resolveCheck(ctx, pending.Request, nil); resolveErr == nil {
-					fresh.CheckID = pending.Ref
-					resolved = fresh
-				} else {
-					o.logger.Event("pending.resolve_error", map[string]any{"error": resolveErr.Error()})
-				}
-			}
-			if resolved != nil {
-				resolvedPending = resolved
-				validationEngagement = "auto"
-				directive := fmt.Sprintf("[PLAYER ROLL: %s — %s]", resolved.Outcome, strings.TrimSpace(pending.Request.Stakes))
-				gmDirective = strings.TrimSpace(directive + "\n" + gmDirective)
+// resolvePendingCheckBeforeGeneration resolves a check the GM proposed on an
+// earlier turn, so the model narrates its outcome rather than proposing it
+// again. A roll a previous attempt already resolved is reused, so a retried
+// request cannot change the outcome the player already saw.
+func (o *TurnOrchestrator) resolvePendingCheckBeforeGeneration(ctx context.Context, run *turnRun) {
+	run.turnSpan.SetAttributes(attribute.String("turn.assembled_prompt", run.assembly.Prompt))
+	run.validationEngagement = o.mechanicsEngagement
+	if o.pendingCheckRef == "" {
+		return
+	}
+	run.resolvedRef = o.pendingCheckRef
+	run.continuationOf = findPendingTurn(run.pastTurns, o.pendingCheckRef)
+	if pending := findPendingCheck(run.pastTurns, o.pendingCheckRef); pending != nil {
+		resolved := findResolvedCheck(run.pastTurns, o.pendingCheckRef)
+		if resolved == nil {
+			if fresh, resolveErr := o.resolveCheck(ctx, pending.Request, nil); resolveErr == nil {
+				fresh.CheckID = pending.Ref
+				resolved = fresh
+			} else {
+				o.logger.Event("pending.resolve_error", map[string]any{"error": resolveErr.Error()})
 			}
 		}
-		o.pendingCheckRef = ""
+		if resolved != nil {
+			run.resolvedPending = resolved
+			run.validationEngagement = "auto"
+			directive := fmt.Sprintf("[PLAYER ROLL: %s — %s]", resolved.Outcome, strings.TrimSpace(pending.Request.Stakes))
+			run.gmDirective = strings.TrimSpace(directive + "\n" + run.gmDirective)
+		}
 	}
+	o.pendingCheckRef = ""
+}
 
+// installStreamObservers wraps the caller's chunk callback twice: once to
+// measure time to first token, and once to parse the reply into segments as it
+// arrives. The parser wraps the TTFT listener, so the client still sees each raw
+// chunk first. The player's own line, when this turn says something, is observed
+// immediately so the streamer voices it before the narrator begins.
+func (o *TurnOrchestrator) installStreamObservers(run *turnRun, onChunk func(text string) error) {
+	run.onChunk = onChunk
 	if onChunk != nil {
 		started := time.Now()
 		first := true
 		inner := onChunk
-		onChunk = func(text string) error {
+		run.onChunk = func(text string) error {
 			if first {
 				first = false
 				elapsed := time.Since(started).Milliseconds()
-				engineMetrics().turnTTFT.Record(ctx, float64(elapsed))
+				engineMetrics().turnTTFT.Record(run.ctx, float64(elapsed))
 				o.logger.Event("turn.ttft", map[string]any{"ms": elapsed})
 			}
 			return inner(text)
@@ -998,13 +1188,12 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	// The reply is parsed as it streams, so segments and their speakers are
 	// attributed while the model is still writing. The roster is seeded from the
-	// store, and a persona record extends it mid-stream. The parser wraps the
-	// TTFT listener, so the client still sees each raw chunk first.
+	// store, and a persona record extends it mid-stream.
 	o.roster = newRoster(o.store, o.playerID, o.playerDisplayName(), o.timeline.VoiceProfiles())
 	o.parser = turnstream.NewParser(o.roster)
-	if onChunk != nil {
-		inner := onChunk
-		onChunk = func(text string) error {
+	if run.onChunk != nil {
+		inner := run.onChunk
+		run.onChunk = func(text string) error {
 			if err := inner(text); err != nil {
 				return err
 			}
@@ -1012,7 +1201,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			return nil
 		}
 	} else {
-		onChunk = func(text string) error {
+		run.onChunk = func(text string) error {
 			o.observeSegments(o.parser.Feed(text))
 			return nil
 		}
@@ -1021,7 +1210,7 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 	// A player's spoken line leads the turn: observe it immediately so the
 	// client receives its segment and the streamer voices it in the player's
 	// voice before the narrator begins.
-	if beat := playerSegment(mode, actionInput, o.playerID, o.playerDisplayName()); beat != nil {
+	if beat := playerSegment(run.mode, run.input, o.playerID, o.playerDisplayName()); beat != nil {
 		o.observeSegments([]turnstream.Event{{
 			Kind:      turnstream.KindSpeech,
 			Speaker:   beat.Speaker,
@@ -1030,308 +1219,338 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 			Player:    true,
 		}})
 	}
+}
 
-	cause := cutNone
-	var narration string
-	var recovery RecoveryOutcome
-	var stillIncomplete bool
+// beginRollLoop anchors a check resolved before this continuation. It has no
+// @roll event to place it, so it attaches to the continuation's opening
+// narration, where the consequence is narrated, rather than leading the turn
+// detached. The loop's other accumulators (the reply, the script, the resolved
+// rolls) start empty and are filled by the loop itself.
+func (o *TurnOrchestrator) beginRollLoop(run *turnRun) {
+	if run.resolvedPending != nil {
+		run.rollAnchors = append(run.rollAnchors, rollAnchor{segmentIndex: 0, checkID: run.resolvedPending.CheckID})
+	}
+}
 
-	// A reply may end on a @roll record, in which case the engine resolves it and
-	// asks the model to continue from the outcome. The loop is bounded so a model
-	// that keeps rolling cannot run forever.
-	var result streamResult
-	var collected []turnstream.Event
-	var rollResults []harness.CheckResult
-	var narrationParts []string
-	const maxRollContinuations = 3
-	endedOnRoll := false
-	// rollAnchors record where each resolved roll's check belongs in the turn's
-	// script: at the first segment the continuation produced, so the dice render
-	// where the roll happened rather than leading the turn.
-	type rollAnchor struct {
-		segmentIndex int
-		checkID      string
+// drainTurnEvents moves the parser's accumulated events into the turn.
+// collectedCount is how many of them are already in the turn, so a recovery
+// continuation's events can be appended without duplicating the ones the loop
+// already took.
+func (o *TurnOrchestrator) drainTurnEvents(run *turnRun) {
+	if o.parser == nil {
+		return
 	}
-	var rollAnchors []rollAnchor
-	// A pending check resolved before this continuation has no @roll event to
-	// anchor it, so it attaches to the continuation's opening narration, where the
-	// consequence is narrated, rather than leading the turn detached.
-	if resolvedPending != nil {
-		rollAnchors = append(rollAnchors, rollAnchor{segmentIndex: 0, checkID: resolvedPending.CheckID})
+	o.parser.Flush()
+	events := o.parser.Events()
+	if run.collectedCount < len(events) {
+		run.collected = append(run.collected, events[run.collectedCount:]...)
+		run.collectedCount = len(events)
 	}
-	// collectedCount is how many of the parser's events are already in collected,
-	// so a recovery continuation's events can be appended without duplicating the
-	// ones the loop already took.
-	collectedCount := 0
-	drainEvents := func() {
-		if o.parser == nil {
-			return
-		}
-		o.parser.Flush()
-		events := o.parser.Events()
-		if collectedCount < len(events) {
-			collected = append(collected, events[collectedCount:]...)
-			collectedCount = len(events)
-		}
-	}
+}
+
+// runRollContinuationLoop generates the reply and continues it while it ends on
+// a @roll record. The loop is bounded, so a model that keeps rolling cannot run
+// forever. A player-initiated roll ends the turn on the pending check it asked
+// for, unless the model already proposed one of its own.
+func (o *TurnOrchestrator) runRollContinuationLoop(ctx context.Context, run *turnRun) error {
 	for attempt := 0; ; attempt++ {
-		result, err = o.runGenerationLoop(ctx, &assembly, gmDirective, resolvedPending, validationEngagement, onChunk)
-		if err != nil {
-			outcome = "error"
-			turnSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
-			failure, _ := harness.FailureFrom(err)
-			fields := map[string]any{
-				"code":          generationCode(failure),
-				"error":         err.Error(),
-				"role":          config.RoleGM,
-				"provider":      result.ProviderID,
-				"prompt_chars":  len([]rune(actionInput)),
-				"context_chars": len([]rune(assembly.Prompt)),
-				"elapsed_ms":    time.Since(turnStarted).Milliseconds(),
-				"chunk_count":   result.ChunkCount,
-				"partial_chars": len([]rune(result.Text)),
-			}
-			if failure != nil {
-				fields["attempts"] = len(failure.Attempts)
-				turnSpan.SetAttributes(
-					attribute.String("turn.failure_code", string(failure.Code)),
-					attribute.String("turn.failure_message", failure.Message),
-					attribute.String("localrpg.generation.failure_code", string(failure.Code)),
-					attribute.Int("localrpg.generation.attempts", len(failure.Attempts)),
-				)
-				turnSpan.RecordError(failure)
-				turnSpan.SetStatus(codes.Error, string(failure.Code))
-			} else {
-				code := string(harness.ClassifyProviderError(err))
-				turnSpan.SetAttributes(attribute.String("turn.failure_code", code))
-				turnSpan.SetStatus(codes.Error, code)
-				turnSpan.RecordError(err)
-			}
-			if result.Failure != nil {
-				fields["finish_reason"] = result.Failure.FinishReason
-			}
-			o.logger.Event("generation.error", fields)
-			return nil, fmt.Errorf("gm generation failed: %w", err)
+		if err := o.streamTurnReply(ctx, run); err != nil {
+			return err
 		}
+		if strings.TrimSpace(run.result.Text) != "" {
+			run.narrationParts = append(run.narrationParts, run.result.Text)
+		}
+		o.drainTurnEvents(run)
 
-		if strings.TrimSpace(result.Text) != "" {
-			narrationParts = append(narrationParts, result.Text)
-		}
-		drainEvents()
-
-		// A @roll record ends the call. Under the ask policy it becomes a pending
-		// check the player rolls; under auto the engine rolls at once and the model
-		// continues from the outcome.
-		req, hasRoll := o.pendingRoll()
-		endedOnRoll = hasRoll && result.PendingCheck == nil
-		if !endedOnRoll || o.mechanicsEngagement == config.EngagementOff {
+		if !o.resolveEndingRoll(ctx, run, attempt) {
 			break
-		}
-		if o.mechanicsEngagement == config.EngagementAsk {
-			result.PendingCheck = &harness.PendingCheck{Ref: rollRef(turnNum, 0), Request: req, ProposedBy: harness.ProposedByGM}
-			break
-		}
-		if attempt >= maxRollContinuations {
-			o.logger.Event("roll.cap", map[string]any{"continuations": attempt})
-			if resolved, resolveErr := o.resolveCheck(ctx, req, nil); resolveErr == nil {
-				resolved.CheckID = rollRef(turnNum, len(rollResults))
-				rollResults = append(rollResults, *resolved)
-				result.RollOutcome = strings.TrimSpace(req.Outcomes[resolved.Outcome])
-				result.RollCheckRef = resolved.CheckID
-			}
-			break
-		}
-		resolved, resolveErr := o.resolveCheck(ctx, req, nil)
-		if resolveErr != nil {
-			o.logger.Event("roll.resolve_error", map[string]any{"error": resolveErr.Error()})
-			break
-		}
-		resolved.CheckID = rollRef(turnNum, len(rollResults))
-		rollResults = append(rollResults, *resolved)
-		rollAnchors = append(rollAnchors, rollAnchor{
-			segmentIndex: len(segmentsFromEvents(collected)),
-			checkID:      resolved.CheckID,
-		})
-		gmDirective = rollContinuationDirective(*resolved, req)
-		resolvedPending = nil
-		if o.parser != nil {
-			o.parser.Reset()
-			collectedCount = 0
 		}
 	}
-	// A player-initiated roll ends the turn on the pending check it asked for,
-	// unless the model already proposed one of its own.
-	if pendingCheck != nil && result.PendingCheck == nil {
-		result.PendingCheck = pendingCheck
+	if run.pendingCheck != nil && run.result.PendingCheck == nil {
+		run.result.PendingCheck = run.pendingCheck
 	}
-	result.Checks = append(result.Checks, rollResults...)
+	run.result.Checks = append(run.result.Checks, run.rollResults...)
+	return nil
+}
 
+// streamTurnReply makes one generation call. A call that cannot be made fails
+// the turn, reported with the code, provider, prompt size and partial length the
+// trace and the log need, and nothing is recorded for it.
+func (o *TurnOrchestrator) streamTurnReply(ctx context.Context, run *turnRun) error {
+	result, err := o.runGenerationLoop(ctx, &run.assembly, run.gmDirective, run.resolvedPending, run.validationEngagement, run.onChunk)
+	run.result = result
+	if err == nil {
+		return nil
+	}
+	run.outcome = "error"
+	run.turnSpan.SetAttributes(attribute.String("turn.raw_completion", result.Text))
+	failure, _ := harness.FailureFrom(err)
+	fields := map[string]any{
+		"code":          generationCode(failure),
+		"error":         err.Error(),
+		"role":          config.RoleGM,
+		"provider":      result.ProviderID,
+		"prompt_chars":  len([]rune(run.input)),
+		"context_chars": len([]rune(run.assembly.Prompt)),
+		"elapsed_ms":    time.Since(run.started).Milliseconds(),
+		"chunk_count":   result.ChunkCount,
+		"partial_chars": len([]rune(result.Text)),
+	}
+	if failure != nil {
+		fields["attempts"] = len(failure.Attempts)
+		run.turnSpan.SetAttributes(
+			attribute.String("turn.failure_code", string(failure.Code)),
+			attribute.String("turn.failure_message", failure.Message),
+			attribute.String("localrpg.generation.failure_code", string(failure.Code)),
+			attribute.Int("localrpg.generation.attempts", len(failure.Attempts)),
+		)
+		run.turnSpan.RecordError(failure)
+		run.turnSpan.SetStatus(codes.Error, string(failure.Code))
+	} else {
+		code := string(harness.ClassifyProviderError(err))
+		run.turnSpan.SetAttributes(attribute.String("turn.failure_code", code))
+		run.turnSpan.SetStatus(codes.Error, code)
+		run.turnSpan.RecordError(err)
+	}
+	if result.Failure != nil {
+		fields["finish_reason"] = result.Failure.FinishReason
+	}
+	o.logger.Event("generation.error", fields)
+	return fmt.Errorf("gm generation failed: %w", err)
+}
+
+// resolveEndingRoll decides what a reply that ended on a @roll record means.
+// Under the ask policy it becomes the pending check the player rolls; under auto
+// the engine rolls at once and the model continues from the outcome. It reports
+// whether the loop should continue.
+func (o *TurnOrchestrator) resolveEndingRoll(ctx context.Context, run *turnRun, attempt int) bool {
+	req, hasRoll := o.pendingRoll()
+	run.endedOnRoll = hasRoll && run.result.PendingCheck == nil
+	if !run.endedOnRoll || o.mechanicsEngagement == config.EngagementOff {
+		return false
+	}
+	if o.mechanicsEngagement == config.EngagementAsk {
+		run.result.PendingCheck = &harness.PendingCheck{Ref: rollRef(run.turnNum, 0), Request: req, ProposedBy: harness.ProposedByGM}
+		return false
+	}
+	if attempt >= maxRollContinuations {
+		o.logger.Event("roll.cap", map[string]any{"continuations": attempt})
+		if resolved, resolveErr := o.resolveCheck(ctx, req, nil); resolveErr == nil {
+			resolved.CheckID = rollRef(run.turnNum, len(run.rollResults))
+			run.rollResults = append(run.rollResults, *resolved)
+			run.result.RollOutcome = strings.TrimSpace(req.Outcomes[resolved.Outcome])
+			run.result.RollCheckRef = resolved.CheckID
+		}
+		return false
+	}
+	resolved, resolveErr := o.resolveCheck(ctx, req, nil)
+	if resolveErr != nil {
+		o.logger.Event("roll.resolve_error", map[string]any{"error": resolveErr.Error()})
+		return false
+	}
+	resolved.CheckID = rollRef(run.turnNum, len(run.rollResults))
+	run.rollResults = append(run.rollResults, *resolved)
+	run.rollAnchors = append(run.rollAnchors, rollAnchor{
+		segmentIndex: len(segmentsFromEvents(run.collected)),
+		checkID:      resolved.CheckID,
+	})
+	run.gmDirective = rollContinuationDirective(*resolved, req)
+	run.resolvedPending = nil
+	if o.parser != nil {
+		o.parser.Reset()
+		run.collectedCount = 0
+	}
+	return true
+}
+
+// finaliseNarration turns the streamed parts into the turn's narration. It
+// records the context the reply was produced from, classifies how the reply was
+// cut and recovers it, appends a resolved roll's outcome where the dice belong,
+// and strips the control records that are protocol rather than story.
+func (o *TurnOrchestrator) finaliseNarration(ctx context.Context, run *turnRun) error {
 	_, finaliseSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "turn.finalise")
-	defer finaliseSpan.End()
+	run.finaliseSpan = finaliseSpan
 
-	turnSpan.SetAttributes(
-		attribute.String("turn.raw_completion", result.Text),
-		attribute.String("localrpg.context.strategy", string(assembly.Context.Strategy)),
-		attribute.String("localrpg.context.prefix_hash", assembly.Context.PrefixHash),
-		attribute.Int("localrpg.provider.cached_tokens", assembly.Context.CachedTokens),
+	run.turnSpan.SetAttributes(
+		attribute.String("turn.raw_completion", run.result.Text),
+		attribute.String("localrpg.context.strategy", string(run.assembly.Context.Strategy)),
+		attribute.String("localrpg.context.prefix_hash", run.assembly.Context.PrefixHash),
+		attribute.Int("localrpg.provider.cached_tokens", run.assembly.Context.CachedTokens),
 	)
-	if strings.TrimSpace(result.Text) == "" && len(result.ToolCalls) == 0 {
-		turnSpan.SetAttributes(attribute.String("turn.failure_code", "empty_response"))
+	if strings.TrimSpace(run.result.Text) == "" && len(run.result.ToolCalls) == 0 {
+		run.turnSpan.SetAttributes(attribute.String("turn.failure_code", "empty_response"))
 	}
-	if assembly.Context.Session != nil {
-		turnSpan.SetAttributes(attribute.String("localrpg.context.session_id", assembly.Context.Session.ID))
-	}
-
-	contextPrompt := assembly.Prompt
-	if gmDirective != "" {
-		contextPrompt = gmDirective + "\n\n" + contextPrompt
+	if run.assembly.Context.Session != nil {
+		run.turnSpan.SetAttributes(attribute.String("localrpg.context.session_id", run.assembly.Context.Session.ID))
 	}
 
-	// A pending check is not an empty turn: the prose the model wrote before the
-	// check is the setup the player reads while deciding, so recovery runs for it
-	// too and only a genuinely empty reply is an error.
-	{
-		// The final call may be cut off; earlier continuations ended on a roll and
-		// are complete by construction, so only the last needs classification.
-		if endedOnRoll {
-			cause = cutNone
+	if err := o.classifyAndRecoverReply(ctx, run); err != nil {
+		return err
+	}
+
+	if outcome := strings.TrimSpace(run.result.RollOutcome); outcome != "" {
+		if strings.TrimSpace(run.narration) == "" {
+			run.narration = outcome
 		} else {
-			cause = o.classifyCut(result)
-		}
-		narration, recovery, stillIncomplete = o.recoverReply(ctx, strings.Join(narrationParts, "\n\n"), cause, onChunk)
-		// The recovery pass streams its continuation through onChunk, so its
-		// segments are in the parser now and must join the turn's script.
-		drainEvents()
-		if strings.TrimSpace(narration) == "" && result.PendingCheck == nil {
-			outcome = "error"
-			failure := &harness.GenerationFailure{
-				Code:         harness.FailureEmptyResponse,
-				Message:      "gm returned no narration",
-				FinishReason: result.FinishReason,
-				ElapsedMS:    time.Since(turnStarted).Milliseconds(),
-			}
-			if result.Failure != nil {
-				failure = result.Failure
-			}
-			turnSpan.SetAttributes(attribute.String("localrpg.generation.failure_code", string(failure.Code)))
-			turnSpan.RecordError(failure)
-			turnSpan.SetStatus(codes.Error, string(failure.Code))
-			o.logger.Event("generation.error", map[string]any{
-				"code":          string(failure.Code),
-				"error":         failure.Message,
-				"role":          config.RoleGM,
-				"provider":      result.ProviderID,
-				"prompt_chars":  len([]rune(actionInput)),
-				"elapsed_ms":    time.Since(turnStarted).Milliseconds(),
-				"chunk_count":   result.ChunkCount,
-				"partial_chars": len([]rune(result.Text)),
-				"attempts":      len(failure.Attempts),
-				"finish_reason": result.FinishReason,
-			})
-			return nil, failure
-		}
-	}
-
-	if outcome := strings.TrimSpace(result.RollOutcome); outcome != "" {
-		if strings.TrimSpace(narration) == "" {
-			narration = outcome
-		} else {
-			narration = strings.TrimSpace(narration) + "\n\n" + outcome
+			run.narration = strings.TrimSpace(run.narration) + "\n\n" + outcome
 		}
 	}
 
 	o.logger.Event("generation.complete", map[string]any{
-		"narration_chars": len([]rune(narration)),
-		"finish_reason":   result.FinishReason,
-		"cause":           cause.String(),
-		"recovery":        string(recovery),
-		"truncated":       stillIncomplete,
+		"narration_chars": len([]rune(run.narration)),
+		"finish_reason":   run.result.FinishReason,
+		"cause":           run.cause.String(),
+		"recovery":        string(run.recovery),
+		"truncated":       run.stillIncomplete,
 	})
 
 	// Control records are protocol, not story: strip them from the prose that is
 	// recorded, extracted, and shown. The parser keeps them for the declarations
 	// applied below.
-	narration = stripRecordLines(narration)
+	run.narration = stripRecordLines(run.narration)
+	return nil
+}
 
-	turn := Turn{
-		Number:           turnNum,
-		Timestamp:        time.Now(),
-		Mode:             mode,
-		Input:            actionInput,
-		Roll:             rollRes,
-		Narration:        narration,
-		Location:         locationID,
-		Outcome:          outcome,
-		Truncated:        stillIncomplete,
-		Recovery:         string(recovery),
-		ContextNotes:     assembly.Trimmed,
-		Context:          &assembly.Context,
-		Prompt:           contextPrompt,
-		ToolCalls:        result.Provenance,
-		PendingCheck:     result.PendingCheck,
-		Draft:            o.singleTurn && result.PendingCheck != nil,
-		ResolvesCheckRef: resolvedRef,
-		ContinuationOf:   continuationOf,
-	}
-
-	extraction := harness.Extraction{}
-	var extractionErr error
-	extractionDone := make(chan struct{})
-	// Extraction is a model call, so start it before the local mention and
-	// segment work and await it just before segments are built. A failed
-	// extractor must not lose the turn.
-	if o.extractor != nil {
-		go func() {
-			defer close(extractionDone)
-			extractCtx, extractSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "extract.entities")
-			defer extractSpan.End()
-			if extracted, err := o.extractor.Extract(extractCtx, turn.Narration); err == nil {
-				extraction = *extracted
-			} else {
-				extractionErr = err
-				extractSpan.RecordError(err)
-				extractSpan.SetStatus(codes.Error, string(harness.ClassifyProviderError(err)))
-				o.logger.Event("extract.error", map[string]any{"error": err.Error()})
-			}
-			extractSpan.SetAttributes(attribute.Int("localrpg.entities.extracted", len(extraction.Entities)))
-		}()
+// classifyAndRecoverReply works out how the reply was cut and repairs it. A
+// pending check is not an empty turn: the prose the model wrote before the check
+// is the setup the player reads while deciding, so recovery runs for it too and
+// only a genuinely empty reply is an error.
+func (o *TurnOrchestrator) classifyAndRecoverReply(ctx context.Context, run *turnRun) error {
+	// The final call may be cut off; earlier continuations ended on a roll and
+	// are complete by construction, so only the last needs classification.
+	if run.endedOnRoll {
+		run.cause = cutNone
 	} else {
-		close(extractionDone)
+		run.cause = o.classifyCut(run.result)
 	}
+	run.narration, run.recovery, run.stillIncomplete = o.recoverReply(ctx, strings.Join(run.narrationParts, "\n\n"), run.cause, run.onChunk)
+	// The recovery pass streams its continuation through onChunk, so its
+	// segments are in the parser now and must join the turn's script.
+	o.drainTurnEvents(run)
+	if strings.TrimSpace(run.narration) == "" && run.result.PendingCheck == nil {
+		run.outcome = "error"
+		failure := &harness.GenerationFailure{
+			Code:         harness.FailureEmptyResponse,
+			Message:      "gm returned no narration",
+			FinishReason: run.result.FinishReason,
+			ElapsedMS:    time.Since(run.started).Milliseconds(),
+		}
+		if run.result.Failure != nil {
+			failure = run.result.Failure
+		}
+		run.turnSpan.SetAttributes(attribute.String("localrpg.generation.failure_code", string(failure.Code)))
+		run.turnSpan.RecordError(failure)
+		run.turnSpan.SetStatus(codes.Error, string(failure.Code))
+		o.logger.Event("generation.error", map[string]any{
+			"code":          string(failure.Code),
+			"error":         failure.Message,
+			"role":          config.RoleGM,
+			"provider":      run.result.ProviderID,
+			"prompt_chars":  len([]rune(run.input)),
+			"elapsed_ms":    time.Since(run.started).Milliseconds(),
+			"chunk_count":   run.result.ChunkCount,
+			"partial_chars": len([]rune(run.result.Text)),
+			"attempts":      len(failure.Attempts),
+			"finish_reason": run.result.FinishReason,
+		})
+		return failure
+	}
+	return nil
+}
 
-	turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, locationID, turn.Narration, actionInput)
+// buildTurn is the record of the turn, before its script and its notes are
+// attached.
+func (o *TurnOrchestrator) buildTurn(run *turnRun) {
+	contextPrompt := run.assembly.Prompt
+	if run.gmDirective != "" {
+		contextPrompt = run.gmDirective + "\n\n" + contextPrompt
+	}
+	run.turn = Turn{
+		Number:           run.turnNum,
+		Timestamp:        time.Now(),
+		Mode:             run.mode,
+		Input:            run.input,
+		Roll:             run.rollRes,
+		Narration:        run.narration,
+		Location:         run.locationID,
+		Outcome:          run.outcome,
+		Truncated:        run.stillIncomplete,
+		Recovery:         string(run.recovery),
+		ContextNotes:     run.assembly.Trimmed,
+		Context:          &run.assembly.Context,
+		Prompt:           contextPrompt,
+		ToolCalls:        run.result.Provenance,
+		PendingCheck:     run.result.PendingCheck,
+		Draft:            o.singleTurn && run.result.PendingCheck != nil,
+		ResolvesCheckRef: run.resolvedRef,
+		ContinuationOf:   run.continuationOf,
+	}
+}
 
-	var personae []harness.PersonaDecl
-	var memories []harness.MemoryDecl
-	var stateChanges []harness.StateChangeDecl
-	moveRef := ""
+// startTurnExtraction runs the entity extractor concurrently. Extraction is a
+// model call, so it starts before the local mention and segment work and is
+// awaited just before the segments are built. A failed extractor must not lose
+// the turn.
+func (o *TurnOrchestrator) startTurnExtraction(ctx context.Context, run *turnRun) {
+	run.extractionDone = make(chan struct{})
+	if o.extractor == nil {
+		close(run.extractionDone)
+		return
+	}
+	go func() {
+		defer close(run.extractionDone)
+		extractCtx, extractSpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "extract.entities")
+		defer extractSpan.End()
+		if extracted, err := o.extractor.Extract(extractCtx, run.turn.Narration); err == nil {
+			run.extraction = *extracted
+		} else {
+			run.extractionErr = err
+			extractSpan.RecordError(err)
+			extractSpan.SetStatus(codes.Error, string(harness.ClassifyProviderError(err)))
+			o.logger.Event("extract.error", map[string]any{"error": err.Error()})
+		}
+		extractSpan.SetAttributes(attribute.Int("localrpg.entities.extracted", len(run.extraction.Entities)))
+	}()
+}
+
+// applyTurnRecords records the local mentions and the declarations the stream
+// carried inline: a persona before the line that speaks, a state change after
+// the roll it follows. It then awaits the extractor, whose failure costs the
+// turn nothing.
+func (o *TurnOrchestrator) applyTurnRecords(run *turnRun) {
+	run.turn.Entities = harness.ResolveEntityMentions(o.store, o.playerID, run.locationID, run.turn.Narration, run.input)
+
+	run.moveRef = ""
 	if o.parser != nil {
-		// The progressive stream carries its declarations inline: a persona
-		// before the line that speaks, a state change after the roll it follows.
-		personae, memories, stateChanges, moveRef = o.applyRecords()
+		run.personae, run.memories, run.stateChanges, run.moveRef = o.applyRecords()
 		o.logRepairReport()
 	}
-	for _, persona := range personae {
+	for _, persona := range run.personae {
 		if id := entity.Slugify(persona.Name); id != "" {
-			turn.Personae = append(turn.Personae, id)
+			run.turn.Personae = append(run.turn.Personae, id)
 		}
 	}
-	turn.Checks = result.Checks
-	turn.RecordReport = o.recordReport()
+	run.turn.Checks = run.result.Checks
+	run.turn.RecordReport = o.recordReport()
 
-	<-extractionDone
-	if extractionErr != nil {
-		o.logger.Event("extract.error", map[string]any{"error": extractionErr.Error()})
+	<-run.extractionDone
+	if run.extractionErr != nil {
+		o.logger.Event("extract.error", map[string]any{"error": run.extractionErr.Error()})
 	}
+}
 
+// assembleTurnSegments turns the streamed events into the turn's playback
+// script: the segments themselves, any dialogue the extractor attributed that
+// the parser missed, an identity a persona revealed, the resolved rolls placed
+// where they happened, and the player's own line leading it.
+func (o *TurnOrchestrator) assembleTurnSegments(run *turnRun) {
 	// The streamed reply was parsed as it arrived, across every continuation; its
 	// events are the turn's playback script. A reply with no framing at all falls
 	// back to the legacy prose parser plus the extractor. Any dialogue that slipped
 	// through stream parsing as narration is rescued using extractor attributions.
-	events := collected
-	if parsed := segmentsFromEvents(events); len(parsed) > 0 {
-		turn.Segments = parsed
-		if len(extraction.Dialogue) > 0 {
+	if parsed := segmentsFromEvents(run.collected); len(parsed) > 0 {
+		run.turn.Segments = parsed
+		if len(run.extraction.Dialogue) > 0 {
 			resolve := func(candidate string) (string, bool) {
 				if o.roster != nil {
 					if id, ok := o.roster.Resolve(candidate); ok {
@@ -1341,22 +1560,22 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 				if id := harness.ResolveSpeakerID(o.store, candidate); id != "" {
 					return id, true
 				}
-				return proposedSpeakerID(extraction.Entities, candidate)
+				return proposedSpeakerID(run.extraction.Entities, candidate)
 			}
-			turn.Segments = mergeAttributions(turn.Segments, extraction.Dialogue, resolve)
+			run.turn.Segments = mergeAttributions(run.turn.Segments, run.extraction.Dialogue, resolve)
 		}
 	} else {
-		turn.Segments = buildTurnSegments(o.store, turn.Narration, extraction)
+		run.turn.Segments = buildTurnSegments(o.store, run.turn.Narration, run.extraction)
 	}
 
 	// Remap earlier segments if a declared persona revealed an earlier identity.
-	for _, persona := range personae {
+	for _, persona := range run.personae {
 		if id := entity.Slugify(persona.Name); id != "" {
 			if prev := strings.TrimSpace(persona.PreviousIdentity()); prev != "" {
 				prevSlug := entity.Slugify(prev)
-				for i := range turn.Segments {
-					if turn.Segments[i].SpeakerID == prevSlug || turn.Segments[i].Speaker == prev {
-						turn.Segments[i].SpeakerID = id
+				for i := range run.turn.Segments {
+					if run.turn.Segments[i].SpeakerID == prevSlug || run.turn.Segments[i].Speaker == prev {
+						run.turn.Segments[i].SpeakerID = id
 					}
 				}
 			}
@@ -1365,62 +1584,67 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 
 	// A resolved roll's outcome is narrated after the prose that led to it, so the
 	// chronicle can render the dice inline with the consequence.
-	if outcome := strings.TrimSpace(result.RollOutcome); outcome != "" {
-		turn.Segments = append(turn.Segments, entity.TurnSegment{
+	if outcome := strings.TrimSpace(run.result.RollOutcome); outcome != "" {
+		run.turn.Segments = append(run.turn.Segments, entity.TurnSegment{
 			Kind:     entity.SegmentNarration,
 			Text:     outcome,
-			CheckRef: result.RollCheckRef,
+			CheckRef: run.result.RollCheckRef,
 		})
 	}
 
 	// The player's own spoken line leads the turn, so it is heard in their voice
 	// before the narrator answers. If the narrator's generated text already begins
 	// with the player's line, attachPlayerSegment marks it rather than duplicating it.
-	modelSegments := len(turn.Segments)
-	turn.Segments = attachPlayerSegment(turn.Segments, mode, actionInput, o.playerID, o.playerDisplayName())
+	modelSegments := len(run.turn.Segments)
+	run.turn.Segments = attachPlayerSegment(run.turn.Segments, run.mode, run.input, o.playerID, o.playerDisplayName())
 	// A player segment is prepended, so every model segment shifts by one. Point
 	// each resolved roll's check at the segment its continuation produced, so the
 	// chronicle renders the dice where the roll happened.
-	shift := len(turn.Segments) - modelSegments
-	for _, anchor := range rollAnchors {
+	shift := len(run.turn.Segments) - modelSegments
+	for _, anchor := range run.rollAnchors {
 		index := anchor.segmentIndex + shift
-		if index < 0 || index >= len(turn.Segments) {
+		if index < 0 || index >= len(run.turn.Segments) {
 			continue
 		}
-		if turn.Segments[index].CheckRef == "" {
-			turn.Segments[index].CheckRef = anchor.checkID
+		if run.turn.Segments[index].CheckRef == "" {
+			run.turn.Segments[index].CheckRef = anchor.checkID
 		}
 	}
+}
 
+// annotateTurnSegments logs the script, folds the speakers it named into the
+// turn's mentions, records a scene break, and anchors each speaker's portrait
+// with the character's active version at turn time.
+func (o *TurnOrchestrator) annotateTurnSegments(run *turnRun) {
 	o.logger.Event("segment.build", map[string]any{
-		"count":      len(turn.Segments),
-		"kinds":      segmentKinds(turn.Segments),
-		"speakers":   segmentSpeakers(turn.Segments),
-		"unresolved": unresolvedSpeakers(turn.Segments),
+		"count":      len(run.turn.Segments),
+		"kinds":      segmentKinds(run.turn.Segments),
+		"speakers":   segmentSpeakers(run.turn.Segments),
+		"unresolved": unresolvedSpeakers(run.turn.Segments),
 	})
-	for _, mention := range speechMentions(turn.Segments) {
-		if !containsMention(turn.Entities, mention.ID) {
-			turn.Entities = append(turn.Entities, mention)
+	for _, mention := range speechMentions(run.turn.Segments) {
+		if !containsMention(run.turn.Entities, mention.ID) {
+			run.turn.Entities = append(run.turn.Entities, mention)
 		}
 	}
 
 	// Detect scene breaks via explicit markdown horizontal rules or extractor cues.
-	if hasProseRuleBreak(turn.Narration) || (extraction.SceneBreak != nil && extraction.SceneBreak.Occurred) {
-		turn.SceneBreak = true
-		if extraction.SceneBreak != nil && extraction.SceneBreak.VisualCue != "" {
-			turn.SceneBreakCue = extraction.SceneBreak.VisualCue
+	if hasProseRuleBreak(run.turn.Narration) || (run.extraction.SceneBreak != nil && run.extraction.SceneBreak.Occurred) {
+		run.turn.SceneBreak = true
+		if run.extraction.SceneBreak != nil && run.extraction.SceneBreak.VisualCue != "" {
+			run.turn.SceneBreakCue = run.extraction.SceneBreak.VisualCue
 		}
 	}
 
 	// Anchor speaker portraits with the character's active version at turn time.
-	for i := range turn.Segments {
-		if turn.Segments[i].Kind == entity.SegmentSpeech {
-			speakerID := turn.Segments[i].SpeakerID
-			if speakerID == "" && turn.Segments[i].Speaker != "" {
-				speakerID = harness.ResolveSpeakerID(o.store, turn.Segments[i].Speaker)
+	for i := range run.turn.Segments {
+		if run.turn.Segments[i].Kind == entity.SegmentSpeech {
+			speakerID := run.turn.Segments[i].SpeakerID
+			if speakerID == "" && run.turn.Segments[i].Speaker != "" {
+				speakerID = harness.ResolveSpeakerID(o.store, run.turn.Segments[i].Speaker)
 			}
-			if speakerID == "" && turn.Segments[i].Speaker != "" {
-				speakerID = entity.Slugify(turn.Segments[i].Speaker)
+			if speakerID == "" && run.turn.Segments[i].Speaker != "" {
+				speakerID = entity.Slugify(run.turn.Segments[i].Speaker)
 			}
 			if speakerID != "" && o.store != nil {
 				if ent, err := o.store.GetEntity(speakerID); err == nil && ent != nil {
@@ -1429,60 +1653,91 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 						version = 1
 					}
 					if version > 0 {
-						turn.Segments[i].SpeakerPortrait = fmt.Sprintf("/api/game/%s/character/%s/portrait?v=%d", o.gameID(), speakerID, version)
+						run.turn.Segments[i].SpeakerPortrait = fmt.Sprintf("/api/game/%s/character/%s/portrait?v=%d", o.gameID(), speakerID, version)
 					} else {
-						turn.Segments[i].SpeakerPortrait = fmt.Sprintf("/api/game/%s/character/%s/portrait", o.gameID(), speakerID)
+						run.turn.Segments[i].SpeakerPortrait = fmt.Sprintf("/api/game/%s/character/%s/portrait", o.gameID(), speakerID)
 					}
 				}
 			}
 		}
 	}
+}
 
-	if o.continuityEnabled() {
-		_, continuitySpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "continuity.check")
-		findings := CheckContinuity(ContinuityInput{
-			Store:      o.store,
-			Turn:       &turn,
-			LocationID: locationID,
-			PlayerID:   o.playerID,
-			Context:    assembly.Context,
-			WorkingSet: &workingSet,
-		})
-		for _, finding := range findings {
-			turn.ContinuityNotes = append(turn.ContinuityNotes, finding.Note)
-		}
-		continuitySpan.SetAttributes(attribute.Int("localrpg.continuity.findings", len(findings)))
-		continuitySpan.End()
+// checkTurnContinuity flags prose that contradicts what the campaign knows. The
+// findings are advisory: nothing is rewritten, and a correction is the player's
+// to send.
+func (o *TurnOrchestrator) checkTurnContinuity(ctx context.Context, run *turnRun) {
+	if !o.continuityEnabled() {
+		return
 	}
+	_, continuitySpan := telemetry.Tracer("github.com/darkliquid/localrpg/pkg/engine").Start(ctx, "continuity.check")
+	findings := CheckContinuity(ContinuityInput{
+		Store:      o.store,
+		Turn:       &run.turn,
+		LocationID: run.locationID,
+		PlayerID:   o.playerID,
+		Context:    run.assembly.Context,
+		WorkingSet: &run.workingSet,
+	})
+	for _, finding := range findings {
+		run.turn.ContinuityNotes = append(run.turn.ContinuityNotes, finding.Note)
+	}
+	continuitySpan.SetAttributes(attribute.Int("localrpg.continuity.findings", len(findings)))
+	continuitySpan.End()
+}
 
-	// A move proposed by extraction applies only when it resolves to a real
-	// location, and it takes effect from the next turn: this turn happened where it
-	// started, which is what keeps scenes honest. An explicit move record wins over
-	// an extracted one.
-	move := strings.TrimSpace(moveRef)
+// applyProposedMove moves the party when the turn proposed a location. A move
+// applies only when it resolves to a real location, and it takes effect from the
+// next turn: this turn happened where it started, which is what keeps scenes
+// honest. An explicit move record wins over an extracted one.
+func (o *TurnOrchestrator) applyProposedMove(run *turnRun) error {
+	move := strings.TrimSpace(run.moveRef)
 	if move == "" {
-		move = strings.TrimSpace(extraction.PlayerLocation)
+		move = strings.TrimSpace(run.extraction.PlayerLocation)
 	}
 	if move != "" {
-		if ent := findLocationByRef(o.store, move); ent != nil && ent.ID != locationID {
+		if ent := findLocationByRef(o.store, move); ent != nil && ent.ID != run.locationID {
 			if err := o.timeline.SetPlayerLocation(o.playerID, ent.ID); err != nil {
-				return nil, fmt.Errorf("apply proposed location: %w", err)
+				return fmt.Errorf("apply proposed location: %w", err)
 			}
 		}
 	}
+	return nil
+}
 
-	// Nothing is persisted for a cancelled or failed turn: the timeline only ever
-	// holds completed turns, so a disconnect is a no-op on disk.
+// recordTurn persists a completed turn and everything around it. Nothing is
+// persisted for a cancelled or failed turn: the timeline only ever holds
+// completed turns, so a disconnect is a no-op on disk.
+func (o *TurnOrchestrator) recordTurn(ctx context.Context, run *turnRun) error {
 	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("turn cancelled: %w", err)
+		return fmt.Errorf("turn cancelled: %w", err)
 	}
+	o.reconcileExtractedEntities(run)
+	if err := o.applyTurnStateChanges(run); err != nil {
+		return err
+	}
+	o.runTurnLifecycle(ctx, run)
+	if err := o.persistTurn(ctx, run); err != nil {
+		return err
+	}
+	if err := o.assignPersonaVoices(run); err != nil {
+		return err
+	}
+	if err := o.persistWorkingSet(run); err != nil {
+		return err
+	}
+	o.logRecordedTurn(ctx, run)
+	return nil
+}
 
-	// MatchExistingEntity answers whether a note already exists, so a turn's trace
-	// can say which beings it introduced rather than only which it mentioned.
-	matched := make([]string, 0, len(extraction.Entities))
-	created := make([]string, 0, len(extraction.Entities))
-	for i := range extraction.Entities {
-		proposed := extraction.Entities[i]
+// reconcileExtractedEntities says which of the turn's extracted beings it
+// introduced rather than only which it mentioned. MatchExistingEntity answers
+// whether a note already exists.
+func (o *TurnOrchestrator) reconcileExtractedEntities(run *turnRun) {
+	matched := make([]string, 0, len(run.extraction.Entities))
+	created := make([]string, 0, len(run.extraction.Entities))
+	for i := range run.extraction.Entities {
+		proposed := run.extraction.Entities[i]
 		if existing := harness.MatchExistingEntity(o.store, &proposed); existing != nil {
 			matched = append(matched, existing.ID)
 			continue
@@ -1497,138 +1752,174 @@ func (o *TurnOrchestrator) ProcessActionStream(ctx context.Context, mode, action
 		"matched": matched,
 		"created": created,
 	})
+}
 
-	// RecordTurn creates and voices the entities the turn introduced. Synthesis
-	// must not begin until this returns, or a character invented in this turn
-	// would be read in the narrator's voice.
-	if len(stateChanges) > 0 && o.rulesEngine != nil {
-		notes, err := rules.ApplyStateChanges(o.rulesEngine.HostAPI(), stateChanges, o.declaredStats, o.allowFreeform)
-		if err != nil {
-			return nil, fmt.Errorf("apply state changes: %w", err)
-		}
-		// A change the engine could not apply is recorded rather than fatal: the GM
-		// has already narrated its consequence, and a reference the index does not
-		// hold must not cost the player the turn they just played.
-		for _, note := range notes {
-			trace.OrNil(o.logger).Event("mechanics.state_change_skipped", map[string]any{"note": note})
-		}
+// applyTurnStateChanges applies the state changes the turn declared, after
+// RecordTurn has created and voiced the entities it introduced. A change the
+// engine could not apply is recorded rather than fatal: the GM has already
+// narrated its consequence, and a reference the index does not hold must not
+// cost the player the turn they just played.
+func (o *TurnOrchestrator) applyTurnStateChanges(run *turnRun) error {
+	if len(run.stateChanges) == 0 || o.rulesEngine == nil {
+		return nil
 	}
-
-	// Earn advancement after the turn's own state changes, so the award is part
-	// of the same record and a threshold level sees the final values.
-	o.applyAdvancement(ctx, &turn)
-
-	turn.WorldTick = o.worldTick
-
-	// Health is resolved twice around the post-turn hooks: once before them, so
-	// the hook context carries the effects the turn's own changes caused, and once
-	// after, so a hook that drives a stat to zero is seen on this same turn rather
-	// than the next.
-	pendingEffects := o.healthOutcomes(&turn)
-	o.runTurnEndHooks(turnNum, &turn, pendingEffects)
-	finalEffects := o.healthOutcomes(&turn)
-	turn.HealthEffects = append(turn.HealthEffects, mergeHealthEffects(pendingEffects, finalEffects)...)
-
-	// In single-turn mode a resolved check completes the draft turn in place
-	// rather than appending a continuation, so the fiction stays one record.
-	if o.singleTurn && continuationOf != 0 {
-		turn.Number = continuationOf
-		if err := o.timeline.ReplaceTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
-			return nil, fmt.Errorf("replace turn: %w", err)
-		}
-	} else if err := o.timeline.RecordTurnContextStructured(ctx, &turn, extraction.Entities, personae, memories, result.Checks); err != nil {
-		return nil, fmt.Errorf("record turn: %w", err)
+	notes, err := rules.ApplyStateChanges(o.rulesEngine.HostAPI(), run.stateChanges, o.declaredStats, o.allowFreeform)
+	if err != nil {
+		return fmt.Errorf("apply state changes: %w", err)
 	}
+	for _, note := range notes {
+		trace.OrNil(o.logger).Event("mechanics.state_change_skipped", map[string]any{"note": note})
+	}
+	return nil
+}
 
-	if exec, ok := o.toolExecutor.(interface {
+// runTurnLifecycle closes the turn's mechanics. Advancement is earned after the
+// turn's own state changes, so the award is part of the same record and a
+// threshold level sees the final values. Health is resolved twice around the
+// post-turn hooks: once before them, so the hook context carries the effects the
+// turn's own changes caused, and once after, so a hook that drives a stat to
+// zero is seen on this same turn rather than the next.
+func (o *TurnOrchestrator) runTurnLifecycle(ctx context.Context, run *turnRun) {
+	o.applyAdvancement(ctx, &run.turn)
+
+	run.turn.WorldTick = o.worldTick
+
+	pendingEffects := o.healthOutcomes(&run.turn)
+	o.runTurnEndHooks(run.turnNum, &run.turn, pendingEffects)
+	finalEffects := o.healthOutcomes(&run.turn)
+	run.turn.HealthEffects = append(run.turn.HealthEffects, mergeHealthEffects(pendingEffects, finalEffects)...)
+}
+
+// persistTurn writes the turn. In single-turn mode a resolved check completes
+// the draft turn in place rather than appending a continuation, so the fiction
+// stays one record.
+func (o *TurnOrchestrator) persistTurn(ctx context.Context, run *turnRun) error {
+	if o.singleTurn && run.continuationOf != 0 {
+		run.turn.Number = run.continuationOf
+		if err := o.timeline.ReplaceTurnContextStructured(ctx, &run.turn, run.extraction.Entities, run.personae, run.memories, run.result.Checks); err != nil {
+			return fmt.Errorf("replace turn: %w", err)
+		}
+		return nil
+	}
+	if err := o.timeline.RecordTurnContextStructured(ctx, &run.turn, run.extraction.Entities, run.personae, run.memories, run.result.Checks); err != nil {
+		return fmt.Errorf("record turn: %w", err)
+	}
+	return nil
+}
+
+// assignPersonaVoices gives a persona the voice the tool executor assigned it.
+// Synthesis must not begin until the turn is recorded, or a character invented
+// in this turn would be read in the narrator's voice.
+func (o *TurnOrchestrator) assignPersonaVoices(run *turnRun) error {
+	exec, ok := o.toolExecutor.(interface {
 		AssignedVoices() map[string]config.VoiceProfile
-	}); ok {
-		assigned := exec.AssignedVoices()
-		for _, persona := range personae {
-			slugID := entity.Slugify(persona.Name)
-			if prof, has := assigned[slugID]; has {
-				if ent, err := o.store.GetEntity(slugID); err == nil && ent != nil {
-					ent.Voice = &entity.VoiceConfig{
-						Provider:   prof.Provider,
-						VoiceID:    prof.VoiceID,
-						Pitch:      prof.Pitch,
-						SpeechRate: prof.SpeechRate,
-						Options:    prof.Options,
-					}
-					if err := o.timeline.SaveEntity(ent); err != nil {
-						return nil, fmt.Errorf("save assigned voice for entity %q: %w", slugID, err)
-					}
-				}
-			}
-		}
-	}
-
-	if o.store != nil {
-		var allTurnRefs []harness.Ref
-		if turn.Context != nil {
-			allTurnRefs = turn.Context.Refs
-		}
-		workingSet.Apply(turnNum, allTurnRefs)
-		if err := o.store.ReplaceWorkingSet(workingSet.ToStorageRecords()); err != nil {
-			return nil, fmt.Errorf("replace working set: %w", err)
-		}
-	}
-
-	trace.LogEvent(ctx, o.logger, "record.turn", map[string]any{
-		"number":          turn.Number,
-		"location":        turn.Location,
-		"entities":        len(turn.Entities),
-		"outcome":         turn.Outcome,
-		"narration_chars": len([]rune(turn.Narration)),
 	})
-
-	if o.sceneWorker != nil && o.shouldIllustrate(turn, pastTurns) {
-		var locEntity *entity.Entity
-		if turn.Location != "" && o.store != nil {
-			locEntity, _ = o.store.GetEntity(turn.Location)
-		}
-		cue := turn.SceneBreakCue
-		if cue == "" {
-			cue = ExtractSceneCue(turn.Narration)
-		}
-		sceneCtx := ScenePromptContext{
-			Cue:       cue,
-			Narration: turn.Narration,
-			Action:    turn.Input,
-			Location:  turn.Location,
-			Style:     o.worldArtStyle,
-			Cast:      SceneCast(o.store, &turn),
-		}
-		if locEntity != nil {
-			sceneCtx.Location = locEntity.Name
-			sceneCtx.Appearance = locEntity.Appearance
-			sceneCtx.CurrentAppearance = locEntity.CurrentAppearance
-		}
-		if len(turn.Checks) > 0 {
-			sceneCtx.Outcome = turn.Checks[0].Outcome
-		}
-		// The scene's stable look keeps successive images of one place together;
-		// the reference image is the previous illustration of the same location.
-		sceneCtx.Scene = media.NewSceneStyle(turn.Location, o.worldArtStyle, sceneCtx.Appearance)
-		scenePrompt := BuildScenePrompt(sceneCtx)
-		o.sceneWorker.EnqueueScene(o.gameID(), turn.Number, SceneJob{
-			Prompt:    scenePrompt,
-			Reference: o.sceneReference(turn.Location, pastTurns),
-		})
+	if !ok {
+		return nil
 	}
-
-	if o.portraitWorker != nil {
-		for _, raw := range extraction.Entities {
-			if raw.AppearanceChanged && o.store != nil {
-				matched := harness.MatchExistingEntity(o.store, &raw)
-				if matched != nil && entity.IsCharacterType(matched.Type) {
-					o.portraitWorker.EnqueueVersion(o.gameID(), matched, o.worldArtStyle, true)
+	assigned := exec.AssignedVoices()
+	for _, persona := range run.personae {
+		slugID := entity.Slugify(persona.Name)
+		if prof, has := assigned[slugID]; has {
+			if ent, err := o.store.GetEntity(slugID); err == nil && ent != nil {
+				ent.Voice = &entity.VoiceConfig{
+					Provider:   prof.Provider,
+					VoiceID:    prof.VoiceID,
+					Pitch:      prof.Pitch,
+					SpeechRate: prof.SpeechRate,
+					Options:    prof.Options,
+				}
+				if err := o.timeline.SaveEntity(ent); err != nil {
+					return fmt.Errorf("save assigned voice for entity %q: %w", slugID, err)
 				}
 			}
 		}
 	}
+	return nil
+}
 
-	return &turn, nil
+// persistWorkingSet reweights the campaign's active entities and threads with
+// what this turn referenced.
+func (o *TurnOrchestrator) persistWorkingSet(run *turnRun) error {
+	if o.store == nil {
+		return nil
+	}
+	var allTurnRefs []harness.Ref
+	if run.turn.Context != nil {
+		allTurnRefs = run.turn.Context.Refs
+	}
+	run.workingSet.Apply(run.turnNum, allTurnRefs)
+	if err := o.store.ReplaceWorkingSet(run.workingSet.ToStorageRecords()); err != nil {
+		return fmt.Errorf("replace working set: %w", err)
+	}
+	return nil
+}
+
+// logRecordedTurn records what the turn wrote, for the trace.
+func (o *TurnOrchestrator) logRecordedTurn(ctx context.Context, run *turnRun) {
+	trace.LogEvent(ctx, o.logger, "record.turn", map[string]any{
+		"number":          run.turn.Number,
+		"location":        run.turn.Location,
+		"entities":        len(run.turn.Entities),
+		"outcome":         run.turn.Outcome,
+		"narration_chars": len([]rune(run.turn.Narration)),
+	})
+}
+
+// enqueueSceneArt queues the scene image the turn earned, with the prompt that
+// describes it and the reference image that keeps one place's look stable.
+func (o *TurnOrchestrator) enqueueSceneArt(run *turnRun) {
+	if o.sceneWorker == nil || !o.shouldIllustrate(run.turn, run.pastTurns) {
+		return
+	}
+	var locEntity *entity.Entity
+	if run.turn.Location != "" && o.store != nil {
+		locEntity, _ = o.store.GetEntity(run.turn.Location)
+	}
+	cue := run.turn.SceneBreakCue
+	if cue == "" {
+		cue = ExtractSceneCue(run.turn.Narration)
+	}
+	sceneCtx := ScenePromptContext{
+		Cue:       cue,
+		Narration: run.turn.Narration,
+		Action:    run.turn.Input,
+		Location:  run.turn.Location,
+		Style:     o.worldArtStyle,
+		Cast:      SceneCast(o.store, &run.turn),
+	}
+	if locEntity != nil {
+		sceneCtx.Location = locEntity.Name
+		sceneCtx.Appearance = locEntity.Appearance
+		sceneCtx.CurrentAppearance = locEntity.CurrentAppearance
+	}
+	if len(run.turn.Checks) > 0 {
+		sceneCtx.Outcome = run.turn.Checks[0].Outcome
+	}
+	// The scene's stable look keeps successive images of one place together;
+	// the reference image is the previous illustration of the same location.
+	sceneCtx.Scene = media.NewSceneStyle(run.turn.Location, o.worldArtStyle, sceneCtx.Appearance)
+	scenePrompt := BuildScenePrompt(sceneCtx)
+	o.sceneWorker.EnqueueScene(o.gameID(), run.turn.Number, SceneJob{
+		Prompt:    scenePrompt,
+		Reference: o.sceneReference(run.turn.Location, run.pastTurns),
+	})
+}
+
+// enqueuePortraitVersions queues a new portrait version for anyone the turn gave
+// a new appearance to.
+func (o *TurnOrchestrator) enqueuePortraitVersions(run *turnRun) {
+	if o.portraitWorker == nil {
+		return
+	}
+	for _, raw := range run.extraction.Entities {
+		if raw.AppearanceChanged && o.store != nil {
+			matched := harness.MatchExistingEntity(o.store, &raw)
+			if matched != nil && entity.IsCharacterType(matched.Type) {
+				o.portraitWorker.EnqueueVersion(o.gameID(), matched, o.worldArtStyle, true)
+			}
+		}
+	}
 }
 
 // ProcessAction runs a turn without reporting narration as it arrives.
