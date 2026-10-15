@@ -70,7 +70,12 @@ CREATE TABLE IF NOT EXISTS working_set (
 // pragmas are applied on every connection: WAL lets the GUI, the TUI, and a
 // turn's extraction pass share one file, and the busy timeout turns lock
 // contention into a short wait instead of an immediate failure.
-const pragmas = "_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on&_synchronous=NORMAL"
+// _txlock=immediate makes every explicit transaction take the write lock as it
+// begins. A deferred transaction that reads before it writes cannot be helped by
+// the busy timeout: SQLite returns SQLITE_BUSY at once rather than waiting,
+// because waiting is what would deadlock. Two writers in one process, which is
+// what a turn and its portrait worker are, is exactly that case.
+const pragmas = "_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on&_synchronous=NORMAL&_txlock=immediate"
 
 // OpenDB opens or creates the SQLite index at path, applies LocalRPG's pragmas,
 // creates the schema when it is missing and migrates it when it is old. Callers
