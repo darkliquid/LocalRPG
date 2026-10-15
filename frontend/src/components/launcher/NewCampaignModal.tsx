@@ -1,3 +1,4 @@
+import { errorMessage } from '../../lib/errors';
 import { useFailures } from '../../context/FailuresContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { WorldInfo, SystemInfo, CreateGameRequest, CharacterCreationField, TTSConfig, VoiceProfile } from '../../types';
@@ -52,7 +53,6 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingKind, setGeneratingKind] = useState<'banner' | 'icon' | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
-  const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Unexpected error');
 
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([]);
   const [ttsConfig, setTtsConfig] = useState<TTSConfig | null>(null);

@@ -1,3 +1,4 @@
+import { errorMessage } from '../lib/errors';
 import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient, WorldExistsError } from '../api/client';
@@ -128,8 +129,6 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   const [canForceDelete, setCanForceDelete] = useState(false);
   const detailRequest = React.useRef(0);
   const startModeRef = React.useRef(startMode);
-
-  const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : 'Unexpected error');
 
   const isDraft = selection?.kind === 'draft';
   const savedID = selection?.kind === 'saved' ? selection.id : null;
