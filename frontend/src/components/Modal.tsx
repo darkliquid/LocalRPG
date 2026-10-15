@@ -1,11 +1,6 @@
-import { useCallback, useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { X } from 'lucide-react';
-
-// The element kinds a modal lets you tab through. Disabled controls and
-// tabindex="-1" are excluded because they are not reachable by tabbing, which is
-// what this list is for.
-const FOCUSABLE =
-  'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 export interface ModalProps {
   open: boolean;
@@ -25,53 +20,8 @@ export interface ModalProps {
 // returns focus to whatever opened it. Thirty-one copy-pasted overlays did none
 // of that beyond drawing the same backdrop.
 export function Modal({ open, onClose, title, children, dismissable = true, className }: ModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const openerRef = useRef<HTMLElement | null>(null);
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(open, dismissable ? onClose : undefined);
   const titleID = useId();
-
-  // Remember what had focus so closing puts the user back: dropping focus on the
-  // body makes a keyboard user find their place again from the top.
-  useEffect(() => {
-    if (!open) return;
-    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const dialog = dialogRef.current;
-    const first = dialog?.querySelector<HTMLElement>(FOCUSABLE);
-    (first ?? dialog)?.focus();
-    return () => openerRef.current?.focus();
-  }, [open]);
-
-  // Escape closes, and Tab cycles inside: the point of a modal is that the page
-  // behind it is not reachable while it is open.
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'Escape' && dismissable) {
-        event.stopPropagation();
-        onClose();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      // The selector already excludes what tabbing cannot reach, and jsdom has no
-      // layout, so a visibility filter here would be a filter that answers nothing
-      // in a test and guesses in a browser.
-      const items = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
-      if (items.length === 0) {
-        event.preventDefault();
-        return;
-      }
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    },
-    [dismissable, onClose],
-  );
 
   if (!open) return null;
 
@@ -87,7 +37,7 @@ export function Modal({ open, onClose, title, children, dismissable = true, clas
         aria-modal="true"
         aria-labelledby={titleID}
         tabIndex={-1}
-        onKeyDown={handleKeyDown}
+        onKeyDown={onKeyDown}
         onClick={(event) => event.stopPropagation()}
         className={`max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-stone-800 bg-stone-950 p-6 shadow-2xl focus:outline-none ${className ?? ''}`}
       >
