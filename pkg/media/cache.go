@@ -12,12 +12,17 @@ import (
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
 
+// ComputeAudioCacheKey derives the cache key for one spoken line from the speaker,
+// the voice's hash and the text. Prefer ComputeAudioCacheKeyWithRate, which also
+// separates two characters who share a voice.
 func ComputeAudioCacheKey(speakerID, voiceConfigHash, utteranceText string) string {
 	hasher := sha256.New()
 	hasher.Write([]byte(speakerID + ":" + voiceConfigHash + ":" + utteranceText))
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
+// ComputeAudioCacheKeyWithRate derives a key from the speaker, the voice ID, the
+// pitch and rate, and the text, so characters sharing a voice do not share clips.
 func ComputeAudioCacheKeyWithRate(speakerID, voiceID string, pitch, speechRate float64, text string) string {
 	raw := fmt.Sprintf("%s:%s:%.2f:%.2f:%s", speakerID, voiceID, pitch, speechRate, text)
 	hash := sha256.Sum256([]byte(raw))
@@ -74,6 +79,8 @@ func ClipKeyForPath(path string) string {
 	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 }
 
+// ComputeArtCacheKey derives the cache key for one image from what it depicts: the
+// entity, its appearance and the world's art style.
 func ComputeArtCacheKey(entityID, appearanceHash, worldStyleHash string) string {
 	hasher := sha256.New()
 	key := entityID + ":" + appearanceHash + ":" + worldStyleHash
@@ -86,20 +93,26 @@ func ComputeArtCacheKey(entityID, appearanceHash, worldStyleHash string) string 
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
+// ContentCache is the on-disk cache for generated media: clips and images, one
+// directory per category.
 type ContentCache struct {
 	baseDir string
 }
 
+// NewContentCache roots a cache at baseDir.
 func NewContentCache(baseDir string) *ContentCache {
 	return &ContentCache{baseDir: baseDir}
 }
 
+// Subdir is the directory one category of cached file lives in, for a caller that
+// wants to store something beside it.
 func (c *ContentCache) Subdir(category string) string {
 	dir := filepath.Join(c.baseDir, category)
 	_ = os.MkdirAll(dir, 0755)
 	return dir
 }
 
+// Exists reports whether one cached file is present.
 func (c *ContentCache) Exists(category, filename string) bool {
 	path := filepath.Join(c.Subdir(category), filename)
 	info, err := os.Stat(path)
@@ -141,6 +154,7 @@ func (c *ContentCache) Put(category, filename string, data []byte) (string, erro
 	return path, nil
 }
 
+// Get reads one cached file.
 func (c *ContentCache) Get(category, filename string) ([]byte, error) {
 	path := filepath.Join(c.Subdir(category), filename)
 	return os.ReadFile(path)

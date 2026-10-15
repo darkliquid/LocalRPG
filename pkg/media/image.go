@@ -14,15 +14,19 @@ import (
 	"github.com/darkliquid/localrpg/pkg/entity"
 )
 
+// ImageClient is what every image backend implements.
 type ImageClient interface {
 	GenerateImage(ctx context.Context, prompt string) ([]byte, error)
 }
 
+// ImagePipeline turns a prompt into an image file, cached under a key derived from
+// what the image depicts.
 type ImagePipeline struct {
 	client ImageClient
 	cache  *ContentCache
 }
 
+// NewImagePipeline pairs a client with the cache that keeps what it produces.
 func NewImagePipeline(client ImageClient, cache *ContentCache) *ImagePipeline {
 	return &ImagePipeline{
 		client: client,

@@ -27,6 +27,8 @@ const (
 	DefaultBitrate = 32000
 	// MinBitrate and MaxBitrate bound the encoder's accepted target.
 	MinBitrate = 6000
+	// MaxBitrate is the encoder's ceiling, in bits per second. A higher rate buys
+	// nothing here: the cl-ins the app keeps are speech and short music cues.
 	MaxBitrate = 510000
 	// maxDecodedFrame is the largest frame the decoder can emit (120 ms).
 	maxDecodedFrame = 5760

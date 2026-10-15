@@ -91,6 +91,8 @@ func LegacySegments(narration string) []entity.TurnSegment {
 	return segments
 }
 
+// TTSClient is what every speech backend implements, whatever is underneath: a
+// built-in, an HTTP server, or a command-line tool.
 type TTSClient interface {
 	Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error)
 }
@@ -133,6 +135,8 @@ func ResolveSpeechCueCapabilities(cfg config.TTSConfig, client TTSClient) Speech
 	return caps
 }
 
+// TTSPipeline turns a line of text into an audio file and keeps it, so the same line
+// is never synthesized twice.
 type TTSPipeline struct {
 	client      TTSClient
 	cache       *ContentCache
@@ -454,6 +458,7 @@ func (p *TTSPipeline) setLastUsage(u Usage) {
 	p.lastUsage = u
 }
 
+// NewTTSPipeline pairs a client with the cache that keeps what it produces.
 func NewTTSPipeline(client TTSClient, cache *ContentCache) *TTSPipeline {
 	return &TTSPipeline{
 		client:      client,
@@ -479,6 +484,8 @@ func (p *TTSPipeline) keyLock(key string) *sync.Mutex {
 	return lock
 }
 
+// SynthesizeUtterance returns the path of the clip for one line, synthesizing it only
+// when the cache does not already hold it.
 func (p *TTSPipeline) SynthesizeUtterance(ctx context.Context, speakerID string, voice *entity.VoiceConfig, text string) (string, error) {
 	return p.SynthesizeUtteranceForce(ctx, speakerID, voice, text, false)
 }
@@ -495,6 +502,8 @@ type speechIdentity struct {
 	model    string
 }
 
+// SynthesizeUtteranceForce is SynthesizeUtterance with the choice made explicit:
+// force re-synthesizes and replaces what the cache held.
 func (p *TTSPipeline) SynthesizeUtteranceForce(ctx context.Context, speakerID string, voice *entity.VoiceConfig, text string, force bool) (string, error) {
 	base := ComputeAudioCacheKeyForVoice(speakerID, voice, text)
 	start := time.Now()

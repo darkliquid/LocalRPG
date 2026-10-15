@@ -29,14 +29,18 @@ func NewMockProvider(id string, dims int) *MockProvider {
 	}
 }
 
+// ID is the mock's fixed provider id, so a test can assert on it.
 func (m *MockProvider) ID() string {
 	return m.id
 }
 
+// Dimensions is the width the mock returns.
 func (m *MockProvider) Dimensions() int {
 	return m.dims
 }
 
+// Embed returns a deterministic vector per text, so a test can exercise the index
+// without a model.
 func (m *MockProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	m.mu.Lock()
 	m.CallCount++

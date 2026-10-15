@@ -6,6 +6,7 @@ package media
 // British voice by one.
 const KokoroModelV019 = "kokoro-en-v0_19"
 
+// KokoroSpeaker is one voice a Kokoro model can speak in, as the provider reports it.
 type KokoroSpeaker struct {
 	Name string
 	SID  int
@@ -27,6 +28,8 @@ var kokoroSpeakersByModel = map[string][]KokoroSpeaker{
 	},
 }
 
+// KokoroSpeakersForModel lists the voices a model offers, so an editor can present
+// them without loading the model.
 func KokoroSpeakersForModel(modelID string) []KokoroSpeaker {
 	return kokoroSpeakersByModel[modelID]
 }

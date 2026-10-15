@@ -17,12 +17,16 @@ import (
 	"sync"
 )
 
+// Errors the model manager reports: a model the registry does not know, a download of
+// that model that is already running, and an archive whose checksum did not match.
 var (
 	ErrModelNotFound    = errors.New("model not found in registry")
 	ErrDownloadActive   = errors.New("model download is already active")
 	ErrChecksumMismatch = errors.New("downloaded archive failed checksum verification")
 )
 
+// ModelSpec is one model the registry knows: its id, where its files come from, and
+// what it is for.
 type ModelSpec struct {
 	ID            string   `json:"id"`
 	Name          string   `json:"name"`
@@ -61,6 +65,8 @@ const EmbeddingEncoderModelID = "embedding-encoder"
 // a changed model cannot silently inherit the previous one's token ids.
 const EmbeddingEncoderVariant = "bge-small-en-v1.5-bert-wordpiece"
 
+// ModelStatus is what a client needs to show a model: whether its files are
+// present, whether it is downloading, and how far along.
 type ModelStatus struct {
 	ID              string  `json:"id"`
 	Name            string  `json:"name"`
@@ -72,6 +78,8 @@ type ModelStatus struct {
 	Error           string  `json:"error,omitempty"`
 }
 
+// Manager owns the model cache: it downloads a model's files, reports their state,
+// and tells its subscribers as it goes.
 type Manager struct {
 	cacheDir   string
 	mu         sync.RWMutex
@@ -87,6 +95,8 @@ type downloadSession struct {
 	channels []chan ModelStatus
 }
 
+// NewManager roots a manager at cacheDir, which is where a downloaded model's files
+// live.
 func NewManager(cacheDir string) *Manager {
 	m := &Manager{
 		cacheDir:   cacheDir,
@@ -146,12 +156,15 @@ func (m *Manager) registerDefaultSpecs() {
 	}
 }
 
+// RegisterSpec adds a model to the registry, which is how the app's known models are
+// declared.
 func (m *Manager) RegisterSpec(spec ModelSpec) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.specs[spec.ID] = spec
 }
 
+// ModelDir is where one model's files live under the cache.
 func (m *Manager) ModelDir(modelID string) string {
 	m.mu.RLock()
 	spec, ok := m.specs[modelID]
@@ -162,6 +175,7 @@ func (m *Manager) ModelDir(modelID string) string {
 	return filepath.Join(m.cacheDir, "models", spec.Subdir)
 }
 
+// Status reports one model's state.
 func (m *Manager) Status(modelID string) ModelStatus {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -185,6 +199,7 @@ func (m *Manager) Status(modelID string) ModelStatus {
 	}
 }
 
+// Cancel stops an in-flight download and reports whether one was running.
 func (m *Manager) Cancel(modelID string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -196,6 +211,7 @@ func (m *Manager) Cancel(modelID string) bool {
 	return true
 }
 
+// ListStatuses reports every model the registry knows.
 func (m *Manager) ListStatuses() []ModelStatus {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -227,6 +243,8 @@ func (m *Manager) isInstalledLocked(spec ModelSpec) bool {
 	return true
 }
 
+// Subscribe returns a channel of status changes. Pass it back to Unsubscribe when
+// you stop reading, or the channel is never released.
 func (m *Manager) Subscribe() chan ModelStatus {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -235,6 +253,7 @@ func (m *Manager) Subscribe() chan ModelStatus {
 	return ch
 }
 
+// Unsubscribe stops delivering to a channel from Subscribe.
 func (m *Manager) Unsubscribe(ch chan ModelStatus) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -253,6 +272,8 @@ func (m *Manager) broadcast(status ModelStatus) {
 	}
 }
 
+// Download fetches a model's files and returns a channel of progress. An error here
+// means the download could not be started, not that it failed later.
 func (m *Manager) Download(ctx context.Context, modelID string) (<-chan ModelStatus, error) {
 	m.mu.Lock()
 	spec, ok := m.specs[modelID]
