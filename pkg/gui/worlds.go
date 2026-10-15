@@ -18,6 +18,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ListWorlds reads the world chooser's list. A worlds directory that does not
+// exist yet is an empty list, not an error.
 func (s *Service) ListWorlds(ctx context.Context) ([]WorldSummaryDTO, error) {
 	worldsDir := s.resolver.WorldsDir()
 	entries, err := os.ReadDir(worldsDir)
@@ -66,6 +68,7 @@ func (s *Service) ListWorlds(ctx context.Context) ([]WorldSummaryDTO, error) {
 	return summaries, nil
 }
 
+// GetWorld reads a world's manifest and its template notes for the world editor.
 func (s *Service) GetWorld(ctx context.Context, id string) (*WorldDetailDTO, error) {
 	if err := pathutil.ValidateID(id); err != nil {
 		return nil, fmt.Errorf("invalid world id: %w", err)
@@ -240,6 +243,7 @@ func (s *Service) DeleteWorld(ctx context.Context, worldID string, force bool) e
 	return nil
 }
 
+// GetWorldEntity reads one template note's Markdown out of a world.
 func (s *Service) GetWorldEntity(ctx context.Context, worldID, entityID string) (*WorldEntityDetailDTO, error) {
 	if err := pathutil.ValidateID(worldID); err != nil {
 		return nil, fmt.Errorf("invalid world id: %w", err)
@@ -320,6 +324,8 @@ func (s *Service) SaveWorldEntity(ctx context.Context, worldID, entityID, folder
 	return nil
 }
 
+// DeleteWorldEntity removes one template note from a world. Campaigns already
+// created from that world keep the copies they were made with.
 func (s *Service) DeleteWorldEntity(ctx context.Context, worldID, entityID string) error {
 	if err := pathutil.ValidateID(worldID); err != nil {
 		return fmt.Errorf("invalid world id: %w", err)
@@ -361,6 +367,8 @@ func findWorldEntityNote(worldDir, entityID string) (string, error) {
 	return found, nil
 }
 
+// GetWorldAsset resolves one world asset to a path and its content type.
+// os.ErrNotExist means the asset is not there.
 func (s *Service) GetWorldAsset(worldID, assetKind string) (string, string, error) {
 	if err := pathutil.ValidateID(worldID); err != nil {
 		return "", "", fmt.Errorf("invalid world id: %w", err)
@@ -379,6 +387,7 @@ func (s *Service) GetWorldAsset(worldID, assetKind string) (string, string, erro
 	return p, contentTypeForArt(ext), nil
 }
 
+// SaveWorldAsset writes one world asset and returns the path it wrote.
 func (s *Service) SaveWorldAsset(worldID, assetKind string, data []byte, ext string) (string, error) {
 	if err := pathutil.ValidateID(worldID); err != nil {
 		return "", fmt.Errorf("invalid world id: %w", err)
@@ -413,6 +422,8 @@ func (s *Service) SaveWorldAsset(worldID, assetKind string, data []byte, ext str
 	return fmt.Sprintf("/api/world/%s/%s", worldID, assetKind), nil
 }
 
+// GenerateWorldAsset generates one world image and returns the path it wrote.
+// It is synchronous, like the campaign one.
 func (s *Service) GenerateWorldAsset(ctx context.Context, worldID string, req GenerateAssetRequestDTO) (string, error) {
 	if err := pathutil.ValidateID(worldID); err != nil {
 		return "", fmt.Errorf("invalid world id: %w", err)

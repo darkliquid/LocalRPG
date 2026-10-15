@@ -17,6 +17,8 @@ import (
 	"github.com/darkliquid/localrpg/pkg/systemtest"
 )
 
+// PlayerDTO is the protagonist as the client renders them: the note's identity
+// and state, plus the voice the player's own lines are spoken in.
 type PlayerDTO struct {
 	ID                string               `json:"id"`
 	Name              string               `json:"name"`
@@ -27,6 +29,7 @@ type PlayerDTO struct {
 	Voice             *config.VoiceProfile `json:"voice,omitempty"`
 }
 
+// NarrativeArcDTO is one story arc's progress, for the arc list.
 type NarrativeArcDTO struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -35,6 +38,8 @@ type NarrativeArcDTO struct {
 	Status      string `json:"status"`
 }
 
+// FactionClockDTO is one faction clock's fill: the ticks it has and the ticks it
+// needs before the faction acts.
 type FactionClockDTO struct {
 	Faction  string `json:"faction"`
 	Name     string `json:"name"`
@@ -108,6 +113,9 @@ type LimitsDTO struct {
 	Blocks []harness.LimitState `json:"blocks"`
 }
 
+// GameStateDTO is what the play view needs to open a campaign: who the player
+// is, what is in motion, and where the campaign starts. It is assembled per
+// request, so it is a snapshot rather than a subscription.
 type GameStateDTO struct {
 	GameID        string            `json:"game_id"`
 	GameName      string            `json:"game_name"`
@@ -134,6 +142,9 @@ type GameStateDTO struct {
 	ContentWarnings []string `json:"content_warnings,omitempty"`
 }
 
+// SegmentDTO is one piece of a turn's script: narration or speech, with the
+// clips that play it and the portrait that shows beside it. A speaker the parser
+// could not resolve is left as written, so the line still renders.
 type SegmentDTO struct {
 	Kind      string `json:"kind"`
 	Speaker   string `json:"speaker,omitempty"`
@@ -201,6 +212,8 @@ type AudioProgressDTO struct {
 	Owner         string `json:"owner,omitempty"`
 }
 
+// TurnDTO is one turn of the chronicle: what the player asked, what the narrator
+// wrote, the segments it plays back as, and the bookkeeping shown beside it.
 type TurnDTO struct {
 	TurnNumber  int          `json:"turn_number"`
 	InputText   string       `json:"input_text"`
@@ -319,6 +332,8 @@ type MemoryDTO struct {
 	Tags       []string `json:"tags,omitempty"`
 }
 
+// EntityDTO is one note as the editor and the Codex see it: the Markdown is the
+// record, and the fields beside it are what the index made of it.
 type EntityDTO struct {
 	ID        string         `json:"id"`
 	Name      string         `json:"name"`
@@ -355,22 +370,29 @@ type MergeEntityRequestDTO struct {
 	Confirm bool `json:"confirm"`
 }
 
+// GraphNodeDTO is one node of the entity graph. A node's ID is the note's file
+// name, which is why a note is written as <id>.md.
 type GraphNodeDTO struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
 	Type  string `json:"type"`
 }
 
+// GraphLinkDTO is one edge of the entity graph: a note, and what it links to.
 type GraphLinkDTO struct {
 	Source string `json:"source"`
 	Target string `json:"target"`
 }
 
+// GraphDTO is the entity graph for one view: its nodes and the edges between
+// them, for the Codex to draw.
 type GraphDTO struct {
 	Nodes []GraphNodeDTO `json:"nodes"`
 	Links []GraphLinkDTO `json:"links"`
 }
 
+// GameSummaryDTO is one campaign in the launcher's list: enough to identify it
+// and resume it, without loading its state.
 type GameSummaryDTO struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
@@ -391,6 +413,8 @@ type GameSummaryDTO struct {
 	PlayTimeSeconds int64  `json:"play_time_seconds,omitempty"`
 }
 
+// SystemSummaryDTO is one system in a chooser: what it is called and what it
+// claims to be, without its script.
 type SystemSummaryDTO struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -398,6 +422,8 @@ type SystemSummaryDTO struct {
 	Version     string `json:"version"`
 }
 
+// WorldSummaryDTO is one world in a chooser, including which systems it will
+// play with.
 type WorldSummaryDTO struct {
 	ID                string   `json:"id"`
 	Name              string   `json:"name"`
@@ -410,6 +436,8 @@ type WorldSummaryDTO struct {
 	IconURL           string   `json:"icon_url,omitempty"`
 }
 
+// CreateGameRequestDTO is a campaign to create. The ID is optional: leaving it
+// out slugifies the name.
 type CreateGameRequestDTO struct {
 	ID            string             `json:"id,omitempty"`
 	Name          string             `json:"name"`
@@ -480,6 +508,8 @@ type GameSettingsPatchDTO struct {
 	StartLocation *string `json:"start_location,omitempty"`
 }
 
+// SystemDetailDTO is a system's whole definition for the editor: its script and
+// rules prompt as authored, and what the last save found wrong with them.
 type SystemDetailDTO struct {
 	ID                string                     `json:"id"`
 	Name              string                     `json:"name"`
@@ -495,6 +525,8 @@ type SystemDetailDTO struct {
 	Warnings []string `json:"warnings,omitempty"`
 }
 
+// CreateSystemRequestDTO is a system to create or overwrite. Everything but the
+// name is optional, so a save can be a partial edit of a system in place.
 type CreateSystemRequestDTO struct {
 	ID                string                     `json:"id,omitempty"`
 	Name              string                     `json:"name"`
@@ -645,6 +677,8 @@ type SystemScenariosDTO struct {
 	Scenarios []systemtest.Scenario `json:"scenarios"`
 }
 
+// WorldEntitySummaryDTO is one template note of a world, for the world editor's
+// list.
 type WorldEntitySummaryDTO struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -654,6 +688,8 @@ type WorldEntitySummaryDTO struct {
 	Folder string `json:"folder,omitempty"`
 }
 
+// WorldDetailDTO is a world's whole definition for the editor, with its template
+// notes summarised rather than inlined.
 type WorldDetailDTO struct {
 	ID            string                  `json:"id"`
 	Name          string                  `json:"name"`
@@ -666,6 +702,8 @@ type WorldDetailDTO struct {
 	Entities      []WorldEntitySummaryDTO `json:"entities"`
 }
 
+// CreateWorldRequestDTO is a world to create or overwrite. The ID is optional:
+// leaving it out slugifies the name.
 type CreateWorldRequestDTO struct {
 	ID            string   `json:"id,omitempty"`
 	Name          string   `json:"name"`
@@ -677,6 +715,8 @@ type CreateWorldRequestDTO struct {
 	LorePrompt    string   `json:"lore_prompt,omitempty"`
 }
 
+// WorldEntityDetailDTO is one template note's raw Markdown, for the world
+// editor.
 type WorldEntityDetailDTO struct {
 	ID       string `json:"id"`
 	Markdown string `json:"markdown"`
@@ -933,6 +973,8 @@ type RegistrySourceDTO struct {
 	Error        string `json:"error,omitempty"`
 }
 
+// SettingsResponseDTO is the whole settings payload: the configuration in force,
+// the file it was read from, and anything wrong with it.
 type SettingsResponseDTO struct {
 	Config          config.Config `json:"config"`
 	ConfigFilePath  string        `json:"config_file_path"`
@@ -949,6 +991,9 @@ type OpenURLRequestDTO struct {
 	URL string `json:"url"`
 }
 
+// TestProviderRequestDTO asks the server to exercise one provider
+// configuration, which may be unsaved: that is what lets the editor test a
+// provider before it applies it.
 type TestProviderRequestDTO struct {
 	Category   string `json:"category"` // "llm", "tts", "stt", "image"
 	Provider   any    `json:"provider"`
@@ -992,6 +1037,9 @@ type TTSInspectResponseDTO struct {
 	SpeechCues media.SpeechCueCapabilities `json:"speech_cues"`
 }
 
+// TestProviderResponseDTO is what a provider probe produced: how long it took,
+// what it said, and any media it returned, so the editor can show the result
+// rather than only a pass or fail.
 type TestProviderResponseDTO struct {
 	Success   bool   `json:"success"`
 	LatencyMS int64  `json:"latency_ms"`
@@ -1199,12 +1247,16 @@ type STTResponse struct {
 	Text string `json:"text"`
 }
 
+// RefDTO is one context reference a turn's prompt carried: an entity or a
+// thread, and how it got there.
 type RefDTO struct {
 	Kind     string `json:"kind"`
 	ID       string `json:"id"`
 	Relation string `json:"relation,omitempty"`
 }
 
+// SectionReportDTO is one section of an assembled prompt and whether the budget
+// included it, which is what explains a reply that came back thinner than usual.
 type SectionReportDTO struct {
 	Name     string   `json:"name"`
 	Tokens   int      `json:"tokens"`
@@ -1213,6 +1265,8 @@ type SectionReportDTO struct {
 	Refs     []RefDTO `json:"refs,omitempty"`
 }
 
+// ProviderSessionDTO is the provider-side session a turn continued, instead of
+// resending the whole prompt.
 type ProviderSessionDTO struct {
 	Provider    string `json:"provider"`
 	ID          string `json:"id"`
@@ -1221,6 +1275,9 @@ type ProviderSessionDTO struct {
 	PrefixHash  string `json:"prefix_hash,omitempty"`
 }
 
+// TurnContextDTO is the durable description of one turn's context: what was
+// sent, what it cost, and what it left behind. It is persisted with the turn, so
+// the Chronicle can explain a reply after the fact.
 type TurnContextDTO struct {
 	TurnNumber      int                 `json:"turn_number"`
 	Mode            string              `json:"mode"`
@@ -1241,6 +1298,8 @@ type TurnContextDTO struct {
 	Prompt          string              `json:"prompt,omitempty"`
 }
 
+// WorkingEntryDTO is one entry of the working set as the client shows it: what
+// is active, how strongly, and when it was last touched.
 type WorkingEntryDTO struct {
 	Kind     string  `json:"kind"`
 	ID       string  `json:"id"`

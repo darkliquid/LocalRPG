@@ -255,6 +255,10 @@ var ErrTurnInFlight = errors.New("a turn is already in flight")
 // the caller can answer before any bytes are sent.
 var ErrCampaignNotPlayable = errors.New("campaign cannot be prepared")
 
+// BeginTurn takes the campaign's turn lock and prepares a turn for streaming. It
+// answers ErrTurnInFlight while another turn is already in flight, so two clients
+// cannot play the same campaign at once, and it fails before any bytes are sent
+// when the campaign cannot be played.
 func (s *Service) BeginTurn(gameID string) (*TurnSession, error) {
 	lock := s.gameLock(gameID)
 	if !lock.TryLock() {

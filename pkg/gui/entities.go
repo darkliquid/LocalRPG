@@ -83,6 +83,8 @@ func (s *Service) ListEntities(ctx context.Context, gameID string) ([]EntitySumm
 	return summaries, nil
 }
 
+// GetEntity reads one note of a campaign for the editor: its Markdown, the fields
+// the index derived from it, and whether it parsed at all.
 func (s *Service) GetEntity(ctx context.Context, gameID, entityID string) (*EntityDTO, error) {
 	if err := pathutil.ValidateID(gameID); err != nil {
 		return nil, fmt.Errorf("invalid game id: %w", err)
@@ -570,6 +572,9 @@ func (s *Service) WorldFolders(worldID string) ([]FolderDTO, error) {
 	return s.ListFolders(filepath.Join(s.resolver.WorldDir(worldID), "entities"))
 }
 
+// GetGraph builds the campaign's entity graph from its notes: a node per note and
+// an edge per wikilink, location or faction field. It reads the files rather than
+// the index, so a hand-edited note appears without a reindex.
 func (s *Service) GetGraph(ctx context.Context, gameID string) (*GraphDTO, error) {
 	gameDir := s.resolver.GameDir(gameID)
 	entitiesDir := filepath.Join(gameDir, "entities")

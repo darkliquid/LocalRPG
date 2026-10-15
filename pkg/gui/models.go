@@ -18,10 +18,15 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
+// GetModelsStatus reports every model the app can use: what is installed, what is
+// downloading, and what is missing.
 func (s *Service) GetModelsStatus() []models.ModelStatus {
 	return s.modelsManager.ListStatuses()
 }
 
+// DownloadModel fetches a model's files. A request cancellation is dropped rather
+// than propagated: closing the window must not leave a half-written model behind,
+// and the download is resumable from what it kept.
 func (s *Service) DownloadModel(ctx context.Context, id string) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -32,10 +37,14 @@ func (s *Service) DownloadModel(ctx context.Context, id string) error {
 	return err
 }
 
+// SubscribeModelEvents returns a channel of model status changes, so a download
+// can be shown as it progresses. The caller must pass it back to
+// UnsubscribeModelEvents when it stops reading, or the channel is never released.
 func (s *Service) SubscribeModelEvents() chan models.ModelStatus {
 	return s.modelsManager.Subscribe()
 }
 
+// UnsubscribeModelEvents stops delivering to a channel from SubscribeModelEvents.
 func (s *Service) UnsubscribeModelEvents(ch chan models.ModelStatus) {
 	s.modelsManager.Unsubscribe(ch)
 }
