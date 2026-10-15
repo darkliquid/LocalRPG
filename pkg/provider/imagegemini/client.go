@@ -220,6 +220,7 @@ func mapGeminiImageError(err error) error {
 	return fmt.Errorf("gemini image: generation failed: %w", err)
 }
 
+// MapGeminiImageErrorForTest exposes the image provider's error mapping to the tests that pin it.
 func MapGeminiImageErrorForTest(err error) error {
 	return mapGeminiImageError(err)
 }

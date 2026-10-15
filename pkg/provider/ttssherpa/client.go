@@ -18,8 +18,13 @@ import (
 	sherpa "github.com/k2-fsa/sherpa-onnx-go/sherpa_onnx"
 )
 
+// ErrModelNotLoaded reports synthesis attempted before the model's weights were
+// loaded, so a caller can tell a missing model from a failed synthesis.
 var ErrModelNotLoaded = errors.New("sherpa-onnx model weights are not loaded")
 
+// SherpaTTSClient synthesizes speech locally with sherpa-onnx, so a campaign can
+// be voiced with no server and no network. The weights are loaded on first use and
+// kept until Close.
 type SherpaTTSClient struct {
 	modelDir string
 	modelID  string
@@ -28,10 +33,13 @@ type SherpaTTSClient struct {
 	logger   trace.Logger
 }
 
+// NewSherpaTTSClient points a client at a model directory. The weights are not
+// loaded here, so building one is cheap and cannot fail on a missing model.
 func NewSherpaTTSClient(modelDir string) *SherpaTTSClient {
 	return &SherpaTTSClient{modelDir: modelDir, modelID: media.KokoroModelV019}
 }
 
+// SetLogger attaches a trace sink. A nil logger records nothing.
 func (s *SherpaTTSClient) SetLogger(logger trace.Logger) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -71,6 +79,8 @@ func (s *SherpaTTSClient) ensureLoadedLocked() error {
 	return nil
 }
 
+// Synthesize renders one line of speech, loading the model first when this is the
+// first call. It returns ErrModelNotLoaded when the model could not be loaded.
 func (s *SherpaTTSClient) Synthesize(ctx context.Context, text string, voice *entity.VoiceConfig) ([]byte, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -113,6 +123,8 @@ func (s *SherpaTTSClient) Synthesize(ctx context.Context, text string, voice *en
 	return wavBytes, nil
 }
 
+// Close releases the loaded model. A client that never loaded one has nothing to
+// release, and the client must not be used again afterwards.
 func (s *SherpaTTSClient) Close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -164,7 +176,8 @@ func (s *SherpaTTSClient) ListVoices(ctx context.Context) ([]media.ProviderVoice
 	return voices, nil
 }
 
-// media.SpeechCueCapabilities advertises that SherpaTTSClient supports plain text only.
+// SpeechCueCapabilities reports that this client takes plain text only: the local
+// model is not told how a line should be acted.
 func (s *SherpaTTSClient) SpeechCueCapabilities() media.SpeechCueCapabilities {
 	return media.SpeechCueCapabilities{
 		AudioTags:        false,

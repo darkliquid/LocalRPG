@@ -424,7 +424,7 @@ func mapElevenLabsVoice(voice elevenLabsVoice) media.ProviderVoice {
 	return mapped
 }
 
-// media.SpeechCueCapabilities advertises ElevenLabs' support for bracketed audio tags.
+// SpeechCueCapabilities advertises ElevenLabs' support for bracketed audio tags.
 func (c *ElevenLabsTTSClient) SpeechCueCapabilities() media.SpeechCueCapabilities {
 	return media.SpeechCueCapabilities{
 		AudioTags:        true,

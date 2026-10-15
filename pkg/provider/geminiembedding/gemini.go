@@ -13,11 +13,14 @@ import (
 	"google.golang.org/genai"
 )
 
+// ClientConfig is one Gemini embedding configuration: the API key and the model.
 type ClientConfig struct {
 	APIKey string `json:"api_key"`
 	Model  string `json:"model"`
 }
 
+// Client calls Google's Gemini embedding model for the campaign index. It builds
+// its API client for each call rather than holding one.
 type Client struct {
 	apiKey     string
 	model      string
@@ -65,6 +68,8 @@ func init() {
 	})
 }
 
+// NewClient builds a client from the configuration, defaulting the model to
+// text-embedding-004.
 func NewClient(cfg ClientConfig) *Client {
 	model := cfg.Model
 	if model == "" {
@@ -77,14 +82,19 @@ func NewClient(cfg ClientConfig) *Client {
 	}
 }
 
+// ID is the fixed provider id, "gemini-embedding".
 func (c *Client) ID() string {
 	return "gemini-embedding"
 }
 
+// Dimensions is the vector width, which the index stores beside every vector so
+// a query is compared in the same space as the documents it searches.
 func (c *Client) Dimensions() int {
 	return c.dimensions
 }
 
+// Embed returns one vector per input text, in the same order. An empty input is
+// an empty result rather than a call.
 func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	if len(texts) == 0 {
 		return nil, nil
