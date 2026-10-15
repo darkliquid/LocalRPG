@@ -165,8 +165,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
         // A missing pack listing must not stop the settings from loading.
         setStylePacks(null);
       }
-    } catch (err: any) {
-      setFeedback({ type: 'error', message: err.message || 'Failed to load settings' });
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Failed to load settings' });
     } finally {
       setIsLoading(false);
     }
@@ -189,8 +189,8 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       }
       setFeedback({ type: 'success', message: 'Settings saved and live-reloaded successfully.' });
       if (onSaved) onSaved();
-    } catch (err: any) {
-      setFeedback({ type: 'error', message: err.message || 'Failed to save settings' });
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Failed to save settings' });
     } finally {
       setIsSaving(false);
     }
@@ -231,10 +231,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       if (category === 'tts' && res.success && res.audio_data_uri) {
         playVoicePreview(res.audio_data_uri, (provider as { master_volume?: number })?.master_volume ?? 1);
       }
-    } catch (err: any) {
+    } catch (err) {
       setTestResult({
         category,
-        res: { success: false, latency_ms: 0, message: err.message || 'Test failed' },
+        res: { success: false, latency_ms: 0, message: err instanceof Error ? err.message : 'Test failed' },
       });
     } finally {
       setTestingCategory(null);

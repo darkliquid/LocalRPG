@@ -49,9 +49,9 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({ isOpen, onClose, o
       try {
         const results = await APIClient.searchRegistry(query);
         setPackages(results || []);
-      } catch (err: any) {
+      } catch (err) {
         report({ text: 'Could not search the registries.', detail: err instanceof Error ? err.message : String(err) });
-        setError(err.message || 'Failed to search registry');
+        setError(err instanceof Error ? err.message : 'Failed to search registry');
       } finally {
         setIsLoading(false);
       }
@@ -148,8 +148,8 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({ isOpen, onClose, o
         onInstalled();
       }
       checkUpdates();
-    } catch (err: any) {
-      setInstallError(err.message || 'Failed to install package');
+    } catch (err) {
+      setInstallError(err instanceof Error ? err.message : 'Failed to install package');
     } finally {
       setIsInstalling(false);
     }

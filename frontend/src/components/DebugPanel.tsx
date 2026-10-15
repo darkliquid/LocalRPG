@@ -34,8 +34,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
     try {
       setEvents(await APIClient.traceEvents(300));
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Could not read the trace');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not read the trace');
     } finally {
       setLoading(false);
     }
@@ -58,8 +58,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ config, setConfig }) => 
       await APIClient.clearTrace();
       setEvents([]);
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Could not clear the trace');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not clear the trace');
     }
   };
 
