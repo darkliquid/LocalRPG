@@ -3,6 +3,8 @@ package provider
 // Family is the kind of capability a provider offers.
 type Family string
 
+// The families of capability a provider can offer. A configuration's type
+// selects between them, and they are what the UI groups providers by.
 const (
 	FamilyLLM       Family = "llm"
 	FamilyTTS       Family = "tts"
@@ -16,6 +18,9 @@ const (
 // drift guard, so a descriptor cannot claim what the code cannot do.
 type Feature string
 
+// The features a provider may advertise. They are what the editor offers, and
+// the drift guard checks each one against the adapter's real interfaces, so a
+// descriptor cannot claim what the code cannot do.
 const (
 	FeatureStreaming        Feature = "streaming"
 	FeatureTools            Feature = "tools"

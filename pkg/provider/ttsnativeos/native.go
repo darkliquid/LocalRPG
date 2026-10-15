@@ -14,6 +14,8 @@ import (
 
 type nativeOSTTSClient struct{}
 
+// NewNativeOSTTSClient builds the client that speaks through the operating
+// system's own voice, which needs no model and no network.
 func NewNativeOSTTSClient() media.TTSClient {
 	return &nativeOSTTSClient{}
 }

@@ -18,6 +18,9 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
+// GeminiProvider talks to Google's Gemini API through the genai client. It is the
+// one LLM provider here that holds a server-side interaction, so a turn can
+// continue from where the last one stopped instead of resending the prompt.
 type GeminiProvider struct {
 	id                 string
 	model              string
@@ -34,6 +37,9 @@ type GeminiProvider struct {
 	chunkLimitOverride int
 }
 
+// GeminiProviderOptions configures one Gemini provider. Everything except the key
+// and the model has a default, and the client fields exist so a test can point
+// the provider at its own server.
 type GeminiProviderOptions struct {
 	Model          string
 	APIKey         string
@@ -47,6 +53,8 @@ type GeminiProviderOptions struct {
 	BaseURL        string        // Optional baseURL override for testing
 }
 
+// NewGeminiProvider builds a provider for one model, creating the API client
+// unless the options supply one. An empty model takes the provider's default.
 func NewGeminiProvider(id string, opts GeminiProviderOptions) (*GeminiProvider, error) {
 	model := strings.TrimSpace(opts.Model)
 	if model == "" {
@@ -92,14 +100,19 @@ func NewGeminiProvider(id string, opts GeminiProviderOptions) (*GeminiProvider, 
 	}, nil
 }
 
+// ID is the configured provider id.
 func (g *GeminiProvider) ID() string {
 	return g.id
 }
 
+// Model is the model this provider calls, which the turn's context records so a
+// later turn can tell whether the model changed underneath it.
 func (g *GeminiProvider) Model() string {
 	return g.model
 }
 
+// StartSession opens a server-side interaction and returns the first reply in the
+// same call, so there is no round trip that produces nothing.
 func (g *GeminiProvider) StartSession(ctx context.Context, req harness.GenerateRequest) (*harness.SessionHandle, error) {
 	id, text, cachedTokens, err := g.callInteractions(ctx, "", req)
 	if err != nil {
@@ -116,6 +129,8 @@ func (g *GeminiProvider) StartSession(ctx context.Context, req harness.GenerateR
 	}, nil
 }
 
+// ContinueSession continues a stored interaction, so the model keeps the
+// conversation instead of being sent the whole prompt again.
 func (g *GeminiProvider) ContinueSession(ctx context.Context, session *harness.SessionHandle, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
 	prevID := ""
 	if session != nil {
@@ -273,6 +288,9 @@ func interactionsText(parsed interactionsReply) string {
 	}
 	return sb.String()
 }
+
+// ToolCallerCapable reports that this provider accepts tool declarations, which it
+// does through the API's function calling.
 func (g *GeminiProvider) ToolCallerCapable() bool {
 	return true
 }
@@ -282,10 +300,12 @@ func (g *GeminiProvider) SupportsThinking() bool {
 	return true
 }
 
+// SetLogger attaches a trace sink. A nil logger records nothing.
 func (g *GeminiProvider) SetLogger(logger trace.Logger) {
 	g.logger = trace.OrNil(logger)
 }
 
+// SetChunkLimit overrides the provider's default streaming chunk limit.
 func (g *GeminiProvider) SetChunkLimit(limit int) {
 	g.chunkLimitOverride = limit
 }
@@ -528,6 +548,7 @@ func (b *geminiContents) matchToolCall(toolCallID string) pendingToolCall {
 	return call
 }
 
+// Generate makes one non-streaming call and returns the whole reply.
 func (g *GeminiProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
 	cfg := g.buildGenerateConfig(req)
 	contents := g.buildContents(req)
@@ -585,6 +606,7 @@ func (g *GeminiProvider) Generate(ctx context.Context, req harness.GenerateReque
 	return &harness.GenerateResponse{Text: sb.String(), Usage: usageFromMetadata(g.model, resp.UsageMetadata)}, nil
 }
 
+// Stream forwards the reply as it arrives.
 func (g *GeminiProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
 	defer close(out)
 
@@ -689,6 +711,9 @@ func mapGeminiError(err error) error {
 	return fmt.Errorf("gemini: request failed: %w", err)
 }
 
+// MapGeminiErrorForTest exposes the provider's error mapping to the tests that pin
+// it, because the class an error is mapped to decides whether the engine retries
+// or gives up on the turn.
 func MapGeminiErrorForTest(err error) error {
 	return mapGeminiError(err)
 }

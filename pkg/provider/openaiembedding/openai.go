@@ -16,6 +16,8 @@ import (
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
+// ClientConfig is one OpenAI-compatible embedding configuration: where to reach
+// it, the key, the model, and the vector width the caller wants back.
 type ClientConfig struct {
 	Endpoint   string `json:"endpoint"`
 	APIKey     string `json:"api_key"`
@@ -23,6 +25,8 @@ type ClientConfig struct {
 	Dimensions int    `json:"dimensions"`
 }
 
+// Client calls an OpenAI-compatible embeddings endpoint, which is what the
+// campaign index uses to turn text into vectors it can search.
 type Client struct {
 	endpoint   string
 	apiKey     string
@@ -71,6 +75,8 @@ func init() {
 	})
 }
 
+// NewClient builds a client from the configuration, defaulting the endpoint to
+// OpenAI's and the model to the one this encoder is known by.
 func NewClient(cfg ClientConfig) *Client {
 	endpoint := strings.TrimRight(cfg.Endpoint, "/")
 	if endpoint == "" {
@@ -97,10 +103,13 @@ func NewClient(cfg ClientConfig) *Client {
 	}
 }
 
+// ID is the fixed provider id, "openai-embedding".
 func (c *Client) ID() string {
 	return "openai-embedding"
 }
 
+// Dimensions is the vector width, which the index stores beside every vector so
+// a query is compared in the same space as the documents it searches.
 func (c *Client) Dimensions() int {
 	return c.dimensions
 }
@@ -134,6 +143,8 @@ func (c *Client) LastUsage() harness.Usage {
 	return c.lastUsage
 }
 
+// Embed returns one vector per input text, in the same order. An empty input is
+// an empty result rather than a call.
 func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	if len(texts) == 0 {
 		return nil, nil
