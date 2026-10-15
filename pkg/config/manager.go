@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -93,21 +94,33 @@ func (m *ConfigManager) IsLocalOverride() bool {
 	return m.isOverride
 }
 
+// Load reads the user configuration, then a local override when there is one, and
+// returns the layered result. A file that does not parse is reported: the error
+// names it, the same failure is recorded in Warnings for a caller that has no
+// error channel, and the file is skipped rather than half applied. The
+// configuration returned is always usable and holds everything that did parse, so
+// a caller which sees the error must report it rather than quietly use the
+// defaults it fell back to.
 func (m *ConfigManager) Load() (*Config, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	merged := DefaultConfig()
+	var problems []error
 
 	// 1. Try User Global Config
 	if data, err := os.ReadFile(m.userConfigPath); err == nil {
-		_ = yaml.Unmarshal(data, merged)
+		if err := mergeConfigFile(m.userConfigPath, data, merged); err != nil {
+			problems = append(problems, err)
+		}
 	}
 
 	// 2. Try Local Override
 	if data, err := os.ReadFile(m.localConfigPath); err == nil {
-		if err := yaml.Unmarshal(data, merged); err == nil {
+		if err := mergeConfigFile(m.localConfigPath, data, merged); err == nil {
 			m.isOverride = true
+		} else {
+			problems = append(problems, err)
 		}
 	} else {
 		m.isOverride = false
@@ -116,7 +129,29 @@ func (m *ConfigManager) Load() (*Config, error) {
 	m.warnings = merged.Validate()
 	m.activeConfig = merged
 	m.revision.Add(1)
+
+	if err := errors.Join(problems...); err != nil {
+		// A caller with no error channel still has the warnings list, which the GUI
+		// logs and the Settings payload returns.
+		m.warnings = append(m.warnings, err.Error())
+		return merged, err
+	}
 	return m.activeConfig, nil
+}
+
+// mergeConfigFile layers one configuration document over cfg. It parses the
+// document into a throwaway Config first, so a file that does not parse leaves cfg
+// exactly as it was: the alternative is a configuration built from the prefix of a
+// file that yaml managed to read before it gave up. The error names the file.
+func mergeConfigFile(path string, data []byte, cfg *Config) error {
+	var probe Config
+	if err := yaml.Unmarshal(data, &probe); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	return nil
 }
 
 func (m *ConfigManager) Save(cfg *Config) error {
