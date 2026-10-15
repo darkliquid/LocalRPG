@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useFailures } from '../../context/FailuresContext';
 import { GameSummary, TTSConfig, VoiceProfile } from '../../types';
 import { APIClient } from '../../api/client';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
@@ -30,6 +31,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   onRestartGame,
   onDeleteGame,
 }) => {
+  const { report } = useFailures();
   const [generatingKind, setGeneratingKind] = useState<'banner' | 'icon' | null>(null);
   const [confirmAction, setConfirmAction] = useState<'restart' | 'delete' | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -61,7 +63,12 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
         setVoiceProfiles(res.config.media.tts.voice_profiles || []);
         setTtsConfig(res.config.media.tts);
       })
-      .catch((err) => console.error('Failed to load voice profiles', err));
+      .catch((err) =>
+        report({
+          text: 'Could not load the voice profiles.',
+          detail: err instanceof Error ? err.message : String(err),
+        }),
+      );
 
     // Load current campaign game state
     const client = new APIClient(game.id);
@@ -72,10 +79,15 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
         setOpeningPrompt(state.opening_prompt || '');
         setStartLocation(state.start_location || '');
       })
-      .catch((err) => console.error('Failed to load game state settings', err));
+      .catch((err) =>
+        report({
+          text: "Could not load the campaign's settings.",
+          detail: err instanceof Error ? err.message : String(err),
+        }),
+      );
 
     setSettingsSaved(false);
-  }, [isOpen, game]);
+  }, [report, isOpen, game]);
 
   if (!mounted || !game) return null;
 
@@ -99,7 +111,10 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 3000);
     } catch (err) {
-      console.error('Failed to update game settings:', err);
+      report({
+        text: "Could not save the campaign's settings.",
+        detail: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setIsSavingSettings(false);
     }
@@ -118,7 +133,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
       try {
         await onUploadAsset(game.id, 'banner', file);
       } catch (err) {
-        console.error('banner upload failed:', err);
+        report({ text: 'Could not upload the banner.', detail: err instanceof Error ? err.message : String(err) });
       } finally {
         setIsBusy(false);
       }
@@ -132,7 +147,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
       try {
         await onUploadAsset(game.id, 'icon', file);
       } catch (err) {
-        console.error('icon upload failed:', err);
+        report({ text: 'Could not upload the icon.', detail: err instanceof Error ? err.message : String(err) });
       } finally {
         setIsBusy(false);
       }
@@ -144,7 +159,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
     try {
       await onGenerateAsset(game.id, kind);
     } catch (err) {
-      console.error('AI generation failed:', err);
+      report({ text: 'Could not generate the artwork.', detail: err instanceof Error ? err.message : String(err) });
     } finally {
       setGeneratingKind(null);
     }
@@ -155,7 +170,10 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
     try {
       await onUseWorldArtwork(game.id, kind);
     } catch (err) {
-      console.error('failed to restore world artwork:', err);
+      report({
+        text: "Could not restore the world's artwork.",
+        detail: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setIsBusy(false);
     }
@@ -168,7 +186,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
       setConfirmAction(null);
       onClose();
     } catch (err) {
-      console.error('restart failed:', err);
+      report({ text: 'Could not restart the campaign.', detail: err instanceof Error ? err.message : String(err) });
     } finally {
       setIsBusy(false);
     }
@@ -181,7 +199,7 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
       setConfirmAction(null);
       onClose();
     } catch (err) {
-      console.error('delete failed:', err);
+      report({ text: 'Could not delete the campaign.', detail: err instanceof Error ? err.message : String(err) });
     } finally {
       setIsBusy(false);
     }
