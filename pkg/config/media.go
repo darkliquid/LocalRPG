@@ -43,7 +43,10 @@ func (m MediaConfig) ImageFor(name string) ImageConfig {
 func (m MediaConfig) TTSNames() []string { return providerNames(m.TTSProviders) }
 
 // STTNames and ImageNames mirror TTSNames.
-func (m MediaConfig) STTNames() []string   { return providerNames(m.STTProviders) }
+func (m MediaConfig) STTNames() []string { return providerNames(m.STTProviders) }
+
+// ImageNames lists the configured image providers, with the reserved default first
+// and the rest sorted, so a caller presents them in a stable order.
 func (m MediaConfig) ImageNames() []string { return providerNames(m.ImageProviders) }
 
 // providerNames lists the reserved default first, then the named entries sorted.

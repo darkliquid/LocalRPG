@@ -1,5 +1,7 @@
 package config
 
+// AgentPresets are ready-made role configurations for the servers people actually
+// run, so a role is pointed at one by name rather than by endpoint.
 var AgentPresets = map[string]AgentRoleConfig{
 	"ollama": {
 		Type:        "http",
@@ -104,6 +106,7 @@ var AgentPresets = map[string]AgentRoleConfig{
 func intPtr(i int) *int           { return &i }
 func floatPtr(f float64) *float64 { return &f }
 
+// TTSPresets are ready-made speech configurations for the servers people run.
 var TTSPresets = map[string]TTSConfig{
 	"kokoro-fastapi": {
 		Type:          "http",
@@ -243,6 +246,7 @@ var TTSPresets = map[string]TTSConfig{
 	},
 }
 
+// STTPresets are ready-made transcription configurations.
 var STTPresets = map[string]STTConfig{
 	"cartesia": {
 		Type:        "builtin",
@@ -274,6 +278,7 @@ var STTPresets = map[string]STTConfig{
 	},
 }
 
+// ImagePresets are ready-made image configurations.
 var ImagePresets = map[string]ImageConfig{
 	"comfyui": {
 		Type:     "http",
@@ -340,6 +345,8 @@ var ImagePresets = map[string]ImageConfig{
 	},
 }
 
+// KokoroVoiceProfiles is Kokoro's catalog of voices, so a character can be given
+// one by name without the provider having to be asked for the list.
 var KokoroVoiceProfiles = []VoiceProfile{
 	{ID: "af", Name: "Default (American Female)", VoiceID: "af", Pitch: 1.0, SpeechRate: 1.0, Tags: []string{"american", "female", "default", "neutral"}, Description: "The model's stock American female voice."},
 	{ID: "af_bella", Name: "Bella (American Female)", VoiceID: "af_bella", Pitch: 1.0, SpeechRate: 1.0, Tags: []string{"american", "female", "bella", "warm", "friendly"}, Description: "American female voice, warm, approachable, and pleasant."},
@@ -354,21 +361,25 @@ var KokoroVoiceProfiles = []VoiceProfile{
 	{ID: "bm_lewis", Name: "Lewis (British Male)", VoiceID: "bm_lewis", Pitch: 1.0, SpeechRate: 1.0, Tags: []string{"british", "male", "lewis", "thoughtful", "refined"}, Description: "British male voice, measured, polite, and reflective."},
 }
 
+// GetAgentPreset returns the preset registered under name, if there is one.
 func GetAgentPreset(id string) (AgentRoleConfig, bool) {
 	p, ok := AgentPresets[id]
 	return p, ok
 }
 
+// GetTTSPreset returns the preset registered under name, if there is one.
 func GetTTSPreset(id string) (TTSConfig, bool) {
 	p, ok := TTSPresets[id]
 	return p, ok
 }
 
+// GetSTTPreset returns the preset registered under name, if there is one.
 func GetSTTPreset(id string) (STTConfig, bool) {
 	p, ok := STTPresets[id]
 	return p, ok
 }
 
+// GetImagePreset returns the preset registered under name, if there is one.
 func GetImagePreset(id string) (ImageConfig, bool) {
 	p, ok := ImagePresets[id]
 	return p, ok

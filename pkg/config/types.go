@@ -11,6 +11,10 @@ import (
 	"github.com/darkliquid/localrpg/pkg/provider"
 )
 
+// PathsConfig is the four directories the app works in. An empty value means the
+// platform's own default, an absolute one is used as written, and a relative one
+// resolves against the data or cache base, or against the project when the process
+// is running in project mode.
 type PathsConfig struct {
 	Systems string `yaml:"systems" json:"systems"`
 	Worlds  string `yaml:"worlds" json:"worlds"`
@@ -33,6 +37,9 @@ const (
 	EngagementAsk  = "ask"
 )
 
+// AgentRoleConfig configures one role's provider: which kind it is, and whatever
+// that kind needs. A role can inherit another's settings, which is what keeps a
+// fallback chain from repeating one endpoint four times.
 type AgentRoleConfig struct {
 	Type        string   `yaml:"type" json:"type"`                                     // "builtin", "http", "cli", "inherit", "disabled"
 	InheritFrom string   `yaml:"inherit_from,omitempty" json:"inherit_from,omitempty"` // role to inherit when type is "inherit"
@@ -74,6 +81,8 @@ func (a AgentRoleConfig) ChainConfig() ChainConfig {
 	return ChainConfig{Chain: a.Chain, Select: a.Select, Tag: a.Tag}
 }
 
+// AgentsConfig is every role's provider, the role a turn uses when it names none,
+// each role's fallbacks, and the limits a turn runs under.
 type AgentsConfig struct {
 	DefaultRole string                     `yaml:"default_role" json:"default_role"`
 	Roles       map[string]AgentRoleConfig `yaml:"roles" json:"roles"`
@@ -149,6 +158,9 @@ type CompletionConfig struct {
 	TimeoutSeconds int `yaml:"timeout_seconds,omitempty" json:"timeout_seconds"`
 }
 
+// VoiceProfile is one named voice a character can be given: the provider's voice
+// ID plus the pitch and rate layered on it, and the tags an extractor scores a
+// character's description against.
 type VoiceProfile struct {
 	ID          string   `yaml:"id" json:"id"`
 	Name        string   `yaml:"name" json:"name"`
@@ -164,6 +176,8 @@ type VoiceProfile struct {
 	Options map[string]any `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
+// TTSConfig is one text-to-speech provider: which kind it is, and whatever that
+// kind needs to be reached.
 type TTSConfig struct {
 	Type          string         `yaml:"type" json:"type"` // "builtin", "http", "cli", "disabled"
 	BuiltinName   string         `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`
@@ -231,6 +245,8 @@ type SpeechCuesConfig struct {
 	DisplayMode      string `yaml:"display_mode,omitempty" json:"display_mode,omitempty"`
 }
 
+// STTConfig is one speech-to-text provider: which kind it is, and whatever that
+// kind needs to be reached.
 type STTConfig struct {
 	Type        string   `yaml:"type" json:"type"`
 	BuiltinName string   `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`
@@ -247,6 +263,8 @@ type STTConfig struct {
 	Instance string `yaml:"instance,omitempty" json:"instance,omitempty"`
 }
 
+// ImageConfig is one image provider: which kind it is, and whatever that kind
+// needs to be reached.
 type ImageConfig struct {
 	Type         string   `yaml:"type" json:"type"`
 	BuiltinName  string   `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`
@@ -280,6 +298,8 @@ type ImageConfig struct {
 	Instance string `yaml:"instance,omitempty" json:"instance,omitempty"`
 }
 
+// MediaConfig is the media half of the configuration: the named speech,
+// transcription and image providers, and which one each purpose uses.
 type MediaConfig struct {
 	TTS   TTSConfig   `yaml:"tts" json:"tts"`
 	STT   STTConfig   `yaml:"stt" json:"stt"`
@@ -300,6 +320,8 @@ type MediaConfig struct {
 	PurposeChains map[string]ChainConfig `yaml:"purpose_chains,omitempty" json:"purpose_chains,omitempty"`
 }
 
+// PreferencesConfig is what the app remembers about presentation, as opposed to
+// how a campaign runs.
 type PreferencesConfig struct {
 	Streaming        bool   `yaml:"streaming" json:"streaming"`
 	TypingSpeedMS    int    `yaml:"typing_speed_ms" json:"typing_speed_ms"`
@@ -354,14 +376,20 @@ type PriceConfig struct {
 	PerRequest       int64  `yaml:"per_request,omitempty" json:"per_request,omitempty"`
 }
 
+// GeminiProviderConfig is the Gemini-specific part of the provider configuration.
 type GeminiProviderConfig struct {
 	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 }
 
+// CartesiaProviderConfig is the Cartesia-specific part of the provider
+// configuration.
 type CartesiaProviderConfig struct {
 	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 }
 
+// EmbeddingsConfig is the index's encoder: which provider embeds text, the width
+// it produces, and how it is batched, so vector search can be configured without
+// a local model.
 type EmbeddingsConfig struct {
 	Enabled    bool                               `yaml:"enabled" json:"enabled"`
 	Provider   string                             `yaml:"provider" json:"provider"` // "builtin-local", "openai", "gemini", "disabled"
@@ -371,6 +399,8 @@ type EmbeddingsConfig struct {
 	Providers  map[string]EmbeddingProviderConfig `yaml:"providers,omitempty" json:"providers,omitempty"`
 }
 
+// EmbeddingProviderConfig is one embedding provider: which kind it is, whatever
+// that kind needs, and where a local model's files live.
 type EmbeddingProviderConfig struct {
 	Type        string `yaml:"type" json:"type"` // "builtin", "onnx", "http", "gemini", "disabled"
 	BuiltinName string `yaml:"builtin_name,omitempty" json:"builtin_name,omitempty"`
@@ -389,6 +419,9 @@ type EmbeddingProviderConfig struct {
 	Instance string `yaml:"instance,omitempty" json:"instance,omitempty"`
 }
 
+// Config is the whole configuration: where files go, which providers and roles
+// exist, and how media, embeddings, presentation and telemetry behave. Every field
+// has a default, so a file need only name what it changes.
 type Config struct {
 	Version     string            `yaml:"version" json:"version"`
 	Paths       PathsConfig       `yaml:"paths" json:"paths"`

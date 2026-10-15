@@ -3,6 +3,9 @@ package config
 // Purpose names a role a media provider plays.
 type Purpose string
 
+// The purposes a media provider can be assigned to: who narrates, who speaks for
+// characters, who draws a scene and a portrait, and what stands in while an image is
+// being made.
 const (
 	PurposeNarrator    Purpose = "narrator"
 	PurposeNPC         Purpose = "npc"
