@@ -15,6 +15,9 @@ import (
 
 var wikilinkRegex = regexp.MustCompile(`\[\[([^\]\|]+)(?:\|[^\]]+)?\]\]`)
 
+// VoiceConfig is how one entity speaks: the provider that synthesises it, the
+// provider's own voice ID, and the prosody layered on top. It lives in the
+// note's frontmatter, so it survives a reindex.
 type VoiceConfig struct {
 	Provider   string  `yaml:"provider,omitempty" json:"provider,omitempty"`
 	VoiceID    string  `yaml:"voice_id,omitempty" json:"voice_id,omitempty"`
@@ -25,6 +28,10 @@ type VoiceConfig struct {
 	Options map[string]any `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
+// EntityFrontmatter is a note's YAML frontmatter: the fields LocalRPG owns, plus
+// ExtraMeta for anything an author adds. It is the on-disk shape, so its yaml
+// tags are a format contract; Entity is the same data in the shape the engine
+// works with.
 type EntityFrontmatter struct {
 	ID              string       `yaml:"id"`
 	Name            string       `yaml:"name"`
@@ -49,6 +56,9 @@ type EntityFrontmatter struct {
 	ExtraMeta         map[string]any `yaml:",inline"`
 }
 
+// Entity is one being, place or thing in a campaign: its note's frontmatter, its
+// body, and the graph derived from them. The wikilinks in the body, and the
+// location and faction fields, become edges when the note is parsed.
 type Entity struct {
 	ID              string
 	Name            string
@@ -82,10 +92,17 @@ type Entity struct {
 	Folder string
 }
 
+// InitState replaces the entity's state with a State that wraps data. A nil map
+// becomes an empty, writable state, so a caller that only wants to set a path
+// need not build one first.
 func (e *Entity) InitState(data map[string]any) {
 	e.State = state.NewState(data)
 }
 
+// ParseMarkdownEntity reads a note: its YAML frontmatter, its Markdown body, the
+// wikilinks across both, and the hash of the bytes it was given. The ID comes
+// from the frontmatter and falls back to the slugified name, and the hash is what
+// tells a sync whether the note has changed since it was written.
 func ParseMarkdownEntity(data []byte) (*Entity, error) {
 	hashBytes := sha256.Sum256(data)
 	fileHash := hex.EncodeToString(hashBytes[:])
@@ -344,6 +361,9 @@ func IsCharacterType(t string) bool {
 	return false
 }
 
+// SerializeMarkdown renders the entity as a note: the frontmatter block, then
+// the body. State is written through Raw, and Folder is deliberately not written
+// at all, because it is where the file sits rather than something the file says.
 func (e *Entity) SerializeMarkdown() ([]byte, error) {
 	fm := EntityFrontmatter{
 		ID:                e.ID,

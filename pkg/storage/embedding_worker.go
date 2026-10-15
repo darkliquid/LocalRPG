@@ -17,6 +17,10 @@ type EmbeddingItem struct {
 	Text       string
 }
 
+// EmbeddingWorkerOptions tunes the background indexer: how many documents one
+// provider call embeds, how long a partial batch waits before it is sent anyway,
+// and how many items may queue before Enqueue blocks. A zero field takes the
+// worker's own default.
 type EmbeddingWorkerOptions struct {
 	BatchSize     int
 	FlushInterval time.Duration

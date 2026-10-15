@@ -22,6 +22,9 @@ type Chronicler struct {
 	logger     trace.Logger
 }
 
+// NewChronicler pairs a campaign's timeline and store with the summariser that
+// reads them. Summarisation is off until SetEvery gives it a cadence, so a
+// caller that never sets one never pays for a summary.
 func NewChronicler(timeline *Timeline, store *storage.Store, summariser *harness.Summariser) *Chronicler {
 	return &Chronicler{timeline: timeline, store: store, summariser: summariser}
 }
@@ -31,6 +34,8 @@ func (c *Chronicler) SetEvery(every int) {
 	c.every = every
 }
 
+// SetLogger attaches a logger, treating nil as a no-op logger so a caller need
+// not check before logging.
 func (c *Chronicler) SetLogger(logger trace.Logger) {
 	c.logger = trace.OrNil(logger)
 }

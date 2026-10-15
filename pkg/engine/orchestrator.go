@@ -58,6 +58,12 @@ func OpeningPrompt(manifest *core.GameManifest) string {
 	return strings.TrimSpace(prompt)
 }
 
+// TurnOrchestrator plays a campaign's turns: it assembles the prompt from the
+// world and the campaign's history, calls the model for the GM's reply, resolves
+// checks and dice, extracts the entities the reply introduced, and hands the
+// finished turn to the Timeline. It owns no durable writes of its own, because
+// every one of them belongs to the Timeline; the phases of a turn are the methods
+// that follow ProcessActionStream.
 type TurnOrchestrator struct {
 	store               *storage.Store
 	timeline            *Timeline
@@ -368,6 +374,11 @@ func (o *TurnOrchestrator) offersTools(isCaller bool) bool {
 	}
 }
 
+// NewTurnOrchestrator builds the pipeline for one campaign out of what every
+// campaign has: its store, its timeline, its provider router, and where it
+// starts. Everything optional, the rules engine, the extractor, the tools and the
+// art workers among them, is attached afterwards with a Set method, so a caller
+// wires only the parts that campaign actually has.
 func NewTurnOrchestrator(
 	store *storage.Store,
 	timeline *Timeline,
@@ -396,6 +407,9 @@ func NewTurnOrchestrator(
 	return o
 }
 
+// SetPrompts sets the system's rules text and the world's lore text, which the
+// context assembler layers above the scene. LoadPrompts reads them from disk
+// instead.
 func (o *TurnOrchestrator) SetPrompts(rulesPrompt, lorePrompt string) {
 	o.rulesPrompt = rulesPrompt
 	o.lorePrompt = lorePrompt
@@ -609,6 +623,11 @@ func (o *TurnOrchestrator) playerRollRequest(input string) harness.CheckRequest 
 	return req
 }
 
+// LoadPrompts reads a system's prompts/rules.md and a world's prompts/lore.md
+// into the orchestrator, and takes the system's mechanics schema with them: a
+// system that ships a script or a declarative block also has its schema set, so
+// the GM is told when to call a check. A file that is not there leaves what it
+// would have set alone, so a system with no prompts still runs.
 func (o *TurnOrchestrator) LoadPrompts(paths *core.PathResolver, systemID, worldID string) {
 	if paths != nil {
 		if systemID != "" {

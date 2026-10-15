@@ -7,6 +7,7 @@ actionlint = "1.7.12"
 vale = "3.24.0"
 rumdl = "0.2.78"
 staticcheck = "2026.2.1"
+revive = "1.15.0"
 
 [tasks."install:frontend"]
 description = "Install frontend dependencies when package manifests change"
@@ -119,6 +120,23 @@ npm run lint
 description = "Run Vale over tracked prose and source comments (report only; STRICT=1 to gate)"
 depends = ["install:vale-styles"]
 run = "bash scripts/lint-prose.sh"
+
+[tasks."lint:revive"]
+description = "Report undocumented exported symbols with revive (report only; STRICT=1 to gate)"
+# revive exits non-zero as soon as it finds anything, so its status is captured
+# rather than passed through: the list is a report while the middle layers are
+# still undocumented, and STRICT=1 is what turns it into a gate. The rules and
+# the reason for each are in revive.toml.
+run = """
+findings="$(revive -config revive.toml ./... 2>&1 || true)"
+if [ -n "$findings" ]; then
+  printf '%s\\n' "$findings"
+  printf 'revive: %s findings\\n' "$(printf '%s\\n' "$findings" | grep -c ':')"
+fi
+if [ "${STRICT:-0}" = "1" ] && [ -n "$findings" ]; then
+  exit 1
+fi
+"""
 
 [tasks.lint]
 description = "Run code analysis and linting"

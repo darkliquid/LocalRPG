@@ -35,6 +35,10 @@ type Timeline struct {
 	embeddingWorker *storage.EmbeddingWorker
 }
 
+// NewTimeline wires the single writer for one campaign: where its files live, the
+// index it keeps current, the history log it appends to, and the campaign ID it
+// records against. Every durable write a turn makes goes through this one value,
+// which is what keeps the notes, the log and the index from disagreeing.
 func NewTimeline(paths *core.PathResolver, store *storage.Store, history *HistoryLogger, gameID string) *Timeline {
 	return &Timeline{paths: paths, store: store, history: history, gameID: gameID}
 }

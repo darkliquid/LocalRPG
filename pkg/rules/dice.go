@@ -9,6 +9,8 @@ import (
 	"github.com/darkliquid/roll"
 )
 
+// RollResult is one evaluated roll: the notation that produced it, its total, how
+// many dice met the success threshold, and the faces themselves.
 type RollResult struct {
 	Notation  string `json:"notation"`
 	Total     int    `json:"total"`
@@ -20,6 +22,9 @@ type RollResult struct {
 	Dice []harness.DieFace `json:"dice,omitempty"`
 }
 
+// EvaluateRoll parses and evaluates dice notation such as "2d6+1". It is
+// system-independent: the notation says what to roll, and the system says what
+// the result means.
 func EvaluateRoll(notation string) (*RollResult, error) {
 	program, err := roll.CompileString(notation)
 	if err != nil {

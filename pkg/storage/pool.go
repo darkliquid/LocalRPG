@@ -12,6 +12,8 @@ type Pool struct {
 	stores map[string]*Store
 }
 
+// NewPool starts an empty pool. Every store it hands out shares one handle per
+// database path, and Close releases them together.
 func NewPool() *Pool {
 	return &Pool{stores: make(map[string]*Store)}
 }

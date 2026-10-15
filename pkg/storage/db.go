@@ -72,6 +72,9 @@ CREATE TABLE IF NOT EXISTS working_set (
 // contention into a short wait instead of an immediate failure.
 const pragmas = "_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on&_synchronous=NORMAL"
 
+// OpenDB opens or creates the SQLite index at path, applies LocalRPG's pragmas,
+// creates the schema when it is missing and migrates it when it is old. Callers
+// get a handle they own; a shared handle is a Pool's business.
 func OpenDB(path string) (*sql.DB, error) {
 	db, err := openWrapped(path, pragmas)
 	if err != nil {

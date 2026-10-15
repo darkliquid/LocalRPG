@@ -22,6 +22,11 @@ type EntityAppearance struct {
 	After    string `json:"after,omitempty"`
 }
 
+// Turn is one recorded turn: what the player asked, what the narrator wrote, the
+// segments it plays back as, the entities and checks it involved, and the context
+// it was generated from. It is the record every later read reconstructs the
+// campaign from, so a field that is written here is written before anything
+// downstream can see it.
 type Turn struct {
 	Number        int                  `json:"number"`
 	Timestamp     time.Time            `json:"timestamp"`
@@ -105,6 +110,9 @@ func (t Turn) Prose() string {
 	return t.LegacyOutput
 }
 
+// HistoryLogger appends turns to one campaign's history.jsonl. That file is the
+// canonical timeline, one JSON object per line, and the only place a turn's
+// segments live, so the index is rebuilt from it rather than the other way round.
 type HistoryLogger struct {
 	mu   sync.RWMutex
 	path string
@@ -117,10 +125,13 @@ type ToolCallRecord struct {
 	ResultChars int    `json:"result_chars"`
 }
 
+// NewHistoryLogger points a logger at a campaign's history.jsonl. The file itself
+// is created by the first append, so a campaign that never turns never has one.
 func NewHistoryLogger(path string) *HistoryLogger {
 	return &HistoryLogger{path: path}
 }
 
+// AppendTurn adds one turn to the end of the log.
 func (h *HistoryLogger) AppendTurn(t Turn) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -142,6 +153,9 @@ func (h *HistoryLogger) AppendTurn(t Turn) error {
 	return nil
 }
 
+// LoadHistory reads the whole log, normalising a legacy record's output field
+// into narration as it goes. A log that does not exist yet is an empty history
+// rather than an error, because a campaign may not have turned.
 func (h *HistoryLogger) LoadHistory() ([]Turn, error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -190,6 +204,9 @@ func (h *HistoryLogger) ReplaceTurn(replacement Turn) error {
 	return nil
 }
 
+// RewindToTurn truncates the log after targetTurnNumber, keeping every turn up to
+// it. It rewrites the file, so it is the one method here that is not append-only,
+// and it is what /undo discards turns with.
 func (h *HistoryLogger) RewindToTurn(targetTurnNumber int) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
