@@ -264,8 +264,10 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
     if (prefetchedRef.current === key) return;
     prefetchedRef.current = key;
     for (const url of nextSegment?.audio_urls ?? nextTurn.segments?.[0]?.audio_urls ?? []) {
+      // Not an API call: this is a media URL the server already named, so it does
+      // not go through the client. The prefetch is best effort either way.
       fetch(url).catch(() => {
-        // Prefetch is best effort; playback still works without it.
+        // Playback still works without it.
       });
     }
     const nextImage = nextTurn.image_url;
