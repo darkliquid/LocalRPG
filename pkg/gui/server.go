@@ -26,6 +26,10 @@ import (
 	"github.com/darkliquid/localrpg/pkg/systemtest"
 )
 
+// Server is the HTTP surface of the app: every /api route, the embedded
+// single-page application at /, and the asset handler behind it. It is built once
+// per process around a Service, which the desktop window, the socket and a TCP
+// port all share.
 type Server struct {
 	service     *Service
 	assetServer http.Handler
@@ -33,6 +37,9 @@ type Server struct {
 	handler     http.Handler
 }
 
+// NewServer registers the routes, mounts assetHandler at / for the embedded app,
+// and wraps the mux in the action-correlation and OpenTelemetry handlers. A nil
+// assetHandler leaves / unregistered, which is what a backend-only build wants.
 func NewServer(service *Service, assetHandler http.Handler) *Server {
 	s := &Server{
 		service:     service,

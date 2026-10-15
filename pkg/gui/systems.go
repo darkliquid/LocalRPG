@@ -25,6 +25,8 @@ func (s *Service) systemDraftsDir() string {
 	return filepath.Join(s.resolver.SystemsDir(), sysgen.DraftsDirName)
 }
 
+// ListSystems reads the system chooser's list. A systems directory that does not
+// exist yet is an empty list, not an error.
 func (s *Service) ListSystems(ctx context.Context) ([]SystemSummaryDTO, error) {
 	sysDir := s.resolver.SystemsDir()
 	entries, err := os.ReadDir(sysDir)
@@ -68,6 +70,8 @@ function evaluateRoll(stats, diceExpr) {
 }
 `
 
+// GetSystem reads a system's definition for the editor: its script and prompts as
+// authored, plus what the last validation found.
 func (s *Service) GetSystem(ctx context.Context, id string) (*SystemDetailDTO, error) {
 	if err := pathutil.ValidateID(id); err != nil {
 		return nil, fmt.Errorf("invalid system id: %w", err)
@@ -101,6 +105,9 @@ func (s *Service) GetSystem(ctx context.Context, id string) (*SystemDetailDTO, e
 	}, nil
 }
 
+// SaveSystem writes a system and returns what it now holds. The name is required
+// and the ID is slugified from it when the request gives none, which is where a
+// new system's directory name comes from.
 func (s *Service) SaveSystem(ctx context.Context, req CreateSystemRequestDTO) (*SystemDetailDTO, error) {
 	if req.Name == "" {
 		return nil, fmt.Errorf("system name is required")

@@ -33,6 +33,10 @@ import (
 	"github.com/darkliquid/localrpg/pkg/turnstream"
 )
 
+// Service is the whole surface the desktop window, the HTTP routes and the socket
+// share: campaigns, worlds, systems, entities, settings, media and models. It owns
+// the process's resolution of the configuration and one index per campaign it has
+// opened, and every exported method here is reachable from a route.
 type Service struct {
 	mu            sync.RWMutex
 	rootDir       string
@@ -232,6 +236,13 @@ func (s *Service) imageRegistry() *media.ImageRegistry {
 	return s.imageReg
 }
 
+// NewService resolves the configuration and the directories the service works in,
+// and returns it ready to use. A rootDir of anything but "." puts the process in
+// project mode: <rootDir>/config.yaml is then the user configuration and a
+// relative paths.* value resolves against rootDir rather than the working
+// directory. The manager's own load error is deliberately not returned, because
+// the app is meant to open so the file can be fixed in Settings; it is in
+// Warnings instead.
 func NewService(rootDir string) *Service {
 	projectMode := rootDir != "" && rootDir != "."
 	userPath, _ := config.DetectConfigFile()
@@ -346,6 +357,8 @@ func (s *Service) Close() {
 	}
 }
 
+// GetResolver returns the path resolver the service was built with, so a caller
+// resolves the same directories the app writes to instead of deriving its own.
 func (s *Service) GetResolver() *core.PathResolver {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1173,6 +1186,9 @@ func (s *Service) applyResolvedPaths(cfg *config.Config) {
 	cfg.Paths = config.PathsConfig{Systems: dirs.Systems, Worlds: dirs.Worlds, Games: dirs.Games, Cache: dirs.Cache}
 }
 
+// GetSettings returns the configuration in force, the file it was read from, and
+// anything wrong with it. The paths in it are the resolved ones, so the editor
+// shows where files actually live.
 func (s *Service) GetSettings(ctx context.Context) (*SettingsResponseDTO, error) {
 	cfg, err := s.configMgr.Load()
 	if err != nil {
@@ -1195,6 +1211,10 @@ func (s *Service) appVersion() string {
 	return s.version
 }
 
+// SaveSettings writes the configuration and returns what is now in force. It
+// validates the four path values, drops the media registries that were built from
+// the old configuration, repoints the resolver and creates the directories, so a
+// change takes effect without a restart.
 func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*SettingsResponseDTO, error) {
 	for _, p := range []string{cfg.Paths.Systems, cfg.Paths.Worlds, cfg.Paths.Games, cfg.Paths.Cache} {
 		if p != "" {
@@ -1234,6 +1254,9 @@ func (s *Service) SaveSettings(ctx context.Context, cfg config.Config) (*Setting
 	}, nil
 }
 
+// ApplyOfflinePreset switches the configuration to one that needs no network and
+// returns what it changed. It saves through SaveSettings, so the preset is in
+// force before it answers.
 func (s *Service) ApplyOfflinePreset(ctx context.Context, req OfflinePresetRequestDTO) (*OfflinePresetResponseDTO, error) {
 	cfg, err := s.configMgr.Load()
 	if err != nil {
@@ -1251,6 +1274,9 @@ func (s *Service) ApplyOfflinePreset(ctx context.Context, req OfflinePresetReque
 	}, nil
 }
 
+// CheckOffline reports what the configuration in force would need from the
+// network, for the offline banner. It answers from the configuration already
+// loaded when there is one, and loads it otherwise.
 func (s *Service) CheckOffline(ctx context.Context) (provider.OfflineReport, error) {
 	cfg := s.configMgr.Get()
 	if cfg == nil {
@@ -1312,6 +1338,8 @@ func gameSettingString(manifest *core.GameManifest, key string) string {
 	return strings.TrimSpace(value)
 }
 
+// GenerateAssetRequestDTO asks for one campaign or world image. Kind names which
+// asset it is, and an empty Prompt is filled in from the entity being illustrated.
 type GenerateAssetRequestDTO struct {
 	Kind   string `json:"kind"`
 	Prompt string `json:"prompt,omitempty"`

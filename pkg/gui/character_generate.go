@@ -50,6 +50,9 @@ type GenerateCharacterRequest struct {
 	Seed     map[string]string             `json:"seed,omitempty"`
 }
 
+// GenerateCharacterResponse is starting values for the fields a character sheet
+// asks about, with the provider that wrote them. Warning carries a partial
+// failure, so a client can show what arrived and say what did not.
 type GenerateCharacterResponse struct {
 	Values      map[string]string          `json:"values"`
 	GeneratedBy string                     `json:"generated_by"`

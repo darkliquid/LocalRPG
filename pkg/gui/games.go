@@ -23,6 +23,8 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
+// GetGameState assembles what the play view opens with: the campaign's manifest,
+// the player, the arcs and clocks in motion, and any content-lock warnings.
 func (s *Service) GetGameState(ctx context.Context, gameID string) (*GameStateDTO, error) {
 	gameDir := s.resolver.GameDir(gameID)
 	gameManifest, err := core.LoadGameManifest(filepath.Join(gameDir, "game.yaml"))
@@ -202,6 +204,9 @@ func (s *Service) GameFolders(gameID string) ([]FolderDTO, error) {
 	return s.ListFolders(filepath.Join(s.resolver.GameDir(gameID), "entities"))
 }
 
+// GetChronicle reads the campaign's log back as turns. A history that cannot be
+// read is an empty chronicle rather than an error: a campaign that has not turned
+// yet has no file, and the engine writes it on the first turn.
 func (s *Service) GetChronicle(ctx context.Context, gameID string) ([]TurnDTO, error) {
 	gameDir := s.resolver.GameDir(gameID)
 	historyFile := filepath.Join(gameDir, "history.jsonl")
@@ -393,6 +398,8 @@ func (s *Service) gameAssetURL(gameDir, worldID, assetKind, gameID string) (stri
 	return "", ""
 }
 
+// ListGames reads the launcher's list from the games directory. A directory that
+// does not exist yet is an empty list, not an error.
 func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 	gamesDir := s.resolver.GamesDir()
 	entries, err := os.ReadDir(gamesDir)
@@ -474,6 +481,9 @@ func (s *Service) ListGames(ctx context.Context) ([]GameSummaryDTO, error) {
 	return summaries, nil
 }
 
+// CreateGame creates a campaign and returns its summary. The ID is slugified from
+// the name when the request leaves it out, and the system decides which character
+// fields the player has to answer.
 func (s *Service) CreateGame(ctx context.Context, req CreateGameRequestDTO) (*GameSummaryDTO, error) {
 	if err := validateCreateGame(&req); err != nil {
 		return nil, err
@@ -775,6 +785,9 @@ func (s *Service) forgetGame(gameID string) {
 	delete(s.indexed, gameID)
 }
 
+// GetGameAsset resolves one campaign asset to a path and its content type,
+// preferring the campaign's own file and falling back to the world it was created
+// from. os.ErrNotExist means the asset is not there.
 func (s *Service) GetGameAsset(gameID, assetKind string) (string, string, error) {
 	if err := pathutil.ValidateID(gameID); err != nil {
 		return "", "", fmt.Errorf("invalid game id: %w", err)
@@ -796,6 +809,9 @@ func (s *Service) GetGameAsset(gameID, assetKind string) (string, string, error)
 	return "", "", os.ErrNotExist
 }
 
+// SaveGameAsset writes one campaign asset and returns the path it wrote. The
+// campaign and the kind are validated first, because the kind names a directory
+// under the campaign's assets.
 func (s *Service) SaveGameAsset(gameID, assetKind string, data []byte, ext string) (string, error) {
 	if err := pathutil.ValidateID(gameID); err != nil {
 		return "", fmt.Errorf("invalid game id: %w", err)
@@ -921,6 +937,9 @@ func (s *Service) protagonistArtSummary(gameDir string, manifest *core.GameManif
 	return strings.Join(parts, ", ")
 }
 
+// GenerateGameAsset generates one campaign image and returns the path it wrote.
+// It is synchronous, because generation is slow and the caller wants the file it
+// asked for rather than a job id.
 func (s *Service) GenerateGameAsset(ctx context.Context, gameID string, req GenerateAssetRequestDTO) (string, error) {
 	if err := pathutil.ValidateID(gameID); err != nil {
 		return "", fmt.Errorf("invalid game id: %w", err)

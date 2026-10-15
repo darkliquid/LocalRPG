@@ -24,6 +24,9 @@ type GenerateTextRequest struct {
 	Seed      string            `json:"seed,omitempty"`
 }
 
+// GenerateTextResponse is the text a generator produced for a set of named fields,
+// with the provider that wrote it. Warning carries a partial failure: the fields
+// that did arrive are still worth showing.
 type GenerateTextResponse struct {
 	Fields      map[string]string          `json:"fields"`
 	GeneratedBy string                     `json:"generated_by"`

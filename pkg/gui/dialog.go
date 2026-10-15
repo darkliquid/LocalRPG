@@ -36,6 +36,8 @@ const (
 	DirectoryChoiceCancelled = "cancelled"
 )
 
+// The states a save-file dialog reports, so the client that opened one can wait
+// for the choice instead of polling the window.
 const (
 	SaveFileChoiceIdle      = "idle"
 	SaveFileChoicePending   = "pending"
