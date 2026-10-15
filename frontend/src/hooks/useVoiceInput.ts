@@ -80,6 +80,8 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        // The console strip shows this inline (ActionConsole renders the hook's error),
+        // so the line stays as the developer's record rather than being reported twice.
         console.error('Speech recognition error:', event.error);
         setError(`Speech recognition: ${event.error}`);
         setIsRecording(false);
@@ -93,6 +95,8 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
       speechRecognitionRef.current = recognition;
       setIsRecording(true);
     } catch (err: unknown) {
+      // The console strip shows this inline (ActionConsole renders the hook's error),
+      // so the line stays as the developer's record rather than being reported twice.
       console.warn('Web speech failed to start:', err);
       setError(
         err instanceof Error
@@ -141,6 +145,8 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
             onTranscribed(res.text);
           }
         } catch (err: unknown) {
+          // The console strip shows this inline (ActionConsole renders the hook's error),
+          // so the line stays as the developer's record rather than being reported twice.
           console.error('Transcription failed:', err);
           setError(err instanceof Error ? err.message : 'Transcription failed');
         } finally {
@@ -152,6 +158,8 @@ export const useVoiceInput = ({ onTranscribed, sttType }: UseVoiceInputOptions) 
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
     } catch (err: unknown) {
+      // The console strip shows this inline (ActionConsole renders the hook's error),
+      // so the line stays as the developer's record rather than being reported twice.
       console.error('Microphone access error:', err);
       setError(
         err instanceof Error && err.name === 'NotAllowedError'
