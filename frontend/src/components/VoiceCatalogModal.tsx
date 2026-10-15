@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Play, Plus, Search, Globe } from 'lucide-react';
 import { ProviderVoice, VoiceProfile } from '../types';
@@ -36,6 +37,10 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
   const [extendedVoices, setExtendedVoices] = useState<ProviderVoice[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  // Its own header, so it takes the dialog behaviour rather than the shell: it
+  // declares itself, moves focus in and returns it, holds Tab, and closes on
+  // Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
   const searchRequestRef = useRef(0);
 
   // Close on Escape key
@@ -127,6 +132,12 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
   return (
     <div
       data-state={state}
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Voice Catalog Browser"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       className={`fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
       }`}
