@@ -66,7 +66,7 @@ export const LLMRoleEditor: React.FC<LLMRoleEditorProps> = ({
         <select
           value={roleConfig.type}
           onChange={(e) => {
-            const updated = { ...roleConfig, type: e.target.value as any };
+            const updated = { ...roleConfig, type: e.target.value as (typeof roleConfig)['type'] };
             setConfig({
               ...config,
               agents: {
