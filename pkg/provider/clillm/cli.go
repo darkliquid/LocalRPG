@@ -15,6 +15,10 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
+// CLIProvider runs a command-line model: the prompt is appended to the configured
+// arguments and the process's standard output is the reply. It is how a local CLI,
+// a llama.cpp binary or a vendor's own tool, becomes an LLM provider without a
+// server in front of it.
 type CLIProvider struct {
 	id      string
 	command string
@@ -35,10 +39,14 @@ func (c *CLIProvider) SetLogger(logger trace.Logger) {
 	c.logger = trace.OrNil(logger)
 }
 
+// NewCLIProvider builds a provider that runs command with args, appending the
+// prompt to them. Generation options are left at their defaults.
 func NewCLIProvider(id, command string, args []string) *CLIProvider {
 	return NewCLIProviderWithOptions(id, command, args, harness.GenerationOptions{})
 }
 
+// NewCLIProviderWithOptions is NewCLIProvider with the generation options, such
+// as temperature and token limits, set for the model.
 func NewCLIProviderWithOptions(id, command string, args []string, opts harness.GenerationOptions) *CLIProvider {
 	return &CLIProvider{
 		id:      id,
@@ -48,6 +56,7 @@ func NewCLIProviderWithOptions(id, command string, args []string, opts harness.G
 	}
 }
 
+// ID is the configured provider id, which is what a role's configuration names.
 func (c *CLIProvider) ID() string {
 	return c.id
 }
@@ -73,6 +82,8 @@ func (c *CLIProvider) buildCmd(ctx context.Context, req harness.GenerateRequest)
 	return cmd
 }
 
+// Generate runs the command once and returns its whole reply, which is Stream
+// with nowhere to put the chunks.
 func (c *CLIProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
 	c.logger = trace.OrNil(c.logger)
 	c.logRequest(req, "generate")
@@ -99,6 +110,8 @@ func (c *CLIProvider) Generate(ctx context.Context, req harness.GenerateRequest)
 	return &harness.GenerateResponse{Text: text}, nil
 }
 
+// Stream runs the command and forwards its standard output as it arrives, so a
+// CLI that writes progressively is seen progressively rather than only at the end.
 func (c *CLIProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
 	defer close(out)
 

@@ -19,6 +19,10 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
+// HTTPProvider talks to an OpenAI-compatible chat completions endpoint, which is
+// what any OpenAI-shaped server speaks: OpenAI itself, a local llama.cpp or vLLM
+// server, or a gateway in front of one. The API key may be empty, because a local
+// server needs none.
 type HTTPProvider struct {
 	id                 string
 	endpoint           string
@@ -31,6 +35,8 @@ type HTTPProvider struct {
 	chunkLimitOverride int
 }
 
+// NewHTTPProvider builds a provider for one endpoint and model. The key may be
+// empty and the generation options are left at their defaults.
 func NewHTTPProvider(id, endpoint, model, apiKey string) *HTTPProvider {
 	return NewHTTPProviderWithOptions(id, endpoint, model, apiKey, harness.GenerationOptions{})
 }
@@ -59,6 +65,8 @@ func (h *HTTPProvider) chunkLimit() int {
 	return h.chunkLimitOverride
 }
 
+// NewHTTPProviderWithOptions is NewHTTPProvider with the generation options set
+// for the model.
 func NewHTTPProviderWithOptions(id, endpoint, model, apiKey string, opts harness.GenerationOptions) *HTTPProvider {
 	return &HTTPProvider{
 		id:         id,
@@ -83,6 +91,7 @@ func NewHTTPProviderWithAuth(id, endpoint, model, apiKey, authScheme string, opt
 	return provider
 }
 
+// ID is the configured provider id.
 func (h *HTTPProvider) ID() string {
 	return h.id
 }
@@ -199,6 +208,8 @@ func (a *toolCallAccumulator) result() []harness.ToolCall {
 	return calls
 }
 
+// Generate streams the reply and collects it into one response, so a caller that
+// wants no chunks still takes the streaming path and its timeout behaviour.
 func (h *HTTPProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
 	out := make(chan harness.StreamChunk, 20)
 	var sb strings.Builder
@@ -226,6 +237,7 @@ func (h *HTTPProvider) Generate(ctx context.Context, req harness.GenerateRequest
 	return &harness.GenerateResponse{Text: sb.String(), Usage: usage}, nil
 }
 
+// Stream forwards each delta as it arrives.
 func (h *HTTPProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
 	defer close(out)
 	return h.streamOnce(ctx, req, out, true)
