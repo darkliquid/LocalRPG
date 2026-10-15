@@ -1,5 +1,6 @@
 import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useMemo } from 'react';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import {
   X,
   Search,
@@ -33,6 +34,9 @@ const CATEGORY_ICONS: Record<string, React.FC<{ className?: string }>> = {
 };
 
 export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose, initialArticleID }) => {
+  // Its own layout, so it takes the behaviour rather than the shell: focus in,
+  // Tab trapped, Escape closing, focus returned to whatever opened it.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(isOpen, onClose);
   const { report } = useFailures();
   const [summaries, setSummaries] = useState<DocArticleSummary[]>([]);
   const [selectedArticleID, setSelectedArticleID] = useState<string>('');
@@ -93,18 +97,6 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose, initialAr
     };
   }, [report, selectedArticleID, isOpen]);
 
-  // Keyboard shortcut: Escape to close
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
   // Grouped categories
   const categories = useMemo(() => {
     const map = new Map<string, DocArticleSummary[]>();
@@ -143,9 +135,12 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose, initialAr
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="Documentation & Reference"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md anim-fade-in"
     >
       <div className="relative w-full max-w-6xl h-[90vh] bg-stone-900/95 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col anim-scale-in">
