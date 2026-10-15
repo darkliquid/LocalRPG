@@ -3,6 +3,7 @@ import { Volume2, Download, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import { APIClient } from '../api/client';
 import { ModelStatus } from '../types';
 import { useMountTransition } from '../hooks/useMountTransition';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 interface ModelDownloadModalProps {
   modelId: string;
@@ -60,10 +61,22 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
     }
   };
 
+  // Its own entrance animation, so it takes the dialog behaviour rather than the
+  // shell: it declares itself, holds focus, and gains an Escape key it never had
+  // — until now the only way out of this modal was the close button, which is
+  // hidden while a download runs.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(isOpen, onClose);
+
   if (!mounted) return null;
 
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Enable Voice Narration"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       data-state={state}
       className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
