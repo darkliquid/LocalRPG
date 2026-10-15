@@ -1,3 +1,4 @@
+import { useFailures } from '../../context/FailuresContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { WorldInfo, SystemInfo, CreateGameRequest, CharacterCreationField, TTSConfig, VoiceProfile } from '../../types';
 import { APIClient } from '../../api/client';
@@ -30,6 +31,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   onCreateGame,
   isSubmitting,
 }) => {
+  const { report } = useFailures();
   const [campaignName, setCampaignName] = useState('');
   const [selectedSystemID, setSelectedSystemID] = useState('');
   const [playerName, setPlayerName] = useState('');
@@ -72,8 +74,13 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
         setVoiceProfiles(res.config.media.tts.voice_profiles || []);
         setTtsConfig(res.config.media.tts);
       })
-      .catch((err) => console.error('Failed to load voice profiles', err));
-  }, []);
+      .catch((err) =>
+        report({
+          text: 'Could not load the voice profiles.',
+          detail: err instanceof Error ? err.message : String(err),
+        }),
+      );
+  }, [report]);
 
   // A system may author its own creation prompts. They are read from the selected
   // system's detail, so the form follows the manifest rather than a fixed list.
@@ -239,7 +246,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
         setIconPreview(URL.createObjectURL(blob));
       }
     } catch (err) {
-      console.error('Failed to generate preview', err);
+      report({ text: 'Could not generate the preview.', detail: err instanceof Error ? err.message : String(err) });
       setGenError(errorMessage(err) || 'Generation failed');
     } finally {
       setGeneratingKind(null);

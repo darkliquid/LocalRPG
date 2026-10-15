@@ -1,3 +1,4 @@
+import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
@@ -32,6 +33,7 @@ const CATEGORY_ICONS: Record<string, React.FC<{ className?: string }>> = {
 };
 
 export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose, initialArticleID }) => {
+  const { report } = useFailures();
   const [summaries, setSummaries] = useState<DocArticleSummary[]>([]);
   const [selectedArticleID, setSelectedArticleID] = useState<string>('');
   const [currentArticle, setCurrentArticle] = useState<DocArticle | null>(null);
@@ -56,14 +58,14 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose, initialAr
       })
       .catch((err) => {
         if (!isMounted) return;
-        console.error('Failed to load docs list:', err);
+        report({ text: 'Could not load the help articles.', detail: err instanceof Error ? err.message : String(err) });
         setError('Failed to load documentation catalogue.');
       });
 
     return () => {
       isMounted = false;
     };
-  }, [isOpen, initialArticleID]);
+  }, [report, isOpen, initialArticleID]);
 
   // Load selected article content
   useEffect(() => {
@@ -81,7 +83,7 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose, initialAr
       })
       .catch((err) => {
         if (!isMounted) return;
-        console.error(`Failed to load doc ${selectedArticleID}:`, err);
+        report({ text: 'Could not load that help article.', detail: err instanceof Error ? err.message : String(err) });
         setError('Failed to load documentation article.');
         setIsLoading(false);
       });
@@ -89,7 +91,7 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose, initialAr
     return () => {
       isMounted = false;
     };
-  }, [selectedArticleID, isOpen]);
+  }, [report, selectedArticleID, isOpen]);
 
   // Keyboard shortcut: Escape to close
   useEffect(() => {

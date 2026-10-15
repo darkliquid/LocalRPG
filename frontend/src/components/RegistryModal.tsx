@@ -1,3 +1,4 @@
+import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Package,
@@ -22,6 +23,7 @@ interface RegistryModalProps {
 }
 
 export const RegistryModal: React.FC<RegistryModalProps> = ({ isOpen, onClose, onInstalled }) => {
+  const { report } = useFailures();
   const [packages, setPackages] = useState<PackageRefDTO[]>([]);
   const [updates, setUpdates] = useState<PackageRefDTO[]>([]);
   const [sources, setSources] = useState<RegistrySourceDTO[]>([]);
@@ -40,19 +42,22 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({ isOpen, onClose, o
   const [installError, setInstallError] = useState<string | null>(null);
   const [justInstalledIDs, setJustInstalledIDs] = useState<Set<string>>(new Set());
 
-  const fetchPackages = useCallback(async (query: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const results = await APIClient.searchRegistry(query);
-      setPackages(results || []);
-    } catch (err: any) {
-      console.error('Failed to search registry:', err);
-      setError(err.message || 'Failed to search registry');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const fetchPackages = useCallback(
+    async (query: string) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const results = await APIClient.searchRegistry(query);
+        setPackages(results || []);
+      } catch (err: any) {
+        report({ text: 'Could not search the registries.', detail: err instanceof Error ? err.message : String(err) });
+        setError(err.message || 'Failed to search registry');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [report],
+  );
 
   const loadSources = useCallback(async () => {
     try {
@@ -68,11 +73,11 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({ isOpen, onClose, o
       const up = await APIClient.checkRegistryUpdates();
       setUpdates(up || []);
     } catch (err) {
-      console.error('Failed to check updates:', err);
+      report({ text: 'Could not check for updates.', detail: err instanceof Error ? err.message : String(err) });
     } finally {
       setIsCheckingUpdates(false);
     }
-  }, []);
+  }, [report]);
 
   // The query is debounced so typing does not refetch every index per keystroke.
   useEffect(() => {
