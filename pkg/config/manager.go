@@ -12,6 +12,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ConfigManager holds the configuration in force, the file it was read from, and a
+// revision counter a caller can key a cache on. It is safe for concurrent use.
+// ConfigManager holds the configuration in force, the file it was read from, and a
+// revision counter a caller can key a cache on. It is safe for concurrent use.
 type ConfigManager struct {
 	mu              sync.RWMutex
 	userConfigPath  string
@@ -55,12 +59,20 @@ func DetectConfigFile() (read, write string) {
 	return fallback, fallback
 }
 
+// NewConfigManager resolves the standard locations: the user's configuration file,
+// and a localrpg.yaml in the working directory as an override.
+// NewConfigManager resolves the standard locations: the user's configuration file,
+// and a localrpg.yaml in the working directory as an override.
 func NewConfigManager() *ConfigManager {
 	userPath, _ := DetectConfigFile()
 	localPath := "./localrpg.yaml"
 	return NewConfigManagerWithPaths(userPath, localPath)
 }
 
+// NewConfigManagerWithPaths builds a manager around explicit paths, which is what
+// a test or a --dir run needs.
+// NewConfigManagerWithPaths builds a manager around explicit paths, which is what
+// a test or a --dir run needs.
 func NewConfigManagerWithPaths(userPath, localPath string) *ConfigManager {
 	return &ConfigManager{
 		userConfigPath:  userPath,
@@ -69,6 +81,10 @@ func NewConfigManagerWithPaths(userPath, localPath string) *ConfigManager {
 	}
 }
 
+// ActiveFilePath is the file a save would write: the local override when one is in
+// force, and the user configuration otherwise.
+// ActiveFilePath is the file a save would write: the local override when one is in
+// force, and the user configuration otherwise.
 func (m *ConfigManager) ActiveFilePath() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -88,6 +104,8 @@ func (m *ConfigManager) StylesDir() string {
 	return filepath.Join(dir, "styles")
 }
 
+// IsLocalOverride reports whether the local file is the one in force.
+// IsLocalOverride reports whether the local file is the one in force.
 func (m *ConfigManager) IsLocalOverride() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -154,6 +172,10 @@ func mergeConfigFile(path string, data []byte, cfg *Config) error {
 	return nil
 }
 
+// Save writes the configuration to the active file. A local override that exists
+// stays the active file, so a project keeps being edited in place.
+// Save writes the configuration to the active file. A local override that exists
+// stays the active file, so a project keeps being edited in place.
 func (m *ConfigManager) Save(cfg *Config) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -185,6 +207,10 @@ func (m *ConfigManager) Save(cfg *Config) error {
 	return nil
 }
 
+// Get returns the configuration in force without re-reading it. A manager that has
+// never loaded answers with defaults.
+// Get returns the configuration in force without re-reading it. A manager that has
+// never loaded answers with defaults.
 func (m *ConfigManager) Get() *Config {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
