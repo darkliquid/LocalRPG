@@ -26,8 +26,17 @@
 
 ### Task 1: Classify
 
-- [ ] **Step 1: The 33 files, each marked** blocking dialog, confirmation, drawer/panel, or already a dialog. The list goes in the batch's pull request.
-- [ ] **Step 2: The count of surfaces that will not convert**, each with its reason.
+- [x] **Step 1: A first pass, by name and marker** (34 files match `fixed inset-0`, including the primitive itself):
+
+  | Class | Count | Files |
+  |---|---|---|
+  | already a dialog | 3 | `Modal` (the primitive), `AboutModal`, `DocsModal` |
+  | drawer or overlay | 4 | `CinematicOverlay`, `CodexDrawer`, `Drawers`, `StoryTheater` |
+  | to convert | 27 | the rest |
+
+  **This pass is a heuristic, not the classification.** Two things it cannot decide, and both are why the step is not finished: six of the 27 are *hosts* that contain one or more overlays rather than being overlays themselves (`App.tsx`, `player/main.tsx`, `LauncherHub`, `SystemsStudio`, `WorldsStudio`, `ContentStudio`), so the surface count is higher than the file count; and a name is not a behaviour — `StoryTheater` is a takeover a user must be able to leave, which is a modal's job, while `Drawers.tsx` may hold panels the page stays usable behind. Each is confirmed by reading it, in the batch that converts it.
+
+- [ ] **Step 2: The confirmed count of surfaces that will not convert**, each with its reason.
 
 ---
 
