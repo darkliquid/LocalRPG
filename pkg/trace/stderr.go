@@ -38,10 +38,12 @@ func (l *StderrLogger) SetLevel(level Level) {
 	l.level = level
 }
 
+// Enabled reports whether the logger prints level.
 func (l *StderrLogger) Enabled(level Level) bool {
 	return l.level != LevelOff && level <= l.level
 }
 
+// Event prints one event to standard error.
 func (l *StderrLogger) Event(name string, fields map[string]any) {
 	if !l.Enabled(LevelSummary) {
 		return

@@ -148,6 +148,8 @@ func (r stepReporter) step(name, status, detail string) {
 	}
 }
 
+// Generate writes a whole system from a brief, reporting each step as it finishes so a
+// caller can show progress.
 func Generate(ctx context.Context, gen Generator, brief Brief, onStep ...func(Step)) (System, error) {
 	if gen == nil {
 		return System{}, fmt.Errorf("sysgen: no generator configured")

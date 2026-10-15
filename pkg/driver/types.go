@@ -3,6 +3,8 @@ package driver
 // ActionType enumerates the supported declarative scenario actions.
 type ActionType string
 
+// The kinds of action a driver can be asked to take. The type says what a step means;
+// the driver decides how to perform it.
 const (
 	ActionNavigate          ActionType = "navigate"
 	ActionClick             ActionType = "click"

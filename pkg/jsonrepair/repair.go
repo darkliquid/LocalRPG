@@ -12,6 +12,8 @@ const maxPayload = 64 * 1024
 // Kind names the structural repair that produced a valid payload.
 type Kind string
 
+// What a repair scan concluded about a reply: no problem at all, or one of the
+// malformed shapes it knows how to fix.
 const (
 	KindNone          Kind = ""
 	KindFence         Kind = "fence"

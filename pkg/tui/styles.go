@@ -2,6 +2,8 @@ package tui
 
 import "github.com/charmbracelet/lipgloss"
 
+// The lipgloss styles the app renders its chrome with, kept in one place so a
+// renderer does not invent its own.
 var (
 	TitleStyle = lipgloss.NewStyle().
 			Bold(true).

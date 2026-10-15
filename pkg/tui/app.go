@@ -14,6 +14,8 @@ type turnResultMsg struct {
 	err  error
 }
 
+// AppModel is the terminal app: one campaign, the transcript it has built, and the
+// Bubbletea loop that drives it.
 type AppModel struct {
 	orchestrator *engine.TurnOrchestrator
 	history      []engine.Turn
@@ -28,6 +30,7 @@ type AppModel struct {
 	statusMsg    string
 }
 
+// NewAppModel builds the terminal app for one campaign at a given size.
 func NewAppModel(orchestrator *engine.TurnOrchestrator, width, height int) *AppModel {
 	return &AppModel{
 		orchestrator: orchestrator,
@@ -48,10 +51,12 @@ func (m *AppModel) Seed(turns []engine.Turn) {
 	m.history = append(m.history[:0], turns...)
 }
 
+// Init is the Bubbletea hook that returns the app's first command.
 func (m *AppModel) Init() tea.Cmd {
 	return nil
 }
 
+// Update is the Bubbletea hook that handles one message and returns the next state.
 func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -130,6 +135,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// View is the Bubbletea hook that renders the current state.
 func (m *AppModel) View() string {
 	var sb strings.Builder
 

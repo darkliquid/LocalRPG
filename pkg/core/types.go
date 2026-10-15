@@ -11,6 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// SystemManifest is a system's system.yaml: what it is called, the requirements it
+// places on a world, the mechanics it declares, and the character fields it asks for.
 type SystemManifest struct {
 	ID          string `yaml:"id"`
 	Name        string `yaml:"name"`
@@ -120,6 +122,8 @@ func (r ContentRequirement) Satisfies(targetVersion string) bool {
 	return true
 }
 
+// WorldManifest is a world's world.yaml: its name, genre and art style, the systems
+// it will play with, and where a campaign starts.
 type WorldManifest struct {
 	ID            string               `yaml:"id"`
 	Name          string               `yaml:"name"`
@@ -132,6 +136,8 @@ type WorldManifest struct {
 	Tags          []string             `yaml:"tags,omitempty"`
 }
 
+// GameManifest is a campaign's game.yaml: the system and world it was created from,
+// its player, and the location it opens at.
 type GameManifest struct {
 	ID         string         `yaml:"id"`
 	Name       string         `yaml:"name"`
@@ -155,6 +161,8 @@ func SaveGameManifest(path string, manifest *GameManifest) error {
 	return nil
 }
 
+// PathResolver turns a category and an id into a directory, and is the only thing in
+// the app that decides where content lives.
 type PathResolver struct {
 	BaseDir    string
 	systemsDir string
@@ -163,6 +171,8 @@ type PathResolver struct {
 	cacheDir   string
 }
 
+// NewPathResolver resolves every category under baseDir, which is what a test or an
+// export that works in one directory wants.
 func NewPathResolver(baseDir string) *PathResolver {
 	return &PathResolver{
 		BaseDir:    baseDir,
@@ -173,6 +183,8 @@ func NewPathResolver(baseDir string) *PathResolver {
 	}
 }
 
+// NewCustomPathResolver resolves each category to its own directory, which is what a
+// resolved configuration provides.
 func NewCustomPathResolver(systemsDir, worldsDir, gamesDir, cacheDir string) *PathResolver {
 	return &PathResolver{
 		BaseDir:    "",
@@ -183,6 +195,8 @@ func NewCustomPathResolver(systemsDir, worldsDir, gamesDir, cacheDir string) *Pa
 	}
 }
 
+// SetPaths replaces all four directories in place, which is what a settings save does
+// rather than rebuilding the resolver.
 func (p *PathResolver) SetPaths(systemsDir, worldsDir, gamesDir, cacheDir string) {
 	p.systemsDir = systemsDir
 	p.worldsDir = worldsDir
@@ -190,6 +204,7 @@ func (p *PathResolver) SetPaths(systemsDir, worldsDir, gamesDir, cacheDir string
 	p.cacheDir = cacheDir
 }
 
+// SystemsDir is the directory the systems live in.
 func (p *PathResolver) SystemsDir() string {
 	if p.systemsDir != "" {
 		return p.systemsDir
@@ -197,10 +212,12 @@ func (p *PathResolver) SystemsDir() string {
 	return filepath.Join(p.BaseDir, "systems")
 }
 
+// SystemDir is one system's directory.
 func (p *PathResolver) SystemDir(id string) string {
 	return filepath.Join(p.SystemsDir(), pathutil.SanitizeID(id))
 }
 
+// WorldsDir is the directory the worlds live in.
 func (p *PathResolver) WorldsDir() string {
 	if p.worldsDir != "" {
 		return p.worldsDir
@@ -208,10 +225,12 @@ func (p *PathResolver) WorldsDir() string {
 	return filepath.Join(p.BaseDir, "worlds")
 }
 
+// WorldDir is one world's directory.
 func (p *PathResolver) WorldDir(id string) string {
 	return filepath.Join(p.WorldsDir(), pathutil.SanitizeID(id))
 }
 
+// GamesDir is the directory the campaigns live in.
 func (p *PathResolver) GamesDir() string {
 	if p.gamesDir != "" {
 		return p.gamesDir
@@ -219,6 +238,7 @@ func (p *PathResolver) GamesDir() string {
 	return filepath.Join(p.BaseDir, "games")
 }
 
+// GameDir is one campaign's directory.
 func (p *PathResolver) GameDir(id string) string {
 	return filepath.Join(p.GamesDir(), pathutil.SanitizeID(id))
 }
@@ -228,6 +248,7 @@ func (p *PathResolver) GameDBPath(gameID string) string {
 	return filepath.Join(p.GameDir(gameID), "cache", "index.db")
 }
 
+// CacheDir is the directory derived data lives in, which is safe to delete.
 func (p *PathResolver) CacheDir() string {
 	if p.cacheDir != "" {
 		return p.cacheDir
@@ -258,6 +279,8 @@ func ValidateSemver(v string) error {
 	return nil
 }
 
+// Validate reports what a system manifest is missing, which is the fields a system
+// cannot be loaded without.
 func (s SystemManifest) Validate() error {
 	if err := ValidateSemver(s.Version); err != nil {
 		return fmt.Errorf("system %q: %w", s.ID, err)
@@ -265,6 +288,7 @@ func (s SystemManifest) Validate() error {
 	return nil
 }
 
+// Validate reports what a world manifest is missing.
 func (w WorldManifest) Validate() error {
 	if err := ValidateSemver(w.Version); err != nil {
 		return fmt.Errorf("world %q: %w", w.ID, err)
@@ -272,6 +296,8 @@ func (w WorldManifest) Validate() error {
 	return nil
 }
 
+// LoadSystemManifest reads and parses one system.yaml, applying the defaults a file
+// need not state.
 func LoadSystemManifest(path string) (*SystemManifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -287,6 +313,7 @@ func LoadSystemManifest(path string) (*SystemManifest, error) {
 	return &manifest, nil
 }
 
+// LoadWorldManifest reads and parses one world.yaml.
 func LoadWorldManifest(path string) (*WorldManifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -302,6 +329,7 @@ func LoadWorldManifest(path string) (*WorldManifest, error) {
 	return &manifest, nil
 }
 
+// LoadGameManifest reads and parses one game.yaml.
 func LoadGameManifest(path string) (*GameManifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
