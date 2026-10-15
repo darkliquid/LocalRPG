@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
+import { Modal } from '../Modal';
 
 interface DiscardDraftConfirmProps {
   isOpen: boolean;
@@ -9,37 +10,39 @@ interface DiscardDraftConfirmProps {
   description?: string;
 }
 
+// DiscardDraftConfirm is the confirmation that leaves without saving, and it is
+// the Modal shell with three lines of content. The shell brings what it needs:
+// the dialog semantics, focus moved in and returned, and Escape — which here
+// means "keep editing", because that is what cancelling does.
 export const DiscardDraftConfirm: React.FC<DiscardDraftConfirmProps> = ({
   isOpen,
   onCancel,
   onDiscard,
   title = 'Discard unsaved world?',
   description = 'This world has not been saved. Leaving now discards every field you entered.',
-}) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
-      <div className="w-full max-w-md bg-stone-900 border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4">
-        <div className="flex items-center gap-2 text-amber-300">
-          <AlertCircle className="w-4 h-4" />
-          <h3 className="font-sans text-sm font-bold text-white">{title}</h3>
-        </div>
-        <p className="text-xs font-sans text-stone-400">{description}</p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onCancel}
-            className="text-xs font-sans px-3 py-1.5 rounded-lg border border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800 transition-all cursor-pointer"
-          >
-            Keep editing
-          </button>
-          <button
-            onClick={onDiscard}
-            className="text-xs font-sans font-bold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-all cursor-pointer"
-          >
-            Discard
-          </button>
-        </div>
+}) => (
+  <Modal open={isOpen} onClose={onCancel} title={title} className="max-w-md">
+    <div className="space-y-4">
+      <p className="flex items-center gap-2 text-xs font-sans text-stone-400">
+        <AlertCircle className="h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+        {description}
+      </p>
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="cursor-pointer rounded-lg border border-stone-700 px-3 py-1.5 font-sans text-xs text-stone-300 transition-all hover:bg-stone-800 hover:text-white"
+        >
+          Keep editing
+        </button>
+        <button
+          type="button"
+          onClick={onDiscard}
+          className="cursor-pointer rounded-lg bg-red-600 px-3 py-1.5 font-sans text-xs font-bold text-white transition-all hover:bg-red-500"
+        >
+          Discard
+        </button>
       </div>
     </div>
-  );
-};
+  </Modal>
+);
