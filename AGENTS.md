@@ -363,7 +363,7 @@ configured by the checked-in `revive.toml`, which carries the reason for each ch
 the stutter check is off, because it asks for `entity.Frontmatter` where the type's name
 is the Markdown block the file defines.
 
-**It is report-only, and it is not a dependency of `mise run lint`,** because the count
+**It is a gate**, run by `mise run lint` under `STRICT=1`, because the count
 is still large: **271 findings**, down from 336 now that `pkg/state`, `pkg/entity`,
 `pkg/storage`, `pkg/rules` and `pkg/engine` are documented (RD-5). `STRICT=1` makes it
 exit non-zero, which is how it becomes a gate once the count is near zero; the

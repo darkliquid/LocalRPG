@@ -6,6 +6,8 @@ import (
 	"github.com/charmbracelet/glamour"
 )
 
+// RenderMarkdown renders a guide article or a line of narration as terminal text,
+// wrapped to wordWrap columns.
 func RenderMarkdown(content string, wordWrap int) (string, error) {
 	if wordWrap <= 0 {
 		wordWrap = 80

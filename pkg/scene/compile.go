@@ -222,6 +222,8 @@ func (c *scriptCounts) spoke(kind BeatKind, outcome audioOutcome) {
 	}
 }
 
+// Compile turns one campaign's history into a film script: its scenes, the captions
+// that carry the prose, and the assets each scene needs.
 func (c *Compiler) Compile(ctx context.Context, gameID string, opts Options) (*Script, error) {
 	turns, err := c.source.Turns()
 	if err != nil {

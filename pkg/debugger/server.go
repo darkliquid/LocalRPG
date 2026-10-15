@@ -165,6 +165,8 @@ func (s *Server) handleDashboardUI(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(DashboardHTML))
 }
 
+// DashboardHTML is the dashboard `localrpg debug server` serves, which shows a run's
+// trace without opening the app.
 const DashboardHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>

@@ -34,6 +34,7 @@ type FileSink struct {
 	failures int
 }
 
+// NewFileSink opens the log at path and returns a logger that appends to it.
 func NewFileSink(path string, opts FileOptions) (*FileSink, error) {
 	if opts.MaxBytes <= 0 {
 		opts.MaxBytes = 268435456
@@ -55,8 +56,10 @@ func NewFileSink(path string, opts FileOptions) (*FileSink, error) {
 	return sink, nil
 }
 
+// Path is the file the sink writes to.
 func (s *FileSink) Path() string { return s.path }
 
+// Enabled reports whether the sink records level.
 func (s *FileSink) Enabled(level Level) bool {
 	return s != nil && s.opts.Level != LevelOff && level <= s.opts.Level
 }
@@ -83,6 +86,7 @@ func (s *FileSink) SetGame(gameID string) {
 	s.game = gameID
 }
 
+// Event records one event, which the sink writes to its file.
 func (s *FileSink) Event(name string, fields map[string]any) {
 	if s == nil || s.opts.Level == LevelOff {
 		return
@@ -131,6 +135,7 @@ func (s *FileSink) Event(name string, fields map[string]any) {
 	}
 }
 
+// Close flushes and closes the file.
 func (s *FileSink) Close() error {
 	if s == nil {
 		return nil

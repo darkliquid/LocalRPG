@@ -152,6 +152,7 @@ depends = ["lint:docs", "lint:gofmt", "lint:staticcheck", "lint:frontend", "lint
 run = """
 go vet ./...
 go vet -tags e2e ./pkg/e2e/...
+STRICT=1 mise run lint:revive
 """
 
 [tasks."dev:gui"]

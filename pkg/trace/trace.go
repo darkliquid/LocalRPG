@@ -112,10 +112,14 @@ type Memory struct {
 	events []Event
 }
 
+// NewMemory returns a logger that keeps events in memory, which is what a test
+// asserts on.
 func NewMemory(level Level) *Memory {
 	return &Memory{level: level}
 }
 
+// Enabled reports whether this logger records level, so a caller can skip building
+// a field map for nothing.
 func (m *Memory) Enabled(level Level) bool {
 	return m.level != LevelOff && level <= m.level
 }
@@ -149,12 +153,14 @@ func (m *Memory) SetGame(gameID string) {
 	m.game = gameID
 }
 
+// Events returns everything recorded so far, oldest first.
 func (m *Memory) Events() []Event {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return append([]Event(nil), m.events...)
 }
 
+// Names lists the recorded event names in order, including repeats.
 func (m *Memory) Names() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -165,6 +171,7 @@ func (m *Memory) Names() []string {
 	return names
 }
 
+// Find returns the first event with this name.
 func (m *Memory) Find(name string) (Event, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
