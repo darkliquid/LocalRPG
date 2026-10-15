@@ -1,3 +1,4 @@
+import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient, WorldExistsError } from '../api/client';
 import {
@@ -64,6 +65,7 @@ function typeFromMarkdown(markdown: string): string {
 }
 
 export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startMode = 'browse' }) => {
+  const { report } = useFailures();
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [selection, setSelection] = useState<WorldSelection>(null);
@@ -518,10 +520,20 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       }
 
       if (bannerFile) {
-        await APIClient.uploadWorldAsset(saved.id, 'banner', bannerFile).catch(console.error);
+        await APIClient.uploadWorldAsset(saved.id, 'banner', bannerFile).catch((err) =>
+          report({
+            text: 'The world was saved, but its banner could not be uploaded.',
+            detail: err instanceof Error ? err.message : String(err),
+          }),
+        );
       }
       if (iconFile) {
-        await APIClient.uploadWorldAsset(saved.id, 'icon', iconFile).catch(console.error);
+        await APIClient.uploadWorldAsset(saved.id, 'icon', iconFile).catch((err) =>
+          report({
+            text: 'The world was saved, but its icon could not be uploaded.',
+            detail: err instanceof Error ? err.message : String(err),
+          }),
+        );
       }
 
       setToast({ type: 'success', message: `World "${saved.name}" saved successfully!` });
