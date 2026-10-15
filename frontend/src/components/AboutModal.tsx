@@ -1,6 +1,7 @@
 import React from 'react';
 import { BookOpen, Bug, Github, Sparkles, X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { PROJECT_ISSUES_URL, PROJECT_NAME, PROJECT_REPO_URL, PROJECT_TAGLINE, openExternal } from '../lib/project';
 
 interface AboutModalProps {
@@ -18,11 +19,17 @@ const HIGHLIGHTS = [
 
 export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, onOpenDocs, version }) => {
   const { mounted, state } = useMountTransition(isOpen, 200);
+  // Its own layout, so it takes the behaviour rather than the shell: focus in,
+  // Tab trapped, Escape closes, focus returned to the button that opened it.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(isOpen, onClose);
 
   if (!mounted) return null;
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       data-state={state}
       className={`fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
