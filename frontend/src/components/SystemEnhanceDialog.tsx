@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { Check, Lightbulb, Sparkles, TriangleAlert, X } from 'lucide-react';
 import { APIClient } from '../api/client';
 import { SystemEnhanceApplyResult, SystemProposal } from '../types';
@@ -55,6 +56,10 @@ export const SystemEnhanceDialog: React.FC<SystemEnhanceDialogProps> = ({
   const [applied, setApplied] = useState<string[] | null>(null);
   const [oracle, setOracle] = useState(false);
 
+  // Its own header and layout, so it takes the dialog behaviour: it declares
+  // itself, moves focus in and returns it, holds Tab, and gains Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
+
   const accepted = proposals.filter((proposal, index) => proposal.valid !== false && !rejected.has(index));
 
   const toggle = (index: number) => {
@@ -101,7 +106,15 @@ export const SystemEnhanceDialog: React.FC<SystemEnhanceDialogProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Enhance this system"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+    >
       <div className="relative w-full max-w-2xl overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
