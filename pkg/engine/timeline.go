@@ -493,6 +493,27 @@ func (t *Timeline) resolveExtractedEntity(raw harness.ExtractedEntity) (*entity.
 	}, ""
 }
 
+// writeNoteAtomic writes a note whole or not at all. os.WriteFile truncates
+// before it writes, and a reader (the index sync that follows a write, a portrait
+// update, the GUI) can catch the file while it is empty, which parses as a note
+// with no frontmatter. A temporary file in the same directory and a rename means a
+// reader sees the previous note or the new one, never a half-written file.
+func writeNoteAtomic(path string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".note-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
+}
+
 func (t *Timeline) writeEntities(pending map[string]*entity.Entity) error {
 	dir := t.EntitiesDir()
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -515,7 +536,7 @@ func (t *Timeline) writeEntities(pending map[string]*entity.Entity) error {
 		if err != nil {
 			return fmt.Errorf("serialize entity %q: %w", id, err)
 		}
-		if err := os.WriteFile(path, data, 0644); err != nil {
+		if err := writeNoteAtomic(path, data); err != nil {
 			return fmt.Errorf("write entity %q: %w", id, err)
 		}
 		// Index just this file. Syncing the whole directory re-parsed every
