@@ -87,40 +87,24 @@ example: the systems, the selection, the draft, and the four callbacks that chan
 the form values it edits and the setter for each, which is verbose and is the point: the compiler then
 says exactly what a tab depends on, and a test can render one tab without the other four.
 
-Form state is the case that decides the shape. The container holds twenty-odd `useState` values that
-belong to one form, and passing twenty pairs to a tab is unreadable. So each form view takes its values
-in one object **of its own fields**, not the container's state object:
+### What the implementations decided
 
-```tsx
-export interface ManifestFormValues {
-  name: string;
-  slugID: string;
-  version: string;
-  description: string;
-  rulesPrompt: string;
-  script: string;
-  mechanics: MechanicsSpec;
-  creationPreamble: string;
-  creationFields: CharacterCreationField[];
-}
+Each view takes its values and their setters **by name**, not as one object with a keyed setter. The
+spec first proposed the keyed setter, and the extraction showed why it loses: the form regions call
+their setters about thirty times, so an object would rewrite every one of those call sites, and a move
+that stops being verbatim cannot be checked by reading it. Six value props and six setter props name
+exactly what a form view depends on, which is what the focused-props rule is for.
 
-export interface SystemManifestTabProps {
-  values: ManifestFormValues;
-  onChange: <K extends keyof ManifestFormValues>(key: K, value: ManifestFormValues[K]) => void;
-  ...
-}
-```
+Two regions were not in the first cut of the plan and are views in their own right: `SystemReport.tsx`
+(the toast, the verification result, the scenario failures and the generation notes) and
+`WorldReport.tsx` (the toast alone). Both are what the last action left behind, and both are siblings
+of the header rather than children of it, so folding them into the header would have moved them in the
+DOM.
 
-That means the container gains one `changeManifestField` helper, which is the only new logic this
-change adds, and it is a switch over a key rather than a behaviour change.
-
-Hmm. Twenty setters turned into one keyed setter is a change in how the container works. It is worth
-it for readability, but it is not a verbatim move, so the spec records it as the one deviation: the
-helper is mechanical (a `switch` returning the same setters), and every call site passes the same key
-it used before.
-
-The alternative, twenty individual props, keeps the container untouched and makes each tab's signature
-unreadable. The keyed setter is chosen, and this paragraph is the reason.
+One hazard the extraction hit twice: a tab's own wrapper element can sit on the line *before* the
+region the line numbers name, so a move can leave the wrapper in the container and take its closing
+tag. `tsc` and prettier both catch it immediately, which is why every extraction ran them before
+anything was committed.
 
 ### Verification
 

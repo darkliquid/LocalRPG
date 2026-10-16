@@ -41,36 +41,36 @@
 
 ## Task 1: The safety net
 
-- [ ] `SystemsStudio.test.tsx`: a smoke test that mocks the studio's APIs, renders it, and opens each
+- [x] `SystemsStudio.test.tsx`: a smoke test that mocks the studio's APIs, renders it, and opens each
       of the five tabs in turn asserting a landmark of each (the name field, the rules editor, the
       mechanics editor, the script editor, the scenarios panel).
-- [ ] `WorldsStudio.test.tsx`: the same for its three tabs (the lore form, the lore prompt editor, the
+- [x] `WorldsStudio.test.tsx`: the same for its three tabs (the lore form, the lore prompt editor, the
       starter entity list).
-- [ ] Confirm both pass against the studios as they are, before anything moves.
+- [x] Confirm both pass against the studios as they are, before anything moves.
 
 ## Task 2: The systems list and header
 
-- [ ] `SystemList.tsx`: the master column, taking the systems, the selection, the draft and the four
+- [x] `SystemList.tsx`: the master column, taking the systems, the selection, the draft and the four
       callbacks that change them.
-- [ ] `SystemHeader.tsx`: the title, the sub-tabs, the action buttons and the toast.
-- [ ] The container renders both; the smoke test still passes.
+- [x] `SystemHeader.tsx`: the title, the sub-tabs, the action buttons and the toast.
+- [x] The container renders both; the smoke test still passes.
 
 ## Task 3: The systems tabs
 
-- [ ] `SystemManifestTab.tsx`: tab 1, taking its form values in one object and a keyed setter.
-- [ ] `SystemRulesTab.tsx`, `SystemMechanicsTab.tsx`, `SystemScriptTab.tsx`, `SystemTestsTab.tsx`.
-- [ ] The container renders the one the active tab selects, as it does today.
+- [x] `SystemManifestTab.tsx`: tab 1, taking its form values in one object and a keyed setter.
+- [x] `SystemRulesTab.tsx`, `SystemMechanicsTab.tsx`, `SystemScriptTab.tsx`, `SystemTestsTab.tsx`.
+- [x] The container renders the one the active tab selects, as it does today.
 
 ## Task 4: The worlds views
 
-- [ ] `WorldList.tsx`, `WorldHeader.tsx`.
-- [ ] `WorldLoreTab.tsx` (with the banner and icon block), `WorldPromptTab.tsx`, `WorldEntitiesTab.tsx`.
-- [ ] The smoke test still passes.
+- [x] `WorldList.tsx`, `WorldHeader.tsx`.
+- [x] `WorldLoreTab.tsx` (with the banner and icon block), `WorldPromptTab.tsx`, `WorldEntitiesTab.tsx`.
+- [x] The smoke test still passes.
 
 ## Task 5: Gates and the record
 
-- [ ] Measure the two containers and record what each is now.
-- [ ] `AGENTS.md`: where a studio's views live and what a view may take.
-- [ ] `npx prettier --write`, `npx tsc --noEmit`, `npx eslint src`, `npm run build`.
-- [ ] `npx vitest run --coverage` against the floors, `mise run test`, `mise run lint`.
-- [ ] Open the pull request, wait for CI, close the bead with the evidence.
+- [x] Measure the two containers and record what each is now.
+- [x] `AGENTS.md`: where a studio's views live and what a view may take.
+- [x] `npx prettier --write`, `npx tsc --noEmit`, `npx eslint src`, `npm run build`.
+- [x] `npx vitest run --coverage` against the floors, `mise run test`, `mise run lint`.
+- [x] Open the pull request, wait for CI, close the bead with the evidence.
