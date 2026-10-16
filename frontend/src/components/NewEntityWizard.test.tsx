@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { NewEntityWizard } from './NewEntityWizard';
+import { expectNoViolations } from '../test/a11y';
 import { APIClient } from '../api/client';
 import { EntityTypeCatalog, TTSConfig } from '../types';
 
@@ -29,7 +30,7 @@ describe('NewEntityWizard', () => {
     vi.spyOn(APIClient.prototype, 'getEntityTypes').mockResolvedValue(catalog);
     const onClose = vi.fn();
 
-    render(
+    const { container } = render(
       <NewEntityWizard
         isOpen
         existingIds={[]}
@@ -47,5 +48,6 @@ describe('NewEntityWizard', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    await expectNoViolations(container);
   });
 });

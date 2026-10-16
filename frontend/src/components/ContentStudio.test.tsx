@@ -1,16 +1,17 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import ContentStudio from './ContentStudio';
+import { expectNoViolations } from '../test/a11y';
 
 // The editor is CodeMirror, which needs a real layout to mount; the studio's
 // dialog behaviour does not depend on it, so it is replaced with a stub.
 vi.mock('./editor/MarkdownEditor', () => ({ default: () => <div data-testid="editor" /> }));
 
 describe('ContentStudio', () => {
-  it('is a dialog named Content Studio and closes on Escape', () => {
+  it('is a dialog named Content Studio and closes on Escape', async () => {
     const onClose = vi.fn();
 
-    render(<ContentStudio isOpen onClose={onClose} gameID="" />);
+    const { container } = render(<ContentStudio isOpen onClose={onClose} gameID="" />);
 
     const dialog = screen.getByRole('dialog', { name: 'Content Studio' });
     expect(dialog.contains(document.activeElement)).toBe(true);
@@ -18,6 +19,7 @@ describe('ContentStudio', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    await expectNoViolations(container);
   });
 
   it('renders nothing while closed', () => {

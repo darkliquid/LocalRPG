@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ExportModal } from './ExportModal';
+import { expectNoViolations } from '../test/a11y';
 
 // This surface does touch the client on mount — it asks what export formats are
 // available and subscribes to the job's event stream — so both are mocked. The
@@ -21,9 +22,10 @@ function renderModal(overrides: { onClose?: () => void } = {}) {
 }
 
 describe('ExportModal', () => {
-  it('is a dialog named by its title', () => {
-    renderModal();
+  it('is a dialog named by its title', async () => {
+    const { container } = renderModal();
     expect(screen.getByRole('dialog')).toHaveAccessibleName('Export Story Replay');
+    await expectNoViolations(container);
   });
 
   it('takes focus into the dialog', () => {

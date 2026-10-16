@@ -1,10 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ContentImportDialog } from './ContentImportDialog';
+import { expectNoViolations } from '../test/a11y';
 
 describe('ContentImportDialog', () => {
-  it('import shows the manifest and a mechanics.js warning', () => {
-    render(
+  it('import shows the manifest and a mechanics.js warning', async () => {
+    const { container } = render(
       <ContentImportDialog
         manifest={{ id: 'x', name: 'X', version: '1', has_script: true }}
         onConfirm={vi.fn()}
@@ -12,6 +13,7 @@ describe('ContentImportDialog', () => {
       />,
     );
     expect(screen.getByText(/mechanics\.js/)).toBeInTheDocument();
+    await expectNoViolations(container);
   });
 
   it('renders verified provenance chip when trust is verified', () => {

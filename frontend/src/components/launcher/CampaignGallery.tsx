@@ -39,19 +39,16 @@ const CampaignCard: React.FC<{
   onOpenSettings: () => void;
 }> = ({ game, worldName, systemName, onPlay, onOpenSettings }) => {
   return (
-    <div
-      onClick={onPlay}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onPlay();
-        }
-      }}
-      className="group relative flex flex-col text-left rounded-3xl overflow-hidden border border-white/10 hover:border-purple-400/70 bg-stone-900/60 hover:bg-stone-900 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
-      aria-label={`Play campaign ${game.name}`}
-    >
+    <div className="group relative flex flex-col text-left rounded-3xl overflow-hidden border border-white/10 hover:border-purple-400/70 bg-stone-900/60 hover:bg-stone-900 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+      {/* The card's click target is a real button covering it, rather than a
+          role=button wrapper: the settings button sits inside the card, and a
+          control cannot be nested in another control. */}
+      <button
+        type="button"
+        onClick={onPlay}
+        className="absolute inset-0 cursor-pointer"
+        aria-label={`Play campaign ${game.name}`}
+      />
       {/* Banner */}
       <div className="relative h-44 w-full overflow-hidden shrink-0">
         {game.banner_url ? (
@@ -261,8 +258,11 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs text-stone-400 font-sans">Sort by:</span>
+          <label htmlFor="campaign-sort" className="text-xs text-stone-400 font-sans">
+            Sort by:
+          </label>
           <select
+            id="campaign-sort"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
             className="bg-stone-900 border border-white/15 rounded-xl px-3 py-1.5 text-xs text-stone-200 outline-none focus:border-purple-500 cursor-pointer"

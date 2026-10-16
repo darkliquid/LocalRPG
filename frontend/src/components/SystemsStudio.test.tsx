@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { SystemsStudio } from './SystemsStudio';
 import { APIClient } from '../api/client';
+import { expectNoViolations } from '../test/a11y';
 
 function mockStudio() {
   vi.spyOn(APIClient, 'listSystems').mockResolvedValue([
@@ -20,7 +21,7 @@ afterEach(() => {
 describe('SystemsStudio dialogs', () => {
   it('confirms a system delete in a dialog that Escape cancels', async () => {
     mockStudio();
-    render(<SystemsStudio />);
+    const { container } = render(<SystemsStudio />);
 
     fireEvent.click(await screen.findByTitle('Delete system "OSRIC"'));
 
@@ -29,6 +30,7 @@ describe('SystemsStudio dialogs', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /delete system/i })).not.toBeInTheDocument());
     expect(APIClient.deleteSystem).not.toHaveBeenCalled();
+    await expectNoViolations(container);
   });
 
   it('opens the base system catalogue as a dialog', async () => {

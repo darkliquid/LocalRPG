@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { SystemEnhanceDialog } from './SystemEnhanceDialog';
+import { expectNoViolations } from '../test/a11y';
 import { APIClient } from '../api/client';
 import { SystemProposal } from '../types';
 
@@ -17,7 +18,7 @@ describe('SystemEnhanceDialog', () => {
   it('accepts and rejects proposals', async () => {
     const apply = vi.spyOn(APIClient, 'applySystemEnhancements').mockResolvedValue({ written: ['mechanics'] });
 
-    render(<SystemEnhanceDialog systemId="s" onClose={() => {}} proposals={proposals} />);
+    const { container } = render(<SystemEnhanceDialog systemId="s" onClose={() => {}} proposals={proposals} />);
 
     expect(screen.getByText(/2 of 2 accepted/i)).toBeInTheDocument();
     expect(screen.getByText(/why: adds a mental track/i)).toBeInTheDocument();
@@ -29,6 +30,7 @@ describe('SystemEnhanceDialog', () => {
 
     await waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
     expect(apply.mock.calls[0][1].proposals).toEqual([proposals[0]]);
+    await expectNoViolations(container);
   });
 
   it('disables apply when everything is rejected', () => {

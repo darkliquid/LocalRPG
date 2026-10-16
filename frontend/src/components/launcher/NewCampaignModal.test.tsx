@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { NewCampaignModal } from './NewCampaignModal';
+import { expectNoViolations } from '../../test/a11y';
 import { APIClient } from '../../api/client';
 import type { SystemDetail, WorldInfo } from '../../types';
 
@@ -43,7 +44,7 @@ describe('NewCampaignModal authored creation prompts', () => {
     mockModal();
     const onCreateGame = vi.fn().mockResolvedValue(undefined);
 
-    render(
+    const { container } = render(
       <NewCampaignModal
         isOpen
         world={world}
@@ -67,5 +68,6 @@ describe('NewCampaignModal authored creation prompts', () => {
 
     await waitFor(() => expect(onCreateGame).toHaveBeenCalledTimes(1));
     expect(onCreateGame.mock.calls[0][0].player.extra).toEqual({ calling: 'sellsword' });
+    await expectNoViolations(container);
   });
 });

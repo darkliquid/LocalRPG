@@ -585,6 +585,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               onChange={handleFileSelect}
               accept=".lrpgsystem,.lrpgpack"
               className="hidden"
+              aria-label="Choose a system package to import"
             />
             <button
               onClick={() => setShowGenerateDialog(true)}

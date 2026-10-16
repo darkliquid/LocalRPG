@@ -57,6 +57,7 @@ export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
           <button
             onClick={onCancel}
             disabled={loading}
+            aria-label="Close"
             className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
           >
             <X className="w-5 h-5" />

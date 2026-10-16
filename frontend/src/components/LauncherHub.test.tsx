@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { LauncherHub } from './LauncherHub';
 import { APIClient } from '../api/client';
+import { expectNoViolations } from '../test/a11y';
 
 // The studio the settings dialog contains reads the whole configuration on
 // mount; the dialog's own behaviour does not depend on it, so it is stubbed.
@@ -17,7 +18,7 @@ describe('LauncherHub', () => {
     vi.spyOn(APIClient, 'listSystems').mockResolvedValue([]);
     vi.spyOn(APIClient, 'listWorlds').mockResolvedValue([]);
 
-    render(<LauncherHub onSelectGame={vi.fn()} onOpenDocs={vi.fn()} />);
+    const { container } = render(<LauncherHub onSelectGame={vi.fn()} onOpenDocs={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
 
@@ -27,5 +28,6 @@ describe('LauncherHub', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Global Settings' })).not.toBeInTheDocument());
+    await expectNoViolations(container);
   });
 });
