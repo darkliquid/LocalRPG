@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import React, { useState } from 'react';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
@@ -20,13 +21,27 @@ const sizeClasses: Record<'md' | 'lg' | 'xl' | 'full', string> = {
 export const Drawers: React.FC<DrawersProps> = ({ isOpen, onClose, title, children, size = 'md' }) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const { mounted, state } = useMountTransition(isOpen, 300);
+  // The drawer's own slide-in panel and split dim layer, so it takes the dialog
+  // behaviour rather than the shell: it declares itself, moves focus in and
+  // returns it, holds Tab, and closes on Escape. Every drawer in the app renders
+  // through this one, so they all gain it together.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(isOpen, onClose);
 
   if (!mounted) return null;
 
   const currentSizeClass = isMaximized ? 'w-full max-w-full' : `w-full ${sizeClasses[size]}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" style={{ '--anim-dur': '300ms' } as React.CSSProperties}>
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className="fixed inset-0 z-50 flex justify-end"
+      style={{ '--anim-dur': '300ms' } as React.CSSProperties}
+    >
       {/* The dim layer fades on its own. Keeping the fade off the element that
           wraps the blurred panel stops the panel's backdrop-filter from being
           recomposited every frame, which is what made the transition flicker. */}
