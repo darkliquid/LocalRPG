@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, FolderOpen, Globe, PackagePlus, Pencil, RefreshCw, X } from 'lucide-react';
 import { APIClient, HTTPError } from '../api/client';
@@ -57,6 +58,10 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
   const [limitCode, setLimitCode] = useState<string | null>(null);
   // Progress through a source import, so a long read says what it is doing.
   const [progress, setProgress] = useState<WorldImportProgress | null>(null);
+  // Its own header, so it takes the dialog behaviour rather than the shell: it
+  // declares itself, moves focus in and returns it, holds Tab, and closes on
+  // Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
   const abortRef = useRef<AbortController | null>(null);
 
   const urlList = useMemo(
@@ -170,7 +175,15 @@ export const EntityBatchDialog: React.FC<EntityBatchDialogProps> = ({
   const limitSuffix = pendingLimit ? ` (limit ${pendingLimit})` : '';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Add entities to this world"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+    >
       <div className="relative w-full max-w-2xl overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
