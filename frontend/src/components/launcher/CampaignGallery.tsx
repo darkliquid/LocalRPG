@@ -3,6 +3,7 @@ import { GameSummary, SystemInfo, WorldInfo } from '../../types';
 import { ProceduralBanner, ProceduralIcon } from './ProceduralAsset';
 import { Search, Plus, X, Settings, Play, LayoutGrid } from 'lucide-react';
 import { useMountTransition } from '../../hooks/useMountTransition';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 export interface CampaignGalleryProps {
   isOpen: boolean;
@@ -138,22 +139,16 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('recent');
 
+  // The gallery covers the launcher, so Escape belongs to it rather than to a
+  // window listener that fires while it is closed.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(isOpen, onClose);
+
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery('');
       setSortBy('recent');
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   const worldMap = useMemo(() => {
     return new Map(worlds.map((w) => [w.id, w.name]));
@@ -200,6 +195,12 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
 
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Campaigns"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       data-state={state}
       className={`fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-xl ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
