@@ -12,6 +12,7 @@ const game: GameSummary = {
   player_name: 'Andrew',
   turn_count: 3,
   last_played: '2026-10-15T10:00:00Z',
+  thumbnail_url: '',
 };
 
 describe('CampaignGallery', () => {

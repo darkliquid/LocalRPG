@@ -13,6 +13,7 @@ const systemDetail: SystemDetail = {
   version: '1.0.0',
   description: '',
   script: '',
+  rules_prompt: '',
   character_creation: {
     preamble: 'Answer in the chronicle tone.',
     fields: [
