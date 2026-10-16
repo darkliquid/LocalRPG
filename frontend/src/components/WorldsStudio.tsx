@@ -16,7 +16,7 @@ import {
   DraftCommitRequest,
   WorldDraftInfo,
 } from '../types';
-import { Save, Check, AlertCircle, Trash2, Tag, Palette, Upload, Sparkles } from 'lucide-react';
+import { AlertCircle, Palette, Sparkles, Tag, Trash2, Upload } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { useLightbox } from '../hooks/useLightbox';
@@ -35,6 +35,7 @@ import { WorldDraftReview } from './WorldDraftReview';
 import { Modal } from './Modal';
 import { WorldList } from './studios/world/WorldList';
 import { WorldHeader } from './studios/world/WorldHeader';
+import { WorldReport } from './studios/world/WorldReport';
 import { EntityBatchDialog } from './EntityBatchDialog';
 import { WorldEnhanceDialog } from './WorldEnhanceDialog';
 
@@ -727,23 +728,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
         />
 
         {/* Toast Feedback */}
-        {toast && (
-          <div
-            className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
-              toast.type === 'success'
-                ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-200'
-                : 'bg-red-950/60 border border-red-500/40 text-red-200'
-            }`}
-          >
-            {toast.type === 'success' ? (
-              <Check className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-red-400" />
-            )}
-            <span>{toast.message}</span>
-          </div>
-        )}
-
+        <WorldReport toast={toast} />
         {/* Tab 1: Lore & Atmosphere Form */}
         {activeTab === 'lore' && (
           <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-2">
