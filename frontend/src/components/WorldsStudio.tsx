@@ -16,15 +16,13 @@ import {
   DraftCommitRequest,
   WorldDraftInfo,
 } from '../types';
-import { AlertCircle, Palette, Save, Sparkles, Tag, Trash2, Upload } from 'lucide-react';
+import { AlertCircle, Palette, Sparkles, Tag, Trash2, Upload } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { useLightbox } from '../hooks/useLightbox';
 import { ImageLightbox } from './ImageLightbox';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
-import EntityTree from './EntityTree';
-import MarkdownEditor from './editor/MarkdownEditor';
 import { NewEntityWizard } from './NewEntityWizard';
 import { safeImagePreview } from '../utils/security';
 import { ContentImportDialog } from './ContentImportDialog';
@@ -36,6 +34,8 @@ import { Modal } from './Modal';
 import { WorldList } from './studios/world/WorldList';
 import { WorldHeader } from './studios/world/WorldHeader';
 import { WorldReport } from './studios/world/WorldReport';
+import { WorldPromptTab } from './studios/world/WorldPromptTab';
+import { WorldEntitiesTab } from './studios/world/WorldEntitiesTab';
 import { EntityBatchDialog } from './EntityBatchDialog';
 import { WorldEnhanceDialog } from './WorldEnhanceDialog';
 
@@ -1087,150 +1087,37 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
         {/* Tab 2: Agent Lore Prompt Editor */}
         {activeTab === 'prompt' && (
-          <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-              <span>AI Storyteller Atmosphere Instructions (prompts/lore.md)</span>
-              <div className="flex items-center gap-2">
-                <span>Injected into LLM context to guide sensory tone &amp; faction conflicts</span>
-                <AIGenerateButton
-                  formType="world"
-                  fieldName="lore_prompt"
-                  onError={reportGenerationError}
-                  getContext={getWorldContext}
-                  onGenerated={(val) => {
-                    setLorePrompt(val);
-                    markDirty();
-                  }}
-                  systemID={defaultSystem}
-                  seed={lorePrompt}
-                />
-              </div>
-            </div>
-            <MarkdownEditor
-              key={`${savedID || slugID || 'draft'}-lore`}
-              value={lorePrompt}
-              onChange={(next) => {
-                setLorePrompt(next);
-                markDirty();
-              }}
-              language="markdown"
-              ariaLabel="World lore prompt"
-              placeholder="Describe the sensory tone, factions and conflicts the storyteller should hold in mind..."
-            />
-          </div>
+          <WorldPromptTab
+            lorePrompt={lorePrompt}
+            setLorePrompt={setLorePrompt}
+            defaultSystem={defaultSystem}
+            markDirty={markDirty}
+            slugID={slugID}
+            savedID={savedID}
+            reportGenerationError={reportGenerationError}
+            getWorldContext={getWorldContext}
+          />
         )}
 
         {/* Tab 3: Starter Entities Manager */}
         {activeTab === 'entities' && (
-          <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
-            {/* Entity List */}
-            <div className="w-64 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2 min-h-0 h-full">
-              <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
-                <span className="text-xs font-sans uppercase tracking-wider text-stone-400">Templates</span>
-                <button
-                  type="button"
-                  onClick={() => setIsNewEntityModal(true)}
-                  className="text-xs font-sans font-bold px-2 py-0.5 rounded bg-purple-600 text-white cursor-pointer hover:bg-purple-500"
-                >
-                  + Add
-                </button>
-              </div>
-
-              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                {entities.length === 0 ? (
-                  <div className="text-xs text-stone-500 py-6 text-center">
-                    No starter templates. Click + Add to create one!
-                  </div>
-                ) : (
-                  <EntityTree
-                    folders={worldFolders}
-                    entities={entities}
-                    selectedId={selectedEntityID ?? undefined}
-                    onSelect={(id) => void handleSelectEntity(id)}
-                    onMoveEntity={async (id, folder) => {
-                      if (!savedID) {
-                        setToast({ type: 'error', message: 'Save the world before organising its templates.' });
-                        return;
-                      }
-                      const note = await APIClient.getWorldEntity(savedID, id);
-                      await APIClient.saveWorldEntity(savedID, id, note.markdown, folder);
-                      await loadWorldDetail(savedID);
-                      await refreshWorldFolders();
-                    }}
-                    onMoveFolder={async (from, to) => {
-                      if (!savedID) return;
-                      await APIClient.moveWorldFolder(savedID, from, to);
-                      await refreshWorldFolders();
-                    }}
-                    onCreateFolder={async (path) => {
-                      if (!savedID) {
-                        setToast({ type: 'error', message: 'Save the world before creating folders.' });
-                        return;
-                      }
-                      await APIClient.createWorldFolder(savedID, path);
-                      await refreshWorldFolders();
-                    }}
-                    onDeleteFolder={async (path) => {
-                      if (!savedID) return;
-                      await APIClient.deleteWorldFolder(savedID, path, true);
-                      await refreshWorldFolders();
-                    }}
-                    onDeleteEntity={(id) => void handleDeleteEntity(id)}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Entity Markdown Editor */}
-            <div className="flex-1 min-w-0 flex flex-col gap-2 min-h-0 overflow-hidden">
-              {selectedEntityID ? (
-                <>
-                  <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-                    <span>
-                      worlds/{savedID || slugID || 'draft'}/entities/
-                      {entities.find((e) => e.id === selectedEntityID)?.folder
-                        ? `${entities.find((e) => e.id === selectedEntityID)?.folder}/`
-                        : ''}
-                      {selectedEntityID}.md
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteEntity(selectedEntityID)}
-                        title="Delete entity template"
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-950/40 font-bold text-xs cursor-pointer transition-all"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Delete</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSaveEntity}
-                        className="flex items-center gap-1 px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer shadow transition-all"
-                      >
-                        <Save className="w-3 h-3" />
-                        <span>{savedID ? 'Save Entity' : 'Update Draft'}</span>
-                      </button>
-                    </div>
-                  </div>
-                  <MarkdownEditor
-                    key={`${savedID || slugID || 'draft'}-${selectedEntityID}`}
-                    value={entityMarkdown}
-                    onChange={(next) => {
-                      setEntityMarkdown(next);
-                      markDirty();
-                    }}
-                    language="markdown-frontmatter"
-                    ariaLabel="World entity template markdown"
-                  />
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-xs text-stone-500 font-mono">
-                  Select or create an entity template to edit its Markdown.
-                </div>
-              )}
-            </div>
-          </div>
+          <WorldEntitiesTab
+            entities={entities}
+            entityMarkdown={entityMarkdown}
+            setEntityMarkdown={setEntityMarkdown}
+            selectedEntityID={selectedEntityID}
+            worldFolders={worldFolders}
+            savedID={savedID}
+            slugID={slugID}
+            setIsNewEntityModal={setIsNewEntityModal}
+            markDirty={markDirty}
+            handleSelectEntity={handleSelectEntity}
+            handleSaveEntity={handleSaveEntity}
+            handleDeleteEntity={handleDeleteEntity}
+            refreshWorldFolders={refreshWorldFolders}
+            loadWorldDetail={loadWorldDetail}
+            setToast={setToast}
+          />
         )}
       </section>
 
