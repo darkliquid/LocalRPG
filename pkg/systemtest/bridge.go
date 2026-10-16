@@ -150,8 +150,13 @@ func (b *Bridge) SaveEntity(*entity.Entity) error { return nil }
 // InjectGMDirection records a directive a scenario may inspect.
 func (b *Bridge) InjectGMDirection(directive string) { b.directives = append(b.directives, directive) }
 
-// GetDirectives returns every injected directive.
-func (b *Bridge) GetDirectives() []string { return b.directives }
+// DrainDirectives returns the injected directives and clears them, so a scenario
+// reads the same once-per-turn behaviour the campaign bridge has.
+func (b *Bridge) DrainDirectives() []string {
+	injected := b.directives
+	b.directives = make([]string, 0)
+	return injected
+}
 
 // Log records a script log line.
 func (b *Bridge) Log(message string) { b.logs = append(b.logs, message) }

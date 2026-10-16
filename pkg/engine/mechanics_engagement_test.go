@@ -132,6 +132,26 @@ func TestWorldTickHookInjectsDirective(t *testing.T) {
 	}
 }
 
+// TestAHookDirectiveIsDrainedOnce is the regression test for a direction that was
+// applied to the turn that asked for it and to every turn after it: the bridge used
+// to hand the same accumulated list to every drain.
+func TestAHookDirectiveIsDrainedOnce(t *testing.T) {
+	o, jsEngine := engagementOrchestrator(t)
+	if err := jsEngine.LoadScript(`onWorldTick(function (ctx) { injectGMDirection("The tide turns."); });`); err != nil {
+		t.Fatalf("load script: %v", err)
+	}
+	o.SetWorldTickTurns(1)
+
+	o.runWorldTick(1, "tavern")
+	if directives := o.drainDirectives(); len(directives) != 1 {
+		t.Fatalf("first drain = %v, want the directive once", directives)
+	}
+
+	if directives := o.drainDirectives(); len(directives) != 0 {
+		t.Fatalf("second drain = %v, want nothing: a directive belongs to one turn", directives)
+	}
+}
+
 func TestHealthOutcomesIncludeADownedAlly(t *testing.T) {
 	o, jsEngine := engagementOrchestrator(t)
 	if err := jsEngine.HostAPI().SetStat("player", "hp", 5); err != nil {
