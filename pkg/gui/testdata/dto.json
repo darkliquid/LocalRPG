@@ -1,0 +1,4167 @@
+{
+  "types": {
+    "AddressedFinding": {
+      "fields": [
+        {
+          "json": "turn",
+          "go": "Turn",
+          "optional": false
+        },
+        {
+          "json": "rule",
+          "go": "Rule",
+          "optional": false
+        }
+      ]
+    },
+    "AdvancementDTO": {
+      "fields": [
+        {
+          "json": "currency",
+          "go": "Currency",
+          "optional": false
+        },
+        {
+          "json": "label",
+          "go": "Label",
+          "optional": true
+        },
+        {
+          "json": "value",
+          "go": "Value",
+          "optional": false
+        },
+        {
+          "json": "mode",
+          "go": "Mode",
+          "optional": true
+        },
+        {
+          "json": "track",
+          "go": "Track",
+          "optional": true
+        },
+        {
+          "json": "unlocks",
+          "go": "Unlocks",
+          "optional": true
+        },
+        {
+          "json": "pending",
+          "go": "Pending",
+          "optional": false
+        }
+      ]
+    },
+    "AudioProgressDTO": {
+      "fields": [
+        {
+          "json": "turn_number",
+          "go": "TurnNumber",
+          "optional": false
+        },
+        {
+          "json": "sequence",
+          "go": "Sequence",
+          "optional": false
+        },
+        {
+          "json": "total_segments",
+          "go": "TotalSegments",
+          "optional": false
+        },
+        {
+          "json": "stage",
+          "go": "Stage",
+          "optional": false
+        },
+        {
+          "json": "ready_count",
+          "go": "ReadyCount",
+          "optional": false
+        },
+        {
+          "json": "failed_count",
+          "go": "FailedCount",
+          "optional": true
+        },
+        {
+          "json": "audio_key",
+          "go": "AudioKey",
+          "optional": true
+        },
+        {
+          "json": "audio_url",
+          "go": "AudioURL",
+          "optional": true
+        },
+        {
+          "json": "owner",
+          "go": "Owner",
+          "optional": true
+        }
+      ]
+    },
+    "AudioStatusDTO": {
+      "fields": [
+        {
+          "json": "available",
+          "go": "Available",
+          "optional": false
+        },
+        {
+          "json": "playing",
+          "go": "Playing",
+          "optional": false
+        },
+        {
+          "json": "turn",
+          "go": "Turn",
+          "optional": false
+        },
+        {
+          "json": "segment",
+          "go": "Segment",
+          "optional": false
+        },
+        {
+          "json": "owner",
+          "go": "Owner",
+          "optional": true
+        },
+        {
+          "json": "error",
+          "go": "Error",
+          "optional": true
+        },
+        {
+          "json": "stage",
+          "go": "Stage",
+          "optional": true
+        }
+      ]
+    },
+    "CampaignUsageDTO": {
+      "fields": [
+        {
+          "json": "game_id",
+          "go": "GameID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": true
+        },
+        {
+          "json": "total_cost_micros",
+          "go": "TotalCost",
+          "optional": false
+        }
+      ]
+    },
+    "CharacterPortraitDTO": {
+      "fields": [
+        {
+          "json": "portrait_url",
+          "go": "PortraitURL",
+          "optional": false
+        },
+        {
+          "json": "generated_at",
+          "go": "GeneratedAt",
+          "optional": false
+        }
+      ]
+    },
+    "ChooseDirectoryRequestDTO": {
+      "fields": [
+        {
+          "json": "title",
+          "go": "Title",
+          "optional": true
+        },
+        {
+          "json": "default_dir",
+          "go": "DefaultDir",
+          "optional": true
+        }
+      ]
+    },
+    "ChooseSaveFileRequestDTO": {
+      "fields": [
+        {
+          "json": "title",
+          "go": "Title",
+          "optional": true
+        },
+        {
+          "json": "default_dir",
+          "go": "DefaultDir",
+          "optional": true
+        },
+        {
+          "json": "default_filename",
+          "go": "DefaultFilename",
+          "optional": true
+        },
+        {
+          "json": "filters",
+          "go": "Filters",
+          "optional": true
+        }
+      ]
+    },
+    "ClipGroupDTO": {
+      "fields": [
+        {
+          "json": "key",
+          "go": "Key",
+          "optional": false
+        },
+        {
+          "json": "audio_urls",
+          "go": "AudioURLs",
+          "optional": false
+        },
+        {
+          "json": "segment_indexes",
+          "go": "SegmentIndexes",
+          "optional": false
+        }
+      ]
+    },
+    "CountsDTO": {
+      "fields": [
+        {
+          "json": "locations",
+          "go": "Locations",
+          "optional": true
+        },
+        {
+          "json": "factions",
+          "go": "Factions",
+          "optional": true
+        },
+        {
+          "json": "characters",
+          "go": "Characters",
+          "optional": true
+        }
+      ]
+    },
+    "CreateGameRequestDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": true
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "system_id",
+          "go": "SystemID",
+          "optional": false
+        },
+        {
+          "json": "world_id",
+          "go": "WorldID",
+          "optional": false
+        },
+        {
+          "json": "player_name",
+          "go": "PlayerName",
+          "optional": false
+        },
+        {
+          "json": "player",
+          "go": "Player",
+          "optional": true
+        },
+        {
+          "json": "opening_prompt",
+          "go": "OpeningPrompt",
+          "optional": true
+        },
+        {
+          "json": "narrator_voice",
+          "go": "NarratorVoice",
+          "optional": true
+        },
+        {
+          "json": "start_location",
+          "go": "StartLocation",
+          "optional": true
+        }
+      ]
+    },
+    "CreateSystemRequestDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": true
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "version",
+          "go": "Version",
+          "optional": true
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": true
+        },
+        {
+          "json": "script",
+          "go": "Script",
+          "optional": true
+        },
+        {
+          "json": "rules_prompt",
+          "go": "RulesPrompt",
+          "optional": true
+        },
+        {
+          "json": "character_creation",
+          "go": "CharacterCreation",
+          "optional": true
+        },
+        {
+          "json": "mechanics",
+          "go": "Mechanics",
+          "optional": true
+        },
+        {
+          "json": "strict",
+          "go": "Strict",
+          "optional": true
+        }
+      ]
+    },
+    "CreateWorldRequestDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": true
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": true
+        },
+        {
+          "json": "genre",
+          "go": "Genre",
+          "optional": true
+        },
+        {
+          "json": "default_system",
+          "go": "DefaultSystem",
+          "optional": true
+        },
+        {
+          "json": "art_style",
+          "go": "ArtStyle",
+          "optional": true
+        },
+        {
+          "json": "tags",
+          "go": "Tags",
+          "optional": true
+        },
+        {
+          "json": "lore_prompt",
+          "go": "LorePrompt",
+          "optional": true
+        }
+      ]
+    },
+    "DirectoryChoiceDTO": {
+      "fields": [
+        {
+          "json": "status",
+          "go": "Status",
+          "optional": false
+        },
+        {
+          "json": "path",
+          "go": "Path",
+          "optional": true
+        }
+      ]
+    },
+    "DocArticleDTO": {
+      "fields": [
+        {
+          "json": "content",
+          "go": "Content",
+          "optional": false
+        }
+      ]
+    },
+    "DocArticleSummaryDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "title",
+          "go": "Title",
+          "optional": false
+        },
+        {
+          "json": "category",
+          "go": "Category",
+          "optional": false
+        },
+        {
+          "json": "order",
+          "go": "Order",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        }
+      ]
+    },
+    "DraftCommitRequestDTO": {
+      "fields": [
+        {
+          "json": "draft_id",
+          "go": "DraftID",
+          "optional": false
+        },
+        {
+          "json": "target_world_id",
+          "go": "TargetWorldID",
+          "optional": true
+        },
+        {
+          "json": "accept_all",
+          "go": "AcceptAll",
+          "optional": true
+        },
+        {
+          "json": "section_indexes",
+          "go": "SectionIndexes",
+          "optional": true
+        },
+        {
+          "json": "entity_ids",
+          "go": "EntityIDs",
+          "optional": true
+        },
+        {
+          "json": "edits",
+          "go": "Edits",
+          "optional": true
+        },
+        {
+          "json": "meta",
+          "go": "Meta",
+          "optional": true
+        }
+      ]
+    },
+    "DraftDiscardRequestDTO": {
+      "fields": [
+        {
+          "json": "draft_id",
+          "go": "DraftID",
+          "optional": false
+        }
+      ]
+    },
+    "EntityDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        },
+        {
+          "json": "markdown",
+          "go": "Markdown",
+          "optional": false
+        },
+        {
+          "json": "state",
+          "go": "State",
+          "optional": false
+        },
+        {
+          "json": "backlinks",
+          "go": "Backlinks",
+          "optional": false
+        },
+        {
+          "json": "history",
+          "go": "History",
+          "optional": true
+        },
+        {
+          "json": "folder",
+          "go": "Folder",
+          "optional": true
+        },
+        {
+          "json": "parse_error",
+          "go": "ParseError",
+          "optional": true
+        }
+      ]
+    },
+    "EntitySummaryDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        },
+        {
+          "json": "location",
+          "go": "Location",
+          "optional": true
+        },
+        {
+          "json": "tags",
+          "go": "Tags",
+          "optional": true
+        },
+        {
+          "json": "aliases",
+          "go": "Aliases",
+          "optional": true
+        },
+        {
+          "json": "folder",
+          "go": "Folder",
+          "optional": true
+        },
+        {
+          "json": "filename_mismatch",
+          "go": "FilenameMismatch",
+          "optional": true
+        },
+        {
+          "json": "has_portrait",
+          "go": "HasPortrait",
+          "optional": true
+        },
+        {
+          "json": "portrait_url",
+          "go": "PortraitURL",
+          "optional": true
+        },
+        {
+          "json": "parse_error",
+          "go": "ParseError",
+          "optional": true
+        }
+      ]
+    },
+    "EntityTypeCatalog": {
+      "fields": [
+        {
+          "json": "base_keys",
+          "go": "BaseKeys",
+          "optional": false
+        },
+        {
+          "json": "types",
+          "go": "Types",
+          "optional": false
+        }
+      ]
+    },
+    "EntityTypeSpec": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "label",
+          "go": "Label",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        },
+        {
+          "json": "aliases",
+          "go": "Aliases",
+          "optional": true
+        },
+        {
+          "json": "keys",
+          "go": "Keys",
+          "optional": false
+        }
+      ]
+    },
+    "Entry": {
+      "fields": [
+        {
+          "json": "played_ms",
+          "go": "PlayedMS",
+          "optional": false
+        },
+        {
+          "json": "total_ms",
+          "go": "TotalMS",
+          "optional": true
+        },
+        {
+          "json": "complete",
+          "go": "Complete",
+          "optional": true
+        }
+      ]
+    },
+    "ExportCapabilitiesDTO": {
+      "fields": [
+        {
+          "json": "default_dir",
+          "go": "DefaultDir",
+          "optional": true
+        },
+        {
+          "json": "native_dialog",
+          "go": "NativeDialog",
+          "optional": false
+        }
+      ]
+    },
+    "ExportContentRequestDTO": {
+      "fields": [
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        },
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "target_path",
+          "go": "TargetPath",
+          "optional": true
+        }
+      ]
+    },
+    "ExportContentResultDTO": {
+      "fields": [
+        {
+          "json": "path",
+          "go": "Path",
+          "optional": false
+        },
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "version",
+          "go": "Version",
+          "optional": false
+        },
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        }
+      ]
+    },
+    "ExportEvent": {
+      "fields": [
+        {
+          "json": "game_id",
+          "go": "GameID",
+          "optional": false
+        },
+        {
+          "json": "format",
+          "go": "Format",
+          "optional": false
+        },
+        {
+          "json": "phase",
+          "go": "Phase",
+          "optional": false
+        },
+        {
+          "json": "done",
+          "go": "Done",
+          "optional": false
+        },
+        {
+          "json": "total",
+          "go": "Total",
+          "optional": false
+        },
+        {
+          "json": "message",
+          "go": "Message",
+          "optional": true
+        },
+        {
+          "json": "output_path",
+          "go": "OutputPath",
+          "optional": true
+        },
+        {
+          "json": "error",
+          "go": "Error",
+          "optional": true
+        },
+        {
+          "json": "frames",
+          "go": "Frames",
+          "optional": false
+        },
+        {
+          "json": "image_frames",
+          "go": "ImageFrames",
+          "optional": false
+        },
+        {
+          "json": "repeat_frames",
+          "go": "RepeatFrames",
+          "optional": false
+        },
+        {
+          "json": "audio_packets",
+          "go": "AudioPackets",
+          "optional": false
+        },
+        {
+          "json": "total_audio_packets",
+          "go": "TotalAudio",
+          "optional": false
+        },
+        {
+          "json": "audio_bytes",
+          "go": "AudioBytes",
+          "optional": false
+        },
+        {
+          "json": "total_audio_bytes",
+          "go": "TotalBytes",
+          "optional": false
+        },
+        {
+          "json": "elapsed_ms",
+          "go": "ElapsedMs",
+          "optional": false
+        },
+        {
+          "json": "length_ms",
+          "go": "LengthMs",
+          "optional": false
+        }
+      ]
+    },
+    "ExportJobDTO": {
+      "fields": [
+        {
+          "json": "game_id",
+          "go": "GameID",
+          "optional": false
+        },
+        {
+          "json": "format",
+          "go": "Format",
+          "optional": false
+        },
+        {
+          "json": "output_path",
+          "go": "OutputPath",
+          "optional": true
+        },
+        {
+          "json": "running",
+          "go": "Running",
+          "optional": false
+        }
+      ]
+    },
+    "ExportRequestDTO": {
+      "fields": [
+        {
+          "json": "game_id",
+          "go": "GameID",
+          "optional": false
+        },
+        {
+          "json": "format",
+          "go": "Format",
+          "optional": false
+        },
+        {
+          "json": "out_dir",
+          "go": "OutDir",
+          "optional": false
+        },
+        {
+          "json": "art",
+          "go": "Art",
+          "optional": false
+        },
+        {
+          "json": "audio",
+          "go": "Audio",
+          "optional": false
+        },
+        {
+          "json": "still",
+          "go": "Still",
+          "optional": true
+        },
+        {
+          "json": "fps",
+          "go": "FPS",
+          "optional": true
+        },
+        {
+          "json": "size",
+          "go": "Size",
+          "optional": true
+        }
+      ]
+    },
+    "FactionClockDTO": {
+      "fields": [
+        {
+          "json": "faction",
+          "go": "Faction",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "ticks",
+          "go": "Ticks",
+          "optional": false
+        },
+        {
+          "json": "max_ticks",
+          "go": "MaxTicks",
+          "optional": false
+        }
+      ]
+    },
+    "FileFilterDTO": {
+      "fields": [
+        {
+          "json": "display_name",
+          "go": "DisplayName",
+          "optional": false
+        },
+        {
+          "json": "pattern",
+          "go": "Pattern",
+          "optional": false
+        }
+      ]
+    },
+    "FindingsDTO": {
+      "fields": [
+        {
+          "json": "addressed",
+          "go": "Addressed",
+          "optional": false
+        }
+      ]
+    },
+    "FolderDTO": {
+      "fields": [
+        {
+          "json": "path",
+          "go": "Path",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "children",
+          "go": "Children",
+          "optional": true
+        }
+      ]
+    },
+    "FolderRequestDTO": {
+      "fields": [
+        {
+          "json": "path",
+          "go": "Path",
+          "optional": false
+        },
+        {
+          "json": "from",
+          "go": "From",
+          "optional": true
+        }
+      ]
+    },
+    "FrontmatterKeySchema": {
+      "fields": [
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        },
+        {
+          "json": "required",
+          "go": "Required",
+          "optional": false
+        },
+        {
+          "json": "values",
+          "go": "Values",
+          "optional": true
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        }
+      ]
+    },
+    "FrontmatterSchema": {
+      "fields": [
+        {
+          "json": "allowUnknown",
+          "go": "AllowUnknown",
+          "optional": false
+        },
+        {
+          "json": "keys",
+          "go": "Keys",
+          "optional": false
+        }
+      ]
+    },
+    "GameSettingsPatchDTO": {
+      "fields": [
+        {
+          "json": "opening_prompt",
+          "go": "OpeningPrompt",
+          "optional": true
+        },
+        {
+          "json": "narrator_voice",
+          "go": "NarratorVoice",
+          "optional": true
+        },
+        {
+          "json": "start_location",
+          "go": "StartLocation",
+          "optional": true
+        }
+      ]
+    },
+    "GameStateDTO": {
+      "fields": [
+        {
+          "json": "game_id",
+          "go": "GameID",
+          "optional": false
+        },
+        {
+          "json": "game_name",
+          "go": "GameName",
+          "optional": false
+        },
+        {
+          "json": "player",
+          "go": "Player",
+          "optional": false
+        },
+        {
+          "json": "arcs",
+          "go": "Arcs",
+          "optional": false
+        },
+        {
+          "json": "clocks",
+          "go": "Clocks",
+          "optional": false
+        },
+        {
+          "json": "locations",
+          "go": "Locations",
+          "optional": false
+        },
+        {
+          "json": "opening_prompt",
+          "go": "OpeningPrompt",
+          "optional": true
+        },
+        {
+          "json": "narrator_voice",
+          "go": "NarratorVoice",
+          "optional": true
+        },
+        {
+          "json": "start_location",
+          "go": "StartLocation",
+          "optional": true
+        },
+        {
+          "json": "banner_url",
+          "go": "BannerURL",
+          "optional": true
+        },
+        {
+          "json": "genre",
+          "go": "Genre",
+          "optional": true
+        },
+        {
+          "json": "image_budget",
+          "go": "ImageBudget",
+          "optional": true
+        },
+        {
+          "json": "image_approval",
+          "go": "ImageApproval",
+          "optional": true
+        },
+        {
+          "json": "mechanics_engagement",
+          "go": "MechanicsEngagement",
+          "optional": true
+        },
+        {
+          "json": "advancement",
+          "go": "Advancement",
+          "optional": true
+        },
+        {
+          "json": "content_warnings",
+          "go": "ContentWarnings",
+          "optional": true
+        }
+      ]
+    },
+    "GameSummaryDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "system_id",
+          "go": "SystemID",
+          "optional": false
+        },
+        {
+          "json": "world_id",
+          "go": "WorldID",
+          "optional": false
+        },
+        {
+          "json": "player_name",
+          "go": "PlayerName",
+          "optional": false
+        },
+        {
+          "json": "turn_count",
+          "go": "TurnCount",
+          "optional": false
+        },
+        {
+          "json": "last_played",
+          "go": "LastPlayed",
+          "optional": false
+        },
+        {
+          "json": "thumbnail_url",
+          "go": "ThumbnailURL",
+          "optional": false
+        },
+        {
+          "json": "banner_url",
+          "go": "BannerURL",
+          "optional": true
+        },
+        {
+          "json": "icon_url",
+          "go": "IconURL",
+          "optional": true
+        },
+        {
+          "json": "banner_source",
+          "go": "BannerSource",
+          "optional": true
+        },
+        {
+          "json": "icon_source",
+          "go": "IconSource",
+          "optional": true
+        },
+        {
+          "json": "play_time_seconds",
+          "go": "PlayTimeSeconds",
+          "optional": true
+        }
+      ]
+    },
+    "GenerateAssetPreviewRequestDTO": {
+      "fields": [
+        {
+          "json": "kind",
+          "go": "Kind",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        },
+        {
+          "json": "art_style",
+          "go": "ArtStyle",
+          "optional": false
+        },
+        {
+          "json": "genre",
+          "go": "Genre",
+          "optional": true
+        },
+        {
+          "json": "usage_token",
+          "go": "UsageToken",
+          "optional": true
+        }
+      ]
+    },
+    "GenerateAssetRequestDTO": {
+      "fields": [
+        {
+          "json": "kind",
+          "go": "Kind",
+          "optional": false
+        },
+        {
+          "json": "prompt",
+          "go": "Prompt",
+          "optional": true
+        }
+      ]
+    },
+    "GenerateCharacterRequest": {
+      "fields": [
+        {
+          "json": "system_id",
+          "go": "SystemID",
+          "optional": true
+        },
+        {
+          "json": "world_id",
+          "go": "WorldID",
+          "optional": true
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": true
+        },
+        {
+          "json": "fields",
+          "go": "Fields",
+          "optional": false
+        },
+        {
+          "json": "seed",
+          "go": "Seed",
+          "optional": true
+        }
+      ]
+    },
+    "GenerateCharacterResponse": {
+      "fields": [
+        {
+          "json": "values",
+          "go": "Values",
+          "optional": false
+        },
+        {
+          "json": "generated_by",
+          "go": "GeneratedBy",
+          "optional": false
+        },
+        {
+          "json": "warning",
+          "go": "Warning",
+          "optional": true
+        }
+      ]
+    },
+    "GenerateTextRequest": {
+      "fields": [
+        {
+          "json": "form_type",
+          "go": "FormType",
+          "optional": false
+        },
+        {
+          "json": "field_name",
+          "go": "FieldName",
+          "optional": false
+        },
+        {
+          "json": "context",
+          "go": "Context",
+          "optional": false
+        },
+        {
+          "json": "world_id",
+          "go": "WorldID",
+          "optional": true
+        },
+        {
+          "json": "system_id",
+          "go": "SystemID",
+          "optional": true
+        },
+        {
+          "json": "seed",
+          "go": "Seed",
+          "optional": true
+        }
+      ]
+    },
+    "GenerateTextResponse": {
+      "fields": [
+        {
+          "json": "fields",
+          "go": "Fields",
+          "optional": false
+        },
+        {
+          "json": "generated_by",
+          "go": "GeneratedBy",
+          "optional": false
+        },
+        {
+          "json": "warning",
+          "go": "Warning",
+          "optional": true
+        }
+      ]
+    },
+    "GenerationLimitsDTO": {
+      "fields": [
+        {
+          "json": "max_calls",
+          "go": "MaxCalls",
+          "optional": true
+        },
+        {
+          "json": "max_chunks",
+          "go": "MaxChunks",
+          "optional": true
+        }
+      ]
+    },
+    "GraphDTO": {
+      "fields": [
+        {
+          "json": "nodes",
+          "go": "Nodes",
+          "optional": false
+        },
+        {
+          "json": "links",
+          "go": "Links",
+          "optional": false
+        }
+      ]
+    },
+    "GraphLinkDTO": {
+      "fields": [
+        {
+          "json": "source",
+          "go": "Source",
+          "optional": false
+        },
+        {
+          "json": "target",
+          "go": "Target",
+          "optional": false
+        }
+      ]
+    },
+    "GraphNodeDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "label",
+          "go": "Label",
+          "optional": false
+        },
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        }
+      ]
+    },
+    "HealthEffectDTO": {
+      "fields": [
+        {
+          "json": "entity",
+          "go": "Entity",
+          "optional": false
+        },
+        {
+          "json": "effect",
+          "go": "Effect",
+          "optional": false
+        }
+      ]
+    },
+    "ImportResultDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "version",
+          "go": "Version",
+          "optional": false
+        },
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        },
+        {
+          "json": "author",
+          "go": "Author",
+          "optional": true
+        },
+        {
+          "json": "license",
+          "go": "License",
+          "optional": true
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": true
+        },
+        {
+          "json": "file_count",
+          "go": "FileCount",
+          "optional": false
+        },
+        {
+          "json": "has_script",
+          "go": "HasScript",
+          "optional": false
+        },
+        {
+          "json": "action",
+          "go": "Action",
+          "optional": false
+        },
+        {
+          "json": "trust",
+          "go": "Trust",
+          "optional": false
+        }
+      ]
+    },
+    "LimitsDTO": {
+      "fields": [
+        {
+          "json": "blocks",
+          "go": "Blocks",
+          "optional": false
+        }
+      ]
+    },
+    "MediaInspectEntryDTO": {
+      "fields": [
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "provider_key",
+          "go": "ProviderKey",
+          "optional": false
+        },
+        {
+          "json": "key_present",
+          "go": "KeyPresent",
+          "optional": false
+        },
+        {
+          "json": "key_required",
+          "go": "KeyRequired",
+          "optional": false
+        },
+        {
+          "json": "metered",
+          "go": "Metered",
+          "optional": false
+        },
+        {
+          "json": "tier",
+          "go": "Tier",
+          "optional": false
+        },
+        {
+          "json": "model_id",
+          "go": "ModelID",
+          "optional": true
+        },
+        {
+          "json": "model_installed",
+          "go": "ModelInstalled",
+          "optional": true
+        }
+      ]
+    },
+    "MediaInspectRequestDTO": {
+      "fields": [
+        {
+          "json": "family",
+          "go": "Family",
+          "optional": false
+        }
+      ]
+    },
+    "MediaInspectResponseDTO": {
+      "fields": [
+        {
+          "json": "entries",
+          "go": "Entries",
+          "optional": false
+        }
+      ]
+    },
+    "MemoryDTO": {
+      "fields": [
+        {
+          "json": "turn",
+          "go": "Turn",
+          "optional": false
+        },
+        {
+          "json": "kind",
+          "go": "Kind",
+          "optional": false
+        },
+        {
+          "json": "text",
+          "go": "Text",
+          "optional": false
+        },
+        {
+          "json": "importance",
+          "go": "Importance",
+          "optional": false
+        },
+        {
+          "json": "tags",
+          "go": "Tags",
+          "optional": true
+        }
+      ]
+    },
+    "MergeEntityRequestDTO": {
+      "fields": [
+        {
+          "json": "into",
+          "go": "Into",
+          "optional": false
+        },
+        {
+          "json": "confirm",
+          "go": "Confirm",
+          "optional": false
+        }
+      ]
+    },
+    "ModelCatalogueRequestDTO": {
+      "fields": [
+        {
+          "json": "api_key",
+          "go": "APIKey",
+          "optional": true
+        }
+      ]
+    },
+    "ModelCatalogueResponseDTO": {
+      "fields": [
+        {
+          "json": "models",
+          "go": "Models",
+          "optional": false
+        },
+        {
+          "json": "error",
+          "go": "Error",
+          "optional": true
+        }
+      ]
+    },
+    "NarrativeArcDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "progress",
+          "go": "Progress",
+          "optional": false
+        },
+        {
+          "json": "max_progress",
+          "go": "MaxProgress",
+          "optional": false
+        },
+        {
+          "json": "status",
+          "go": "Status",
+          "optional": false
+        }
+      ]
+    },
+    "OfflinePresetRequestDTO": {
+      "fields": [
+        {
+          "json": "tts",
+          "go": "TTS",
+          "optional": true
+        }
+      ]
+    },
+    "OfflinePresetResponseDTO": {
+      "fields": [
+        {
+          "json": "changes",
+          "go": "Changes",
+          "optional": false
+        }
+      ]
+    },
+    "OpenURLRequestDTO": {
+      "fields": [
+        {
+          "json": "url",
+          "go": "URL",
+          "optional": false
+        }
+      ]
+    },
+    "PendingCheckDTO": {
+      "fields": [
+        {
+          "json": "ref",
+          "go": "Ref",
+          "optional": false
+        },
+        {
+          "json": "proposed_by",
+          "go": "ProposedBy",
+          "optional": true
+        },
+        {
+          "json": "request",
+          "go": "Request",
+          "optional": false
+        },
+        {
+          "json": "notation",
+          "go": "Notation",
+          "optional": true
+        },
+        {
+          "json": "bonuses",
+          "go": "Bonuses",
+          "optional": true
+        },
+        {
+          "json": "actor_values",
+          "go": "ActorValues",
+          "optional": true
+        }
+      ]
+    },
+    "PlaybackLedgerDTO": {
+      "fields": [
+        {
+          "json": "turn",
+          "go": "Turn",
+          "optional": false
+        },
+        {
+          "json": "owner",
+          "go": "Owner",
+          "optional": false
+        },
+        {
+          "json": "entries",
+          "go": "Entries",
+          "optional": false
+        }
+      ]
+    },
+    "PlaybackLedgerRequest": {
+      "fields": [
+        {
+          "json": "turn",
+          "go": "Turn",
+          "optional": false
+        },
+        {
+          "json": "entries",
+          "go": "Entries",
+          "optional": false
+        }
+      ]
+    },
+    "PlayerCharacterDTO": {
+      "fields": [
+        {
+          "json": "appearance",
+          "go": "Appearance",
+          "optional": true
+        },
+        {
+          "json": "current_appearance",
+          "go": "CurrentAppearance",
+          "optional": true
+        },
+        {
+          "json": "age",
+          "go": "Age",
+          "optional": true
+        },
+        {
+          "json": "gender",
+          "go": "Gender",
+          "optional": true
+        },
+        {
+          "json": "pronouns",
+          "go": "Pronouns",
+          "optional": true
+        },
+        {
+          "json": "background",
+          "go": "Background",
+          "optional": true
+        },
+        {
+          "json": "voice",
+          "go": "Voice",
+          "optional": true
+        },
+        {
+          "json": "extra",
+          "go": "Extra",
+          "optional": true
+        }
+      ]
+    },
+    "PlayerDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        },
+        {
+          "json": "state",
+          "go": "State",
+          "optional": false
+        },
+        {
+          "json": "appearance",
+          "go": "Appearance",
+          "optional": true
+        },
+        {
+          "json": "current_appearance",
+          "go": "CurrentAppearance",
+          "optional": true
+        },
+        {
+          "json": "voice",
+          "go": "Voice",
+          "optional": true
+        }
+      ]
+    },
+    "ProviderCatalogDTO": {
+      "fields": [
+        {
+          "json": "providers",
+          "go": "Providers",
+          "optional": false
+        }
+      ]
+    },
+    "ProviderSessionDTO": {
+      "fields": [
+        {
+          "json": "provider",
+          "go": "Provider",
+          "optional": false
+        },
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "through_turn",
+          "go": "ThroughTurn",
+          "optional": false
+        },
+        {
+          "json": "model",
+          "go": "Model",
+          "optional": true
+        },
+        {
+          "json": "prefix_hash",
+          "go": "PrefixHash",
+          "optional": true
+        }
+      ]
+    },
+    "RecapDTO": {
+      "fields": [
+        {
+          "json": "summary",
+          "go": "Summary",
+          "optional": true
+        },
+        {
+          "json": "through_turn",
+          "go": "ThroughTurn",
+          "optional": false
+        },
+        {
+          "json": "enabled",
+          "go": "Enabled",
+          "optional": false
+        },
+        {
+          "json": "threads",
+          "go": "Threads",
+          "optional": true
+        }
+      ]
+    },
+    "RecordIssueDTO": {
+      "fields": [
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        },
+        {
+          "json": "repair",
+          "go": "Repair",
+          "optional": true
+        },
+        {
+          "json": "error",
+          "go": "Error",
+          "optional": true
+        }
+      ]
+    },
+    "RecordReportDTO": {
+      "fields": [
+        {
+          "json": "total",
+          "go": "Total",
+          "optional": false
+        },
+        {
+          "json": "repaired",
+          "go": "Repaired",
+          "optional": false
+        },
+        {
+          "json": "failed",
+          "go": "Failed",
+          "optional": false
+        },
+        {
+          "json": "issues",
+          "go": "Issues",
+          "optional": true
+        }
+      ]
+    },
+    "RefDTO": {
+      "fields": [
+        {
+          "json": "kind",
+          "go": "Kind",
+          "optional": false
+        },
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "relation",
+          "go": "Relation",
+          "optional": true
+        }
+      ]
+    },
+    "ReferenceSystemDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "version",
+          "go": "Version",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        },
+        {
+          "json": "rules_prompt",
+          "go": "RulesPrompt",
+          "optional": false
+        },
+        {
+          "json": "script",
+          "go": "Script",
+          "optional": false
+        },
+        {
+          "json": "mechanics",
+          "go": "Mechanics",
+          "optional": true
+        }
+      ]
+    },
+    "ReferenceSystemsDTO": {
+      "fields": [
+        {
+          "json": "systems",
+          "go": "Systems",
+          "optional": false
+        }
+      ]
+    },
+    "RegistryInstallRequestDTO": {
+      "fields": [
+        {
+          "json": "ref",
+          "go": "Ref",
+          "optional": false
+        },
+        {
+          "json": "on_conflict",
+          "go": "OnConflict",
+          "optional": false
+        }
+      ]
+    },
+    "RegistrySourceDTO": {
+      "fields": [
+        {
+          "json": "url",
+          "go": "URL",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": true
+        },
+        {
+          "json": "package_count",
+          "go": "PackageCount",
+          "optional": false
+        },
+        {
+          "json": "error",
+          "go": "Error",
+          "optional": true
+        }
+      ]
+    },
+    "RenegotiateRequestDTO": {
+      "fields": [
+        {
+          "json": "pending_check_ref",
+          "go": "PendingRef",
+          "optional": false
+        },
+        {
+          "json": "counter",
+          "go": "Counter",
+          "optional": false
+        }
+      ]
+    },
+    "RenegotiateResultDTO": {
+      "fields": [
+        {
+          "json": "ruling",
+          "go": "Ruling",
+          "optional": false
+        },
+        {
+          "json": "pending_check",
+          "go": "PendingCheck",
+          "optional": true
+        },
+        {
+          "json": "negotiations",
+          "go": "Negotiations",
+          "optional": true
+        }
+      ]
+    },
+    "ResolveCheckRequestDTO": {
+      "fields": [
+        {
+          "json": "pending_check_ref",
+          "go": "PendingRef",
+          "optional": false
+        },
+        {
+          "json": "manual_result",
+          "go": "ManualResult",
+          "optional": true
+        },
+        {
+          "json": "manual_dice",
+          "go": "ManualDice",
+          "optional": true
+        },
+        {
+          "json": "note",
+          "go": "Note",
+          "optional": true
+        }
+      ]
+    },
+    "STTResponse": {
+      "fields": [
+        {
+          "json": "text",
+          "go": "Text",
+          "optional": false
+        }
+      ]
+    },
+    "SaveFileChoiceDTO": {
+      "fields": [
+        {
+          "json": "status",
+          "go": "Status",
+          "optional": false
+        },
+        {
+          "json": "path",
+          "go": "Path",
+          "optional": true
+        }
+      ]
+    },
+    "SectionReportDTO": {
+      "fields": [
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "tokens",
+          "go": "Tokens",
+          "optional": false
+        },
+        {
+          "json": "included",
+          "go": "Included",
+          "optional": false
+        },
+        {
+          "json": "source",
+          "go": "Source",
+          "optional": true
+        },
+        {
+          "json": "refs",
+          "go": "Refs",
+          "optional": true
+        }
+      ]
+    },
+    "SegmentDTO": {
+      "fields": [
+        {
+          "json": "kind",
+          "go": "Kind",
+          "optional": false
+        },
+        {
+          "json": "speaker",
+          "go": "Speaker",
+          "optional": true
+        },
+        {
+          "json": "speaker_id",
+          "go": "SpeakerID",
+          "optional": true
+        },
+        {
+          "json": "text",
+          "go": "Text",
+          "optional": false
+        },
+        {
+          "json": "audio_urls",
+          "go": "AudioURLs",
+          "optional": true
+        },
+        {
+          "json": "clip_group",
+          "go": "ClipGroup",
+          "optional": true
+        },
+        {
+          "json": "portrait_url",
+          "go": "PortraitURL",
+          "optional": true
+        },
+        {
+          "json": "speaker_portrait",
+          "go": "SpeakerPortrait",
+          "optional": true
+        },
+        {
+          "json": "has_custom_portrait",
+          "go": "HasCustomPortrait",
+          "optional": true
+        },
+        {
+          "json": "check_ref",
+          "go": "CheckRef",
+          "optional": true
+        },
+        {
+          "json": "player",
+          "go": "Player",
+          "optional": true
+        },
+        {
+          "json": "duration",
+          "go": "Duration",
+          "optional": false
+        }
+      ]
+    },
+    "SettingsResponseDTO": {
+      "fields": [
+        {
+          "json": "config",
+          "go": "Config",
+          "optional": false
+        },
+        {
+          "json": "config_file_path",
+          "go": "ConfigFilePath",
+          "optional": false
+        },
+        {
+          "json": "is_local_override",
+          "go": "IsLocalOverride",
+          "optional": false
+        },
+        {
+          "json": "warnings",
+          "go": "Warnings",
+          "optional": true
+        },
+        {
+          "json": "app_version",
+          "go": "AppVersion",
+          "optional": true
+        }
+      ]
+    },
+    "StylePacksDTO": {
+      "fields": [
+        {
+          "json": "active",
+          "go": "Active",
+          "optional": true
+        },
+        {
+          "json": "packs",
+          "go": "Packs",
+          "optional": false
+        },
+        {
+          "json": "warnings",
+          "go": "Warnings",
+          "optional": true
+        }
+      ]
+    },
+    "SystemDeriveRequestDTO": {
+      "fields": [
+        {
+          "json": "base_id",
+          "go": "BaseID",
+          "optional": false
+        },
+        {
+          "json": "instruction",
+          "go": "Instruction",
+          "optional": false
+        }
+      ]
+    },
+    "SystemDetailDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "version",
+          "go": "Version",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        },
+        {
+          "json": "script",
+          "go": "Script",
+          "optional": false
+        },
+        {
+          "json": "rules_prompt",
+          "go": "RulesPrompt",
+          "optional": false
+        },
+        {
+          "json": "character_creation",
+          "go": "CharacterCreation",
+          "optional": false
+        },
+        {
+          "json": "mechanics",
+          "go": "Mechanics",
+          "optional": true
+        },
+        {
+          "json": "warnings",
+          "go": "Warnings",
+          "optional": true
+        }
+      ]
+    },
+    "SystemDraftCommitRequestDTO": {
+      "fields": [
+        {
+          "json": "draft_id",
+          "go": "DraftID",
+          "optional": false
+        },
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": true
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": true
+        },
+        {
+          "json": "version",
+          "go": "Version",
+          "optional": true
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": true
+        },
+        {
+          "json": "mechanics",
+          "go": "Mechanics",
+          "optional": true
+        },
+        {
+          "json": "script",
+          "go": "Script",
+          "optional": true
+        },
+        {
+          "json": "rules_prompt",
+          "go": "RulesPrompt",
+          "optional": true
+        }
+      ]
+    },
+    "SystemDraftDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "version",
+          "go": "Version",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        },
+        {
+          "json": "mechanics",
+          "go": "Mechanics",
+          "optional": true
+        },
+        {
+          "json": "script",
+          "go": "Script",
+          "optional": true
+        },
+        {
+          "json": "rules_prompt",
+          "go": "RulesPrompt",
+          "optional": true
+        },
+        {
+          "json": "verify",
+          "go": "Verify",
+          "optional": false
+        },
+        {
+          "json": "notes",
+          "go": "Notes",
+          "optional": true
+        },
+        {
+          "json": "estimate",
+          "go": "Estimate",
+          "optional": true
+        },
+        {
+          "json": "calls",
+          "go": "Calls",
+          "optional": false
+        },
+        {
+          "json": "oracle",
+          "go": "Oracle",
+          "optional": false
+        }
+      ]
+    },
+    "SystemDraftDiscardRequestDTO": {
+      "fields": [
+        {
+          "json": "draft_id",
+          "go": "DraftID",
+          "optional": false
+        }
+      ]
+    },
+    "SystemEnhanceApplyRequestDTO": {
+      "fields": [
+        {
+          "json": "proposals",
+          "go": "Proposals",
+          "optional": false
+        }
+      ]
+    },
+    "SystemEnhanceApplyResultDTO": {
+      "fields": [
+        {
+          "json": "written",
+          "go": "Written",
+          "optional": false
+        },
+        {
+          "json": "detail",
+          "go": "Detail",
+          "optional": true
+        }
+      ]
+    },
+    "SystemEnhanceRequestDTO": {
+      "fields": [
+        {
+          "json": "instruction",
+          "go": "Instruction",
+          "optional": false
+        },
+        {
+          "json": "kinds",
+          "go": "Kinds",
+          "optional": true
+        }
+      ]
+    },
+    "SystemEnhanceResponseDTO": {
+      "fields": [
+        {
+          "json": "proposals",
+          "go": "Proposals",
+          "optional": false
+        },
+        {
+          "json": "oracle",
+          "go": "Oracle",
+          "optional": true
+        }
+      ]
+    },
+    "SystemExplainResponseDTO": {
+      "fields": [
+        {
+          "json": "explanation",
+          "go": "Explanation",
+          "optional": false
+        },
+        {
+          "json": "oracle",
+          "go": "Oracle",
+          "optional": true
+        }
+      ]
+    },
+    "SystemGenerateRequestDTO": {
+      "fields": [
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": true
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        },
+        {
+          "json": "dry_run",
+          "go": "DryRun",
+          "optional": true
+        },
+        {
+          "json": "limits",
+          "go": "Limits",
+          "optional": true
+        }
+      ]
+    },
+    "SystemProposalDTO": {
+      "fields": [
+        {
+          "json": "kind",
+          "go": "Kind",
+          "optional": false
+        },
+        {
+          "json": "title",
+          "go": "Title",
+          "optional": false
+        },
+        {
+          "json": "reason",
+          "go": "Reason",
+          "optional": true
+        },
+        {
+          "json": "stat",
+          "go": "Stat",
+          "optional": true
+        },
+        {
+          "json": "skill",
+          "go": "Skill",
+          "optional": true
+        },
+        {
+          "json": "profile",
+          "go": "Profile",
+          "optional": true
+        },
+        {
+          "json": "advancement",
+          "go": "Advancement",
+          "optional": true
+        },
+        {
+          "json": "valid",
+          "go": "Valid",
+          "optional": false
+        },
+        {
+          "json": "problems",
+          "go": "Problems",
+          "optional": true
+        }
+      ]
+    },
+    "SystemScenariosDTO": {
+      "fields": [
+        {
+          "json": "scenarios",
+          "go": "Scenarios",
+          "optional": false
+        }
+      ]
+    },
+    "SystemSummaryDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        },
+        {
+          "json": "version",
+          "go": "Version",
+          "optional": false
+        }
+      ]
+    },
+    "SystemTestFailureDTO": {
+      "fields": [
+        {
+          "json": "scenario",
+          "go": "Scenario",
+          "optional": false
+        },
+        {
+          "json": "step",
+          "go": "Step",
+          "optional": false
+        },
+        {
+          "json": "detail",
+          "go": "Detail",
+          "optional": false
+        }
+      ]
+    },
+    "SystemTestRequestDTO": {
+      "fields": [
+        {
+          "json": "system",
+          "go": "System",
+          "optional": false
+        },
+        {
+          "json": "scenarios",
+          "go": "Scenarios",
+          "optional": false
+        }
+      ]
+    },
+    "SystemTestResponseDTO": {
+      "fields": [
+        {
+          "json": "failures",
+          "go": "Failures",
+          "optional": true
+        }
+      ]
+    },
+    "SystemTestSystemDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "script",
+          "go": "Script",
+          "optional": false
+        },
+        {
+          "json": "mechanics",
+          "go": "Mechanics",
+          "optional": true
+        }
+      ]
+    },
+    "TTSBatchCancelRequest": {
+      "fields": [
+        {
+          "json": "game_id",
+          "go": "GameID",
+          "optional": false
+        },
+        {
+          "json": "job_id",
+          "go": "JobID",
+          "optional": false
+        }
+      ]
+    },
+    "TTSBatchClearRequest": {
+      "fields": [
+        {
+          "json": "game_id",
+          "go": "GameID",
+          "optional": true
+        }
+      ]
+    },
+    "TTSBatchJobDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "game_id",
+          "go": "GameID",
+          "optional": false
+        },
+        {
+          "json": "game_name",
+          "go": "GameName",
+          "optional": true
+        },
+        {
+          "json": "provider",
+          "go": "Provider",
+          "optional": false
+        },
+        {
+          "json": "model",
+          "go": "Model",
+          "optional": true
+        },
+        {
+          "json": "status",
+          "go": "Status",
+          "optional": false
+        },
+        {
+          "json": "request_count",
+          "go": "RequestCount",
+          "optional": false
+        },
+        {
+          "json": "completed",
+          "go": "Completed",
+          "optional": false
+        },
+        {
+          "json": "failed_keys",
+          "go": "FailedKeys",
+          "optional": true
+        },
+        {
+          "json": "last_error",
+          "go": "LastError",
+          "optional": true
+        }
+      ]
+    },
+    "TTSInspectRequestDTO": {
+      "fields": [
+        {
+          "json": "config",
+          "go": "Config",
+          "optional": false
+        },
+        {
+          "json": "refresh",
+          "go": "Refresh",
+          "optional": true
+        }
+      ]
+    },
+    "TTSInspectResponseDTO": {
+      "fields": [
+        {
+          "json": "provider_key",
+          "go": "ProviderKey",
+          "optional": false
+        },
+        {
+          "json": "metered",
+          "go": "Metered",
+          "optional": false
+        },
+        {
+          "json": "options",
+          "go": "Options",
+          "optional": true
+        },
+        {
+          "json": "catalog",
+          "go": "Catalog",
+          "optional": false
+        },
+        {
+          "json": "key_present",
+          "go": "KeyPresent",
+          "optional": false
+        },
+        {
+          "json": "key_required",
+          "go": "KeyRequired",
+          "optional": false
+        },
+        {
+          "json": "error",
+          "go": "Error",
+          "optional": true
+        },
+        {
+          "json": "speech_cues",
+          "go": "SpeechCues",
+          "optional": false
+        }
+      ]
+    },
+    "TestProviderRequestDTO": {
+      "fields": [
+        {
+          "json": "category",
+          "go": "Category",
+          "optional": false
+        },
+        {
+          "json": "provider",
+          "go": "Provider",
+          "optional": false
+        },
+        {
+          "json": "test_prompt",
+          "go": "TestPrompt",
+          "optional": true
+        },
+        {
+          "json": "voice_id",
+          "go": "VoiceID",
+          "optional": true
+        }
+      ]
+    },
+    "TestProviderResponseDTO": {
+      "fields": [
+        {
+          "json": "success",
+          "go": "Success",
+          "optional": false
+        },
+        {
+          "json": "latency_ms",
+          "go": "LatencyMS",
+          "optional": false
+        },
+        {
+          "json": "message",
+          "go": "Message",
+          "optional": false
+        },
+        {
+          "json": "preview",
+          "go": "Preview",
+          "optional": true
+        },
+        {
+          "json": "audio_data_uri",
+          "go": "AudioDataURI",
+          "optional": true
+        },
+        {
+          "json": "model_missing",
+          "go": "ModelMissing",
+          "optional": true
+        },
+        {
+          "json": "model_id",
+          "go": "ModelID",
+          "optional": true
+        },
+        {
+          "json": "failure",
+          "go": "Failure",
+          "optional": true
+        }
+      ]
+    },
+    "ThreadDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "status",
+          "go": "Status",
+          "optional": false
+        },
+        {
+          "json": "last_advanced",
+          "go": "LastAdvanced",
+          "optional": false
+        },
+        {
+          "json": "idle",
+          "go": "Idle",
+          "optional": false
+        }
+      ]
+    },
+    "ToolCallDTO": {
+      "fields": [
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "result_chars",
+          "go": "ResultChars",
+          "optional": false
+        }
+      ]
+    },
+    "TraceEventDTO": {
+      "fields": [
+        {
+          "json": "ts",
+          "go": "Time",
+          "optional": false
+        },
+        {
+          "json": "event",
+          "go": "Event",
+          "optional": false
+        },
+        {
+          "json": "level",
+          "go": "Level",
+          "optional": false
+        },
+        {
+          "json": "fields",
+          "go": "Fields",
+          "optional": true
+        }
+      ]
+    },
+    "TrackDTO": {
+      "fields": [
+        {
+          "json": "filled",
+          "go": "Filled",
+          "optional": false
+        },
+        {
+          "json": "size",
+          "go": "Size",
+          "optional": false
+        }
+      ]
+    },
+    "TurnContextDTO": {
+      "fields": [
+        {
+          "json": "turn_number",
+          "go": "TurnNumber",
+          "optional": false
+        },
+        {
+          "json": "mode",
+          "go": "Mode",
+          "optional": false
+        },
+        {
+          "json": "budget",
+          "go": "Budget",
+          "optional": false
+        },
+        {
+          "json": "estimated_tokens",
+          "go": "EstimatedTokens",
+          "optional": false
+        },
+        {
+          "json": "sections",
+          "go": "Sections",
+          "optional": false
+        },
+        {
+          "json": "refs",
+          "go": "Refs",
+          "optional": false
+        },
+        {
+          "json": "working_set",
+          "go": "WorkingSet",
+          "optional": false
+        },
+        {
+          "json": "threads",
+          "go": "Threads",
+          "optional": true
+        },
+        {
+          "json": "summary_version",
+          "go": "SummaryVersion",
+          "optional": false
+        },
+        {
+          "json": "world_hash",
+          "go": "WorldHash",
+          "optional": true
+        },
+        {
+          "json": "system_hash",
+          "go": "SystemHash",
+          "optional": true
+        },
+        {
+          "json": "prompt_hash",
+          "go": "PromptHash",
+          "optional": false
+        },
+        {
+          "json": "strategy",
+          "go": "Strategy",
+          "optional": false
+        },
+        {
+          "json": "prefix_hash",
+          "go": "PrefixHash",
+          "optional": true
+        },
+        {
+          "json": "session",
+          "go": "Session",
+          "optional": true
+        },
+        {
+          "json": "cached_tokens",
+          "go": "CachedTokens",
+          "optional": true
+        },
+        {
+          "json": "prompt",
+          "go": "Prompt",
+          "optional": true
+        }
+      ]
+    },
+    "TurnDTO": {
+      "fields": [
+        {
+          "json": "turn_number",
+          "go": "TurnNumber",
+          "optional": false
+        },
+        {
+          "json": "input_text",
+          "go": "InputText",
+          "optional": false
+        },
+        {
+          "json": "mode",
+          "go": "Mode",
+          "optional": false
+        },
+        {
+          "json": "prose",
+          "go": "Prose",
+          "optional": false
+        },
+        {
+          "json": "image_url",
+          "go": "ImageURL",
+          "optional": true
+        },
+        {
+          "json": "entities_hit",
+          "go": "EntitiesHit",
+          "optional": true
+        },
+        {
+          "json": "segments",
+          "go": "Segments",
+          "optional": true
+        },
+        {
+          "json": "clip_groups",
+          "go": "ClipGroups",
+          "optional": true
+        },
+        {
+          "json": "outcome",
+          "go": "Outcome",
+          "optional": true
+        },
+        {
+          "json": "truncated",
+          "go": "Truncated",
+          "optional": true
+        },
+        {
+          "json": "recovery",
+          "go": "Recovery",
+          "optional": true
+        },
+        {
+          "json": "tool_calls",
+          "go": "ToolCalls",
+          "optional": true
+        },
+        {
+          "json": "context_notes",
+          "go": "ContextNotes",
+          "optional": true
+        },
+        {
+          "json": "continuity_notes",
+          "go": "ContinuityNotes",
+          "optional": true
+        },
+        {
+          "json": "location_id",
+          "go": "LocationID",
+          "optional": true
+        },
+        {
+          "json": "location_name",
+          "go": "LocationName",
+          "optional": true
+        },
+        {
+          "json": "scene_break",
+          "go": "SceneBreak",
+          "optional": true
+        },
+        {
+          "json": "rejected",
+          "go": "Rejected",
+          "optional": true
+        },
+        {
+          "json": "checks",
+          "go": "Checks",
+          "optional": true
+        },
+        {
+          "json": "pending_check",
+          "go": "PendingCheck",
+          "optional": true
+        },
+        {
+          "json": "engagement",
+          "go": "Engagement",
+          "optional": true
+        },
+        {
+          "json": "continuation_of",
+          "go": "ContinuationOf",
+          "optional": true
+        },
+        {
+          "json": "health_effects",
+          "go": "HealthEffects",
+          "optional": true
+        },
+        {
+          "json": "world_tick",
+          "go": "WorldTick",
+          "optional": true
+        },
+        {
+          "json": "record_report",
+          "go": "RecordReport",
+          "optional": true
+        }
+      ]
+    },
+    "TurnEvent": {
+      "fields": [
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        },
+        {
+          "json": "text",
+          "go": "Text",
+          "optional": true
+        },
+        {
+          "json": "turn",
+          "go": "Turn",
+          "optional": true
+        },
+        {
+          "json": "segment",
+          "go": "Segment",
+          "optional": true
+        },
+        {
+          "json": "message",
+          "go": "Message",
+          "optional": true
+        },
+        {
+          "json": "model_id",
+          "go": "ModelID",
+          "optional": true
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": true
+        },
+        {
+          "json": "size_bytes",
+          "go": "Size",
+          "optional": true
+        },
+        {
+          "json": "index",
+          "go": "Index",
+          "optional": true
+        },
+        {
+          "json": "audio_key",
+          "go": "AudioKey",
+          "optional": true
+        },
+        {
+          "json": "audio_url",
+          "go": "AudioURL",
+          "optional": true
+        },
+        {
+          "json": "tool_name",
+          "go": "ToolName",
+          "optional": true
+        },
+        {
+          "json": "tool_status",
+          "go": "ToolStatus",
+          "optional": true
+        },
+        {
+          "json": "tool_summary",
+          "go": "ToolSummary",
+          "optional": true
+        },
+        {
+          "json": "code",
+          "go": "Code",
+          "optional": true
+        },
+        {
+          "json": "detail",
+          "go": "Detail",
+          "optional": true
+        },
+        {
+          "json": "failure",
+          "go": "Failure",
+          "optional": true
+        },
+        {
+          "json": "audio_progress",
+          "go": "AudioProgress",
+          "optional": true
+        },
+        {
+          "json": "character_id",
+          "go": "CharacterID",
+          "optional": true
+        },
+        {
+          "json": "portrait_url",
+          "go": "PortraitURL",
+          "optional": true
+        },
+        {
+          "json": "version",
+          "go": "Version",
+          "optional": true
+        },
+        {
+          "json": "has_custom_portrait",
+          "go": "HasCustomPortrait",
+          "optional": true
+        },
+        {
+          "json": "turn_number",
+          "go": "TurnNumber",
+          "optional": true
+        },
+        {
+          "json": "image_url",
+          "go": "ImageURL",
+          "optional": true
+        },
+        {
+          "json": "retry_after_ms",
+          "go": "RetryAfterMS",
+          "optional": true
+        },
+        {
+          "json": "step",
+          "go": "Step",
+          "optional": true
+        },
+        {
+          "json": "progress",
+          "go": "Progress",
+          "optional": true
+        },
+        {
+          "json": "estimate",
+          "go": "Estimate",
+          "optional": true
+        },
+        {
+          "json": "draft",
+          "go": "Draft",
+          "optional": true
+        },
+        {
+          "json": "system_draft",
+          "go": "SystemDraft",
+          "optional": true
+        },
+        {
+          "json": "batch",
+          "go": "Batch",
+          "optional": true
+        },
+        {
+          "json": "owner",
+          "go": "Owner",
+          "optional": true
+        }
+      ]
+    },
+    "TurnRequest": {
+      "fields": [
+        {
+          "json": "mode",
+          "go": "Mode",
+          "optional": false
+        },
+        {
+          "json": "input",
+          "go": "Input",
+          "optional": false
+        },
+        {
+          "json": "pending_check_ref",
+          "go": "PendingCheckRef",
+          "optional": true
+        },
+        {
+          "json": "scene_only",
+          "go": "SceneOnly",
+          "optional": true
+        },
+        {
+          "json": "forced_total",
+          "go": "ForcedTotal",
+          "optional": true
+        },
+        {
+          "json": "manual_dice",
+          "go": "ManualDice",
+          "optional": true
+        }
+      ]
+    },
+    "UnlockDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "label",
+          "go": "Label",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": true
+        },
+        {
+          "json": "cost",
+          "go": "Cost",
+          "optional": false
+        },
+        {
+          "json": "affordable",
+          "go": "Affordable",
+          "optional": false
+        },
+        {
+          "json": "requires_met",
+          "go": "RequiresMet",
+          "optional": false
+        },
+        {
+          "json": "gate_open",
+          "go": "GateOpen",
+          "optional": false
+        }
+      ]
+    },
+    "UsageDTO": {
+      "fields": [
+        {
+          "json": "rows",
+          "go": "Rows",
+          "optional": true
+        },
+        {
+          "json": "by_provider",
+          "go": "ByProvider",
+          "optional": true
+        },
+        {
+          "json": "by_role",
+          "go": "ByRole",
+          "optional": true
+        },
+        {
+          "json": "total_cost_micros",
+          "go": "TotalCost",
+          "optional": false
+        },
+        {
+          "json": "currency",
+          "go": "Currency",
+          "optional": true
+        },
+        {
+          "json": "campaigns",
+          "go": "Campaigns",
+          "optional": true
+        }
+      ]
+    },
+    "UsageRowDTO": {
+      "fields": [
+        {
+          "json": "turn_number",
+          "go": "TurnNumber",
+          "optional": false
+        },
+        {
+          "json": "role",
+          "go": "Role",
+          "optional": false
+        },
+        {
+          "json": "provider",
+          "go": "Provider",
+          "optional": false
+        },
+        {
+          "json": "model",
+          "go": "Model",
+          "optional": true
+        },
+        {
+          "json": "input_tokens",
+          "go": "InputTokens",
+          "optional": true
+        },
+        {
+          "json": "output_tokens",
+          "go": "OutputTokens",
+          "optional": true
+        },
+        {
+          "json": "characters",
+          "go": "Characters",
+          "optional": true
+        },
+        {
+          "json": "requests",
+          "go": "Requests",
+          "optional": true
+        },
+        {
+          "json": "estimated",
+          "go": "Estimated",
+          "optional": true
+        },
+        {
+          "json": "cost_micros",
+          "go": "CostMicros",
+          "optional": true
+        }
+      ]
+    },
+    "VoiceCatalogDTO": {
+      "fields": [
+        {
+          "json": "available",
+          "go": "Available",
+          "optional": false
+        },
+        {
+          "json": "fetched_at",
+          "go": "FetchedAt",
+          "optional": true
+        },
+        {
+          "json": "stale",
+          "go": "Stale",
+          "optional": false
+        },
+        {
+          "json": "voices",
+          "go": "Voices",
+          "optional": false
+        }
+      ]
+    },
+    "VoiceSearchRequestDTO": {
+      "fields": [
+        {
+          "json": "config",
+          "go": "Config",
+          "optional": false
+        },
+        {
+          "json": "query",
+          "go": "Query",
+          "optional": true
+        },
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": true
+        },
+        {
+          "json": "language_code",
+          "go": "LanguageCode",
+          "optional": true
+        },
+        {
+          "json": "gender",
+          "go": "Gender",
+          "optional": true
+        },
+        {
+          "json": "accent",
+          "go": "Accent",
+          "optional": true
+        },
+        {
+          "json": "persona",
+          "go": "Persona",
+          "optional": true
+        }
+      ]
+    },
+    "VoiceSearchResponseDTO": {
+      "fields": [
+        {
+          "json": "voices",
+          "go": "Voices",
+          "optional": false
+        },
+        {
+          "json": "error",
+          "go": "Error",
+          "optional": true
+        }
+      ]
+    },
+    "WorkingEntryDTO": {
+      "fields": [
+        {
+          "json": "kind",
+          "go": "Kind",
+          "optional": false
+        },
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": true
+        },
+        {
+          "json": "weight",
+          "go": "Weight",
+          "optional": false
+        },
+        {
+          "json": "last_turn",
+          "go": "LastTurn",
+          "optional": false
+        },
+        {
+          "json": "role",
+          "go": "Role",
+          "optional": true
+        }
+      ]
+    },
+    "WorldDetailDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        },
+        {
+          "json": "genre",
+          "go": "Genre",
+          "optional": false
+        },
+        {
+          "json": "default_system",
+          "go": "DefaultSystem",
+          "optional": false
+        },
+        {
+          "json": "art_style",
+          "go": "ArtStyle",
+          "optional": false
+        },
+        {
+          "json": "tags",
+          "go": "Tags",
+          "optional": false
+        },
+        {
+          "json": "lore_prompt",
+          "go": "LorePrompt",
+          "optional": false
+        },
+        {
+          "json": "entities",
+          "go": "Entities",
+          "optional": false
+        }
+      ]
+    },
+    "WorldDraftDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        },
+        {
+          "json": "genre",
+          "go": "Genre",
+          "optional": false
+        },
+        {
+          "json": "art_style",
+          "go": "ArtStyle",
+          "optional": true
+        },
+        {
+          "json": "tags",
+          "go": "Tags",
+          "optional": true
+        },
+        {
+          "json": "lore",
+          "go": "Lore",
+          "optional": false
+        },
+        {
+          "json": "sections",
+          "go": "Sections",
+          "optional": false
+        },
+        {
+          "json": "entities",
+          "go": "Entities",
+          "optional": false
+        },
+        {
+          "json": "estimate",
+          "go": "Estimate",
+          "optional": true
+        },
+        {
+          "json": "calls",
+          "go": "Calls",
+          "optional": true
+        },
+        {
+          "json": "oracle",
+          "go": "Oracle",
+          "optional": true
+        }
+      ]
+    },
+    "WorldDraftEntityDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        },
+        {
+          "json": "tags",
+          "go": "Tags",
+          "optional": true
+        },
+        {
+          "json": "folder",
+          "go": "Folder",
+          "optional": true
+        },
+        {
+          "json": "body",
+          "go": "Body",
+          "optional": false
+        },
+        {
+          "json": "source",
+          "go": "Source",
+          "optional": true
+        },
+        {
+          "json": "links",
+          "go": "Links",
+          "optional": true
+        },
+        {
+          "json": "dropped_links",
+          "go": "Dropped",
+          "optional": true
+        }
+      ]
+    },
+    "WorldDraftSectionDTO": {
+      "fields": [
+        {
+          "json": "title",
+          "go": "Title",
+          "optional": false
+        },
+        {
+          "json": "body",
+          "go": "Body",
+          "optional": false
+        }
+      ]
+    },
+    "WorldEnhanceApplyRequestDTO": {
+      "fields": [
+        {
+          "json": "proposals",
+          "go": "Proposals",
+          "optional": false
+        },
+        {
+          "json": "rename",
+          "go": "Rename",
+          "optional": true
+        }
+      ]
+    },
+    "WorldEnhanceApplyResultDTO": {
+      "fields": [
+        {
+          "json": "written",
+          "go": "Written",
+          "optional": false
+        },
+        {
+          "json": "renamed",
+          "go": "Renamed",
+          "optional": true
+        }
+      ]
+    },
+    "WorldEnhanceRequestDTO": {
+      "fields": [
+        {
+          "json": "instruction",
+          "go": "Instruction",
+          "optional": false
+        },
+        {
+          "json": "kinds",
+          "go": "Kinds",
+          "optional": true
+        }
+      ]
+    },
+    "WorldEnhanceResponseDTO": {
+      "fields": [
+        {
+          "json": "proposals",
+          "go": "Proposals",
+          "optional": false
+        },
+        {
+          "json": "oracle",
+          "go": "Oracle",
+          "optional": true
+        }
+      ]
+    },
+    "WorldEnhancementDTO": {
+      "fields": [
+        {
+          "json": "kind",
+          "go": "Kind",
+          "optional": false
+        },
+        {
+          "json": "title",
+          "go": "Title",
+          "optional": false
+        },
+        {
+          "json": "body",
+          "go": "Body",
+          "optional": false
+        },
+        {
+          "json": "entity",
+          "go": "Entity",
+          "optional": true
+        },
+        {
+          "json": "target",
+          "go": "Target",
+          "optional": true
+        },
+        {
+          "json": "reason",
+          "go": "Reason",
+          "optional": true
+        }
+      ]
+    },
+    "WorldEntityAcceptRequestDTO": {
+      "fields": [
+        {
+          "json": "batch_id",
+          "go": "BatchID",
+          "optional": true
+        },
+        {
+          "json": "ids",
+          "go": "IDs",
+          "optional": true
+        },
+        {
+          "json": "entities",
+          "go": "Entities",
+          "optional": true
+        },
+        {
+          "json": "rename",
+          "go": "Rename",
+          "optional": true
+        }
+      ]
+    },
+    "WorldEntityBatchDTO": {
+      "fields": [
+        {
+          "json": "entities",
+          "go": "Entities",
+          "optional": false
+        },
+        {
+          "json": "batch_id",
+          "go": "BatchID",
+          "optional": true
+        },
+        {
+          "json": "oracle",
+          "go": "Oracle",
+          "optional": true
+        },
+        {
+          "json": "cut_off",
+          "go": "CutOff",
+          "optional": true
+        }
+      ]
+    },
+    "WorldEntityBatchRequestDTO": {
+      "fields": [
+        {
+          "json": "instruction",
+          "go": "Instruction",
+          "optional": false
+        },
+        {
+          "json": "kinds",
+          "go": "Kinds",
+          "optional": true
+        },
+        {
+          "json": "count",
+          "go": "Count",
+          "optional": true
+        },
+        {
+          "json": "focus",
+          "go": "Focus",
+          "optional": true
+        },
+        {
+          "json": "source",
+          "go": "Source",
+          "optional": true
+        },
+        {
+          "json": "limits",
+          "go": "Limits",
+          "optional": true
+        }
+      ]
+    },
+    "WorldEntityDetailDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "markdown",
+          "go": "Markdown",
+          "optional": false
+        },
+        {
+          "json": "folder",
+          "go": "Folder",
+          "optional": true
+        }
+      ]
+    },
+    "WorldEntitySummaryDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "type",
+          "go": "Type",
+          "optional": false
+        },
+        {
+          "json": "folder",
+          "go": "Folder",
+          "optional": true
+        }
+      ]
+    },
+    "WorldEstimateDTO": {
+      "fields": [
+        {
+          "json": "calls",
+          "go": "Calls",
+          "optional": false
+        },
+        {
+          "json": "chunks",
+          "go": "Chunks",
+          "optional": true
+        },
+        {
+          "json": "cost_micros",
+          "go": "CostMicros",
+          "optional": true
+        },
+        {
+          "json": "priced",
+          "go": "Priced",
+          "optional": false
+        }
+      ]
+    },
+    "WorldGenStepDTO": {
+      "fields": [
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "status",
+          "go": "Status",
+          "optional": false
+        },
+        {
+          "json": "detail",
+          "go": "Detail",
+          "optional": true
+        }
+      ]
+    },
+    "WorldGenerateRequestDTO": {
+      "fields": [
+        {
+          "json": "premise",
+          "go": "Premise",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": true
+        },
+        {
+          "json": "genre",
+          "go": "Genre",
+          "optional": true
+        },
+        {
+          "json": "themes",
+          "go": "Themes",
+          "optional": true
+        },
+        {
+          "json": "counts",
+          "go": "Counts",
+          "optional": true
+        },
+        {
+          "json": "source",
+          "go": "Source",
+          "optional": true
+        },
+        {
+          "json": "dry_run",
+          "go": "DryRun",
+          "optional": true
+        },
+        {
+          "json": "limits",
+          "go": "Limits",
+          "optional": true
+        }
+      ]
+    },
+    "WorldImportProgressDTO": {
+      "fields": [
+        {
+          "json": "batch",
+          "go": "Batch",
+          "optional": false
+        },
+        {
+          "json": "batches",
+          "go": "Batches",
+          "optional": false
+        },
+        {
+          "json": "sources",
+          "go": "Sources",
+          "optional": true
+        },
+        {
+          "json": "found",
+          "go": "Found",
+          "optional": false
+        },
+        {
+          "json": "total",
+          "go": "Total",
+          "optional": false
+        },
+        {
+          "json": "names",
+          "go": "Names",
+          "optional": true
+        },
+        {
+          "json": "cut_off",
+          "go": "CutOff",
+          "optional": true
+        }
+      ]
+    },
+    "WorldSourceDTO": {
+      "fields": [
+        {
+          "json": "kind",
+          "go": "Kind",
+          "optional": false
+        },
+        {
+          "json": "path",
+          "go": "Path",
+          "optional": true
+        },
+        {
+          "json": "urls",
+          "go": "URLs",
+          "optional": true
+        }
+      ]
+    },
+    "WorldSummaryDTO": {
+      "fields": [
+        {
+          "json": "id",
+          "go": "ID",
+          "optional": false
+        },
+        {
+          "json": "name",
+          "go": "Name",
+          "optional": false
+        },
+        {
+          "json": "description",
+          "go": "Description",
+          "optional": false
+        },
+        {
+          "json": "genre",
+          "go": "Genre",
+          "optional": false
+        },
+        {
+          "json": "art_style",
+          "go": "ArtStyle",
+          "optional": true
+        },
+        {
+          "json": "tags",
+          "go": "Tags",
+          "optional": true
+        },
+        {
+          "json": "compatible_systems",
+          "go": "CompatibleSystems",
+          "optional": false
+        },
+        {
+          "json": "banner_url",
+          "go": "BannerURL",
+          "optional": true
+        },
+        {
+          "json": "icon_url",
+          "go": "IconURL",
+          "optional": true
+        }
+      ]
+    }
+  }
+}
