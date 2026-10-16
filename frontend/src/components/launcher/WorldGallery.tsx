@@ -4,6 +4,8 @@ import { ProceduralBanner, ProceduralIcon, getGenreIcon } from './ProceduralAsse
 import { X, Plus, Globe, Maximize2, Trash2, AlertCircle } from 'lucide-react';
 import { useLightbox } from '../../hooks/useLightbox';
 import { useMountTransition } from '../../hooks/useMountTransition';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
+import { Modal } from '../Modal';
 import { ImageLightbox } from '../ImageLightbox';
 import { APIClient } from '../../api/client';
 
@@ -145,6 +147,9 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [canForce, setCanForce] = useState(false);
 
+  // The gallery covers the launcher, so it announces itself and owns Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(isOpen, onClose);
+
   const handleConfirmDelete = async (force = false) => {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -173,6 +178,12 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
 
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Explore Worlds"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       data-state={state}
       className={`fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-xl ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
@@ -233,15 +244,20 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
       </div>
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
-          <div className="w-full max-w-md bg-stone-900 border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center gap-2 text-red-400">
-              <Trash2 className="w-5 h-5 shrink-0" />
-              <h3 className="font-sans text-sm font-bold text-white">
-                Delete world &ldquo;{deleteTarget.name}&rdquo;?
-              </h3>
-            </div>
-            <p className="text-xs font-sans text-stone-300">
+        <Modal
+          open
+          onClose={() => {
+            setDeleteTarget(null);
+            setDeleteError(null);
+            setCanForce(false);
+          }}
+          title={`Delete world "${deleteTarget.name}"?`}
+          dismissable={!isDeleting}
+          className="max-w-md"
+        >
+          <div className="space-y-4">
+            <p className="flex items-center gap-2 text-xs font-sans text-stone-300">
+              <Trash2 className="w-4 h-4 shrink-0 text-red-400" aria-hidden="true" />
               This will permanently delete the world directory and all of its lore and entities. This action cannot be
               undone.
             </p>
@@ -293,7 +309,7 @@ export const WorldGallery: React.FC<WorldGalleryProps> = ({
               )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

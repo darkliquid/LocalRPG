@@ -6,6 +6,7 @@ import EntityTree from './EntityTree';
 import MarkdownEditor, { type MarkdownEditorProps } from './editor/MarkdownEditor';
 import { loadEntityIndex, invalidateEntityIndex } from './editor/entityIndex';
 import { NewEntityWizard } from './NewEntityWizard';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 type DocKind = 'entities' | 'prompts' | 'manifests';
 
@@ -82,6 +83,9 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
 
   const isDirty = draft !== saved;
 
+  // The studio covers the campaign, so it announces itself and owns Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const save = async () => {
@@ -103,7 +107,15 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-sm">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Content Studio"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className="fixed inset-0 z-50 flex flex-col bg-stone-950/98 backdrop-blur-sm"
+    >
       <header className="flex items-center justify-between border-b border-white/10 px-5 py-3">
         <div className="flex items-center gap-4">
           <h2 className="font-sans text-sm font-bold uppercase tracking-wider text-stone-200">Content Studio</h2>
@@ -125,7 +137,7 @@ export default function ContentStudio({ isOpen, onClose, gameID }: ContentStudio
         </div>
         <div className="flex items-center gap-3">
           {isDirty && <span className="text-[10px] uppercase tracking-wider text-amber-400">Unsaved</span>}
-          <button onClick={onClose} className="cursor-pointer text-stone-400 hover:text-white">
+          <button onClick={onClose} aria-label="Close" className="cursor-pointer text-stone-400 hover:text-white">
             <X className="h-4 w-4" />
           </button>
         </div>

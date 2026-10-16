@@ -30,6 +30,7 @@ function mockStudio() {
     markdown: `---\nid: ${entityId}\nname: ${entityId}\ntype: concept\n---\n\nA note.\n`,
   }));
   vi.spyOn(APIClient, 'deleteWorldEntity').mockResolvedValue(undefined);
+  vi.spyOn(APIClient, 'deleteWorld').mockResolvedValue(undefined);
 }
 
 afterEach(() => {
@@ -95,5 +96,22 @@ describe('WorldsStudio entity deletion', () => {
     fireEvent.click(screen.getByRole('button', { name: /delete note/i }));
 
     await waitFor(() => expect(APIClient.deleteWorldEntity).toHaveBeenCalledWith('ember-peak', 'saltmarch'));
+  });
+
+  it('confirms a world delete in a dialog that Escape cancels', async () => {
+    mockStudio();
+    render(<WorldsStudio />);
+
+    await waitFor(() => expect(screen.getAllByText('Ember Peak').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('Ember Peak')[0]);
+    await waitFor(() => expect(screen.getByText(/starter entities/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Delete this world'));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete world "Ember Peak"?' });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /delete world/i })).not.toBeInTheDocument());
+    expect(APIClient.deleteWorld).not.toHaveBeenCalled();
   });
 });

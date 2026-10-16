@@ -22,6 +22,19 @@ afterEach(() => {
 });
 
 describe('EntityBatchDialog', () => {
+  it('is a dialog named by its heading, holds focus, and closes on Escape', () => {
+    const onClose = vi.fn();
+
+    render(<EntityBatchDialog worldId="w" onClose={onClose} batch={batch} />);
+
+    const dialog = screen.getByRole('dialog', { name: 'Add entities to this world' });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('previews a batch and accepts it', async () => {
     const accept = vi.spyOn(APIClient, 'acceptWorldEntities').mockResolvedValue({ written: ['the-tidewatch'] });
     const onAccepted = vi.fn();

@@ -14,6 +14,7 @@ import { RegistryModal } from './RegistryModal';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { ArrowLeft, X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 // The launcher's overlays and the docs reader load on demand, so neither the
 // studios, the settings editor, nor the Markdown pipeline sits in the first
@@ -65,6 +66,14 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
   const [docsArticleID, setDocsArticleID] = useState<string | undefined>(undefined);
   const [isRegistryOpen, setIsRegistryOpen] = useState(false);
   const { mounted: settingsMounted, state: settingsState } = useMountTransition(isSettingsOpen, 200);
+
+  // Global Settings covers the launcher, so it announces itself and owns Escape.
+  // The open flag follows the mount transition: the dialog enters on a later
+  // commit than the state change, and a hook that only watched isSettingsOpen
+  // would run its focus pass while there was nothing to focus.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(isSettingsOpen && settingsMounted, () =>
+    setIsSettingsOpen(false),
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -398,6 +407,12 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
       {/* Global Settings Modal */}
       {settingsMounted && (
         <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Global Settings"
+          tabIndex={-1}
+          onKeyDown={onKeyDown}
           data-state={settingsState}
           className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md ${
             settingsState === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
@@ -413,6 +428,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
               <h2 className="text-base font-sans font-bold text-white">Global Settings</h2>
               <button
                 onClick={() => setIsSettingsOpen(false)}
+                aria-label="Close"
                 className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 flex items-center justify-center text-stone-400 hover:text-white transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" />

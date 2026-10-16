@@ -17,6 +17,18 @@ const draft: WorldDraftInfo = {
 };
 
 describe('WorldDraftReview', () => {
+  it('is a dialog named by its heading, holds focus, and cancels on Escape', () => {
+    const onDiscard = vi.fn();
+    render(<WorldDraftReview draft={draft} onCommit={vi.fn()} onDiscard={onDiscard} />);
+
+    const dialog = screen.getByRole('dialog', { name: 'Ashen Reach' });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    expect(onDiscard).toHaveBeenCalledWith('ashen-reach');
+  });
+
   it('counts accepted items', () => {
     render(<WorldDraftReview draft={draft} onCommit={vi.fn()} onDiscard={vi.fn()} />);
     expect(screen.getByText(/3 of 3 accepted/i)).toBeInTheDocument();
