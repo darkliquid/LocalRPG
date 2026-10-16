@@ -3,6 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { EntityBatchDialog } from './EntityBatchDialog';
 import { APIClient, HTTPError } from '../api/client';
 import { SettingsResponse, WorldEntityBatch } from '../types';
+import { expectNoViolations } from '../test/a11y';
 
 const batch: WorldEntityBatch = {
   entities: [
@@ -22,10 +23,10 @@ afterEach(() => {
 });
 
 describe('EntityBatchDialog', () => {
-  it('is a dialog named by its heading, holds focus, and closes on Escape', () => {
+  it('is a dialog named by its heading, holds focus, and closes on Escape', async () => {
     const onClose = vi.fn();
 
-    render(<EntityBatchDialog worldId="w" onClose={onClose} batch={batch} />);
+    const { container } = render(<EntityBatchDialog worldId="w" onClose={onClose} batch={batch} />);
 
     const dialog = screen.getByRole('dialog', { name: 'Add entities to this world' });
     expect(dialog.contains(document.activeElement)).toBe(true);
@@ -33,6 +34,7 @@ describe('EntityBatchDialog', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    await expectNoViolations(container);
   });
 
   it('previews a batch and accepts it', async () => {

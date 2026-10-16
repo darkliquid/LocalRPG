@@ -455,12 +455,15 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
         />
       </Suspense>
 
-      {/* Hidden file input for content import */}
+      {/* Hidden file input for content import. It is hidden rather than
+          inaccessible: the dock's button opens it, and without a name it is
+          still a control axe reports and a screen reader cannot describe. */}
       <input
         ref={fileInputRef}
         type="file"
         accept=".lrpgworld,.lrpgsystem,.lrpgpack"
         className="hidden"
+        aria-label="Choose a package to import"
         onChange={handleFileSelect}
       />
 

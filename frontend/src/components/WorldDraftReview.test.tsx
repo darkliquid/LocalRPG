@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { WorldDraftReview } from './WorldDraftReview';
 import { WorldDraftInfo } from '../types';
+import { expectNoViolations } from '../test/a11y';
 
 const draft: WorldDraftInfo = {
   id: 'ashen-reach',
@@ -17,9 +18,9 @@ const draft: WorldDraftInfo = {
 };
 
 describe('WorldDraftReview', () => {
-  it('is a dialog named by its heading, holds focus, and cancels on Escape', () => {
+  it('is a dialog named by its heading, holds focus, and cancels on Escape', async () => {
     const onDiscard = vi.fn();
-    render(<WorldDraftReview draft={draft} onCommit={vi.fn()} onDiscard={onDiscard} />);
+    const { container } = render(<WorldDraftReview draft={draft} onCommit={vi.fn()} onDiscard={onDiscard} />);
 
     const dialog = screen.getByRole('dialog', { name: 'Ashen Reach' });
     expect(dialog.contains(document.activeElement)).toBe(true);
@@ -27,6 +28,7 @@ describe('WorldDraftReview', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
     expect(onDiscard).toHaveBeenCalledWith('ashen-reach');
+    await expectNoViolations(container);
   });
 
   it('counts accepted items', () => {

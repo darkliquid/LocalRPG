@@ -2,12 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ImageLightbox } from './ImageLightbox';
+import { expectNoViolations } from '../test/a11y';
 
 describe('ImageLightbox', () => {
-  it('is a dialog named by the image it shows, and takes focus', () => {
-    render(<ImageLightbox src="/api/game/c/character/x/portrait" alt="Lady Evelyn" onClose={() => undefined} />);
+  it('is a dialog named by the image it shows, and takes focus', async () => {
+    const { container } = render(
+      <ImageLightbox src="/api/game/c/character/x/portrait" alt="Lady Evelyn" onClose={() => undefined} />,
+    );
     expect(screen.getByRole('dialog')).toHaveAccessibleName('Lady Evelyn');
     expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
+    await expectNoViolations(container);
   });
 
   it('closes on Escape', async () => {

@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { CodexDrawer } from './CodexDrawer';
 import { EntityNote, EntitySummary } from '../types';
+import { expectNoViolations } from '../test/a11y';
 
 // The drawer reads its corpus and folder tree from a campaign, so the fixture
 // omits gameID: every loader effect then returns early and the test needs no
@@ -18,10 +19,12 @@ const note: EntityNote = {
 const other: EntitySummary = { id: 'saltmarch', name: 'Saltmarch', type: 'location' };
 
 describe('CodexDrawer', () => {
-  it('declares the merge confirmation as a dialog and leaves it on Escape', () => {
+  it('declares the merge confirmation as a dialog and leaves it on Escape', async () => {
     const onMerge = vi.fn();
 
-    render(<CodexDrawer entity={note} entities={[other]} onSelect={() => {}} onSave={() => {}} onMerge={onMerge} />);
+    const { container } = render(
+      <CodexDrawer entity={note} entities={[other]} onSelect={() => {}} onSave={() => {}} onMerge={onMerge} />,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /merge note/i }));
 
@@ -32,5 +35,6 @@ describe('CodexDrawer', () => {
 
     expect(screen.queryByRole('dialog', { name: 'Merge Note' })).not.toBeInTheDocument();
     expect(onMerge).not.toHaveBeenCalled();
+    await expectNoViolations(container);
   });
 });

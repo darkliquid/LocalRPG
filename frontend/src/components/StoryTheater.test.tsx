@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { StoryTheater } from './StoryTheater';
+import { expectNoViolations } from '../test/a11y';
 import { Turn, TurnSegment } from '../types';
 
 const seg = (text: string, clip_group: string, audio: string): TurnSegment => ({
@@ -21,9 +22,9 @@ const turns: Turn[] = [
 ];
 
 describe('StoryTheater grouping', () => {
-  it('does not restart audio when stepping within a group', () => {
+  it('does not restart audio when stepping within a group', async () => {
     const onPlayAudio = vi.fn();
-    render(
+    const { container } = render(
       <StoryTheater
         turns={turns}
         isOpen
@@ -48,6 +49,7 @@ describe('StoryTheater grouping', () => {
     fireEvent.click(screen.getByTitle('Next line'));
     expect(screen.getByText(/three/)).toBeInTheDocument();
     expect(onPlayAudio).toHaveBeenLastCalledWith(1, 2);
+    await expectNoViolations(container);
   });
 
   it('steps back to the previous line', () => {

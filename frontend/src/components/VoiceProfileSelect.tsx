@@ -145,6 +145,7 @@ export const VoiceProfileSelect: React.FC<VoiceProfileSelectProps> = ({
                   onChange(null);
                 }}
                 tabIndex={-1}
+                aria-label="Clear selection"
                 className="text-stone-500 hover:text-stone-300 cursor-pointer"
                 title="Clear selection"
               >
@@ -160,6 +161,8 @@ export const VoiceProfileSelect: React.FC<VoiceProfileSelectProps> = ({
                 })
               }
               tabIndex={-1}
+              aria-label={isOpen ? 'Hide voice profiles' : 'Show voice profiles'}
+              aria-expanded={isOpen}
               className="text-stone-500 hover:text-stone-300 cursor-pointer"
             >
               <ChevronDown className="w-3.5 h-3.5" />

@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { CampaignGallery } from './CampaignGallery';
 import { GameSummary } from '../../types';
+import { expectNoViolations } from '../../test/a11y';
 
 const game: GameSummary = {
   id: 'ashen-reach',
@@ -14,10 +15,10 @@ const game: GameSummary = {
 };
 
 describe('CampaignGallery', () => {
-  it('is a dialog named Campaigns, holds focus, and closes on Escape', () => {
+  it('is a dialog named Campaigns, holds focus, and closes on Escape', async () => {
     const onClose = vi.fn();
 
-    render(
+    const { container } = render(
       <CampaignGallery
         isOpen
         games={[game]}
@@ -36,5 +37,6 @@ describe('CampaignGallery', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    await expectNoViolations(container);
   });
 });

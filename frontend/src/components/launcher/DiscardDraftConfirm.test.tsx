@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DiscardDraftConfirm } from './DiscardDraftConfirm';
+import { expectNoViolations } from '../../test/a11y';
 
 describe('DiscardDraftConfirm', () => {
-  it('is a dialog named by its title, with the description inside it', () => {
-    render(<DiscardDraftConfirm isOpen onCancel={() => undefined} onDiscard={() => undefined} />);
+  it('is a dialog named by its title, with the description inside it', async () => {
+    const { container } = render(<DiscardDraftConfirm isOpen onCancel={() => undefined} onDiscard={() => undefined} />);
     expect(screen.getByRole('dialog')).toHaveAccessibleName('Discard unsaved world?');
     expect(screen.getByText(/every field you entered/)).toBeInTheDocument();
+    await expectNoViolations(container);
   });
 
   it('treats Escape as keeping the draft', async () => {

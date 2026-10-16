@@ -167,6 +167,7 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
                 onChange('');
               }}
               tabIndex={-1}
+              aria-label="Clear the search"
               className="text-stone-500 hover:text-stone-300 cursor-pointer"
             >
               <X className="w-3 h-3" />
@@ -181,6 +182,8 @@ export const VoiceCombobox: React.FC<VoiceComboboxProps> = ({
               })
             }
             tabIndex={-1}
+            aria-label={isOpen ? 'Hide voices' : 'Show voices'}
+            aria-expanded={isOpen}
             className="text-stone-500 hover:text-stone-300 cursor-pointer"
           >
             <ChevronDown className="w-3.5 h-3.5" />

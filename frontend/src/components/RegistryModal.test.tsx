@@ -1,6 +1,7 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RegistryModal } from './RegistryModal';
+import { expectNoViolations } from '../test/a11y';
 import { APIClient } from '../api/client';
 import type { PackageRefDTO, RegistrySourceDTO } from '../types';
 
@@ -34,7 +35,7 @@ describe('RegistryModal', () => {
   it('renders package results and check updates button', async () => {
     mockRegistry(oneSource, [testWorld]);
 
-    render(<RegistryModal isOpen={true} onClose={vi.fn()} />);
+    const { container } = render(<RegistryModal isOpen={true} onClose={vi.fn()} />);
 
     expect(screen.getByText('Content Registry')).toBeInTheDocument();
     await waitFor(() => {
@@ -42,6 +43,7 @@ describe('RegistryModal', () => {
     });
     expect(screen.getByText('A test world description')).toBeInTheDocument();
     expect(screen.getByText('Install')).toBeInTheDocument();
+    await expectNoViolations(container);
   });
 
   it('does not render when isOpen is false', () => {

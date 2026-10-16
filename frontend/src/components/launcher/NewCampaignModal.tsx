@@ -358,6 +358,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
           {/* Close button */}
           <button
             onClick={onClose}
+            aria-label="Close"
             className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition-all cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -621,7 +622,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                 {authoredFields.map((field) => (
                   <div key={field.id} className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-sans text-stone-400">
+                      <label htmlFor={`authored-${field.id}`} className="text-xs font-sans text-stone-400">
                         {field.label}
                         {field.required && <span className="ml-1 text-purple-400">*</span>}
                       </label>
@@ -640,6 +641,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                     </div>
                     {field.kind === 'select' ? (
                       <select
+                        id={`authored-${field.id}`}
                         value={creationValues[field.id] ?? field.default ?? ''}
                         onChange={(e) => setAuthoredValue(field.id, e.target.value)}
                         className="w-full bg-stone-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-purple-500 cursor-pointer"
@@ -653,6 +655,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                       </select>
                     ) : field.kind === 'long' ? (
                       <textarea
+                        id={`authored-${field.id}`}
                         rows={2}
                         value={creationValues[field.id] ?? ''}
                         onChange={(e) => setAuthoredValue(field.id, e.target.value)}
@@ -661,6 +664,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                       />
                     ) : (
                       <input
+                        id={`authored-${field.id}`}
                         type={field.kind === 'number' ? 'number' : 'text'}
                         value={creationValues[field.id] ?? ''}
                         onChange={(e) => setAuthoredValue(field.id, e.target.value)}
@@ -749,6 +753,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   onChange={handleBannerSelect}
                   accept="image/png,image/jpeg,image/webp,image/svg+xml"
                   className="hidden"
+                  aria-label="Choose a banner image"
                 />
                 <div
                   onClick={() => bannerInputRef.current?.click()}
@@ -794,6 +799,7 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
                   onChange={handleIconSelect}
                   accept="image/png,image/jpeg,image/webp,image/svg+xml"
                   className="hidden"
+                  aria-label="Choose an icon image"
                 />
                 <div
                   onClick={() => iconInputRef.current?.click()}

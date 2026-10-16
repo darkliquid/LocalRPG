@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { WorldGallery } from './WorldGallery';
 import { WorldInfo } from '../../types';
+import { expectNoViolations } from '../../test/a11y';
 
 const world: WorldInfo = {
   id: 'the-reach',
@@ -12,10 +13,10 @@ const world: WorldInfo = {
 };
 
 describe('WorldGallery', () => {
-  it('is a dialog named Explore Worlds, holds focus, and closes on Escape', () => {
+  it('is a dialog named Explore Worlds, holds focus, and closes on Escape', async () => {
     const onClose = vi.fn();
 
-    render(
+    const { container } = render(
       <WorldGallery
         isOpen
         worlds={[world]}
@@ -32,5 +33,6 @@ describe('WorldGallery', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    await expectNoViolations(container);
   });
 });
