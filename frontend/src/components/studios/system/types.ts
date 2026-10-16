@@ -8,3 +8,6 @@ export interface SystemDraft {
   localId: string;
   dirty: boolean;
 }
+
+// SystemTab names the detail column's tabs, which the header switches between.
+export type SystemTab = 'manifest' | 'rules' | 'mechanics' | 'script' | 'tests';
