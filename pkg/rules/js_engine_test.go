@@ -63,7 +63,7 @@ onAction("attack", function(ctx) {
 	}
 
 	// Verify GM directive injection
-	directives := bridge.GetDirectives()
+	directives := bridge.DrainDirectives()
 	if len(directives) != 1 {
 		t.Errorf("expected 1 directive, got: %v", directives)
 	}

@@ -39,7 +39,9 @@ type GameHostAPI interface {
 	GetEntity(entityID string) (*entity.Entity, error)
 	SaveEntity(ent *entity.Entity) error
 	InjectGMDirection(directive string)
-	GetDirectives() []string
+	// DrainDirectives returns the directives injected since the last drain and
+	// clears them: a direction belongs to the turn that asked for it.
+	DrainDirectives() []string
 	Log(message string)
 	GetLogs() []string
 	SetLocation(locationID string) error
@@ -204,12 +206,13 @@ func (h *DefaultHostBridge) InjectGMDirection(directive string) {
 	h.directives = append(h.directives, directive)
 }
 
-// GetDirectives returns every directive hooks have injected, including those
-// from earlier turns, because the bridge accumulates them for the life of the
-// campaign and the orchestrator drains the list rather than the turn's own
-// additions. It is the caller's slice, not a copy.
-func (h *DefaultHostBridge) GetDirectives() []string {
-	return h.directives
+// DrainDirectives returns the directives hooks have injected since the last drain
+// and clears them, so a direction is applied to the one turn that asked for it
+// rather than to every turn after it. It is the caller's slice, not a copy.
+func (h *DefaultHostBridge) DrainDirectives() []string {
+	injected := h.directives
+	h.directives = make([]string, 0)
+	return injected
 }
 
 // Log records a message from a script, for the turn's diagnostics.

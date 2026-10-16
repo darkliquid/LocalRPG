@@ -173,13 +173,14 @@ func (o *TurnOrchestrator) runWorldTick(turnNum int, locationID string) {
 	}
 }
 
-// drainDirectives returns every directive hooks injected this turn. The host
-// bridge accumulates them; without draining, injectGMDirection had no effect.
+// drainDirectives returns every directive hooks injected since the last drain,
+// which is this turn's. The bridge clears them as it hands them over; without
+// that, a direction from one turn was applied to every turn after it.
 func (o *TurnOrchestrator) drainDirectives() []string {
 	if o.rulesEngine == nil {
 		return nil
 	}
-	directives := o.rulesEngine.HostAPI().GetDirectives()
+	directives := o.rulesEngine.HostAPI().DrainDirectives()
 	out := make([]string, 0, len(directives))
 	for _, directive := range directives {
 		if trimmed := strings.TrimSpace(directive); trimmed != "" {
