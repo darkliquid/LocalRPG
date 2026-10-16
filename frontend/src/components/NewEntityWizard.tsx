@@ -3,6 +3,7 @@ import { Check, Sparkles, X } from 'lucide-react';
 import type { EntityTypeCatalog, TTSConfig, VoiceProfile } from '../types';
 import { APIClient } from '../api/client';
 import { useMountTransition } from '../hooks/useMountTransition';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { buildEntityMarkdown, type VoiceSelection } from '../lib/entityScaffold';
 import { slugify } from '../lib/slug';
 import { VoiceProfileSelect } from './VoiceProfileSelect';
@@ -45,6 +46,8 @@ export const NewEntityWizard: React.FC<NewEntityWizardProps> = ({
   const [type, setType] = useState('');
   const [voiceProfileId, setVoiceProfileId] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(isOpen, onClose);
 
   const spec = catalog?.types.find((candidate) => candidate.id === type);
   const wantsVoice = spec?.keys.some((key) => key.name === 'voice') ?? false;
@@ -137,6 +140,12 @@ export const NewEntityWizard: React.FC<NewEntityWizardProps> = ({
 
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="New Note"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       data-state={state}
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
@@ -155,6 +164,7 @@ export const NewEntityWizard: React.FC<NewEntityWizardProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="cursor-pointer rounded-lg p-1 text-stone-400 hover:bg-stone-800 hover:text-white"
           >
             <X className="h-4 w-4" />
