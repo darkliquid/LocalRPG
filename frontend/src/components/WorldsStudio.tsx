@@ -16,7 +16,7 @@ import {
   DraftCommitRequest,
   WorldDraftInfo,
 } from '../types';
-import { AlertCircle, Palette, Sparkles, Tag, Trash2, Upload } from 'lucide-react';
+import { AlertCircle, Palette, Save, Sparkles, Tag, Trash2, Upload } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { useLightbox } from '../hooks/useLightbox';
