@@ -31,6 +31,7 @@ import { LauncherHub } from './components/LauncherHub';
 import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
 import { Modal } from './components/Modal';
+import { LiveStatus } from './components/ui/LiveStatus';
 import { NewEntityWizard } from './components/NewEntityWizard';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { LimitChip } from './components/LimitChip';
@@ -477,6 +478,9 @@ export const App: React.FC = () => {
   };
 
   const [turnInFlight, setTurnInFlight] = useState(false);
+  // turnStatus is the sentence the live region announces: two per turn, and never
+  // the prose, which a reader would hear one token at a time.
+  const [turnStatus, setTurnStatus] = useState('');
   const [pendingAction, setPendingAction] = useState<{ mode: string; text: string } | null>(null);
   const [streamedSegments, setStreamedSegments] = useState<TurnSegment[]>([]);
   const [toolActivity, setToolActivity] = useState<string | null>(null);
@@ -560,6 +564,7 @@ export const App: React.FC = () => {
       }
       const turn = event.turn;
       setChronicle((prev) => [...prev, turn]);
+      setTurnStatus(`Turn ${turn.turn_number} ready`);
       streamProcessorRef.current.reset();
       setStreamedSegments([]);
       // The turn now carries the action, so drop the pending block at once;
@@ -609,6 +614,7 @@ export const App: React.FC = () => {
     if (!client || !activeGameID || turnInFlight) return;
 
     setTurnInFlight(true);
+    setTurnStatus('Narrating the turn…');
     setPendingAction(action);
     streamProcessorRef.current.reset();
     setStreamedSegments([]);
@@ -1126,7 +1132,11 @@ export const App: React.FC = () => {
 
             {/* Main Floating Translucent Chronicle & Action Container */}
             <main className="relative z-10 flex-1 overflow-hidden mx-6 mb-4 flex flex-col">
-              <div className="flex-1 bg-glass-card rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+              <div
+                aria-busy={turnInFlight}
+                className="flex-1 bg-glass-card rounded-2xl flex flex-col overflow-hidden shadow-2xl"
+              >
+                <LiveStatus message={turnStatus} />
                 {chronicle.length === 0 ? (
                   gameState ? (
                     streamedSegments.length > 0 ? (
@@ -1225,7 +1235,10 @@ export const App: React.FC = () => {
                 />
 
                 {fundsError && (
-                  <div className="mx-4 mb-2 p-3 bg-red-950/80 border border-red-500/50 text-red-200 text-xs rounded-xl flex items-center justify-between shadow-lg">
+                  <div
+                    role="alert"
+                    className="mx-4 mb-2 p-3 bg-red-950/80 border border-red-500/50 text-red-200 text-xs rounded-xl flex items-center justify-between shadow-lg"
+                  >
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
                       <span>
@@ -1243,7 +1256,10 @@ export const App: React.FC = () => {
                 )}
 
                 {gameState?.content_warnings && gameState.content_warnings.length > 0 && !dismissedContentWarnings && (
-                  <div className="mx-4 mb-2 p-3 bg-amber-950/80 border border-amber-500/50 text-amber-200 text-xs rounded-xl flex items-center justify-between shadow-lg">
+                  <div
+                    role="status"
+                    className="mx-4 mb-2 p-3 bg-amber-950/80 border border-amber-500/50 text-amber-200 text-xs rounded-xl flex items-center justify-between shadow-lg"
+                  >
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                       <span>Content warnings: {gameState.content_warnings.join('; ')}</span>
@@ -1258,7 +1274,10 @@ export const App: React.FC = () => {
                 )}
 
                 {isRateLimited && (
-                  <div className="mx-4 mb-2 p-3 bg-amber-950/80 border border-amber-500/50 text-amber-200 text-xs rounded-xl flex items-center gap-2 shadow-lg">
+                  <div
+                    role="status"
+                    className="mx-4 mb-2 p-3 bg-amber-950/80 border border-amber-500/50 text-amber-200 text-xs rounded-xl flex items-center gap-2 shadow-lg"
+                  >
                     <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
                     <span>Rate limit backoff active. Submitting turns paused for {activeRateLimitSeconds}s.</span>
                   </div>
@@ -1437,7 +1456,10 @@ export const App: React.FC = () => {
 
             {/* Turn Failure Banner */}
             {turnError && (
-              <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xl px-4 py-3 rounded-xl bg-red-950/90 border border-red-500/40 text-red-100 text-xs font-sans shadow-2xl flex items-center gap-3">
+              <div
+                role="alert"
+                className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xl px-4 py-3 rounded-xl bg-red-950/90 border border-red-500/40 text-red-100 text-xs font-sans shadow-2xl flex items-center gap-3"
+              >
                 <span className="flex-1 select-text">{turnError}</span>
                 <button onClick={() => setTurnError(null)} className="text-red-300 hover:text-white cursor-pointer">
                   Dismiss

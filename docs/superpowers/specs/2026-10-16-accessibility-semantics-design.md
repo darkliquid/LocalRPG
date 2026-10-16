@@ -96,8 +96,10 @@ screen readers, so it is present and empty and then given a sentence:
 - the turn starts (`beginTurnStream` sets `turnInFlight`) → "Narrating the turn…";
 - a turn lands (`handleTurnEvent`'s `turn` event appends to the chronicle) → "Turn 12 ready".
 
-The second is driven by an effect on the chronicle with a first-run guard, because the chronicle's first
-value is the campaign's history loading, not news.
+Both sentences are set where the event is known: `beginTurnStream` sets the first, and the `turn` branch
+of `handleTurnEvent` sets the second from the turn number it just appended. An effect on the chronicle
+would have needed a first-run guard, because its first value is the campaign's history loading rather
+than news; setting the sentence at the two places that already know removes the question.
 
 The chronicle's container also takes `aria-busy={turnInFlight}`, which is the standard way to say "this
 region is being updated" without announcing the update.

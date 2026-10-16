@@ -60,8 +60,9 @@
 ## Task 4: The turn announcement
 
 - [ ] `App.tsx`: `turnStatus` state, set to "Narrating the turn…" where `beginTurnStream` starts, and to
-      "Turn N ready" from an effect on the chronicle, guarded so the first value (the loaded history) is
-      not announced.
+      "Turn N ready" in the `turn` branch of `handleTurnEvent`. The plan first proposed an effect on the
+      chronicle with a first-run guard; setting the sentence where the event is known is the same
+      behaviour without the guard, so the effect was not written.
 - [ ] Render `<LiveStatus message={turnStatus} />` in the chronicle container and put
       `aria-busy={turnInFlight}` on that container.
 - [ ] Assert the announced number is the turn that landed.
