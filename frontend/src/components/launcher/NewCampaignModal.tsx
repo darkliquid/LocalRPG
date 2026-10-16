@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { errorMessage } from '../../lib/errors';
 import { useFailures } from '../../context/FailuresContext';
 import React, { useState, useEffect, useRef } from 'react';
@@ -60,6 +61,10 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
+  // Its own header, so it takes the dialog behaviour rather than the shell: it
+  // declares itself, moves focus in and returns it, holds Tab, and closes on
+  // Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
 
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
@@ -293,6 +298,12 @@ export const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   return (
     <div
       data-state={state}
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="New Campaign"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md select-none ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
       }`}

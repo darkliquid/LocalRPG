@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import React, { useState } from 'react';
 import { UserPlus, BookOpen, Check, X } from 'lucide-react';
 import { useMountTransition } from '../hooks/useMountTransition';
@@ -18,6 +19,10 @@ export const AddEntityModal: React.FC<AddEntityModalProps> = ({
   onClose,
 }) => {
   const [type, setType] = useState('character');
+  // Its own header, so it takes the dialog behaviour rather than the shell: it
+  // declares itself, moves focus in and returns it, holds Tab, and closes on
+  // Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
   const { mounted, state } = useMountTransition(isOpen, 200);
 
   if (!mounted) return null;
@@ -25,6 +30,12 @@ export const AddEntityModal: React.FC<AddEntityModalProps> = ({
   return (
     <div
       data-state={state}
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Add Canon Note"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
       }`}
