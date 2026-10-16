@@ -33,65 +33,65 @@
 
 ## Task 1: The progress bar component
 
-- [ ] `ProgressBar({ value, max = 100, label, className, barClassName })`: clamp `value` into `0..max`,
+- [x] `ProgressBar({ value, max = 100, label, className, barClassName })`: clamp `value` into `0..max`,
       render `role="progressbar"` with `aria-valuenow`, `aria-valuemin`, `aria-valuemax` and the label,
       and derive the fill width from the same clamped value so the drawn width and the stated number
       cannot disagree.
-- [ ] Tests: the stated value and its label; a value above `max` clamps to `max`; a value below zero
+- [x] Tests: the stated value and its label; a value above `max` clamps to `max`; a value below zero
       clamps to zero; a `max` of 6 reports 3 as `aria-valuenow="3"`, `aria-valuemax="6"` at 50% width.
 
 ## Task 2: Nine bars, two stated and seven hidden
 
-- [ ] `TheaterTransport`'s rail becomes `<ProgressBar value={progress} label="Playback position" />`.
-- [ ] `TTSBatchPanel`'s job bar becomes a `ProgressBar` labelled "Clips stored", replacing the `title`
+- [x] `TheaterTransport`'s rail becomes `<ProgressBar value={progress} label="Playback position" />`.
+- [x] `TTSBatchPanel`'s job bar becomes a `ProgressBar` labelled "Clips stored", replacing the `title`
       that no assistive technology reads on a `div`.
-- [ ] `CharacterSheetDrawer` ×2, `LivingWorldDrawer` ×2, `TTSProviderEditor` ×1, `ModelDownloadModal`
+- [x] `CharacterSheetDrawer` ×2, `LivingWorldDrawer` ×2, `TTSProviderEditor` ×1, `ModelDownloadModal`
       ×1 and `ExportModal` ×1 take `aria-hidden="true"` with a comment naming the text they defer to.
-- [ ] `ImportProgressPanel` is untouched: it already states its value.
-- [ ] None of the seven changes colour, height or width.
+- [x] `ImportProgressPanel` is untouched: it already states its value.
+- [x] None of the seven changes colour, height or width.
 
 ## Task 3: The live region
 
-- [ ] `LiveStatus({ message })` renders an always-mounted `sr-only` paragraph with `role="status"`,
+- [x] `LiveStatus({ message })` renders an always-mounted `sr-only` paragraph with `role="status"`,
       empty when there is nothing to say.
-- [ ] Tests: present and empty with no message; carrying the sentence when given one; still in the tree
+- [x] Tests: present and empty with no message; carrying the sentence when given one; still in the tree
       after the message clears.
 
 ## Task 4: The turn announcement
 
-- [ ] `App.tsx`: `turnStatus` state, set to "Narrating the turn…" where `beginTurnStream` starts, and to
+- [x] `App.tsx`: `turnStatus` state, set to "Narrating the turn…" where `beginTurnStream` starts, and to
       "Turn N ready" in the `turn` branch of `handleTurnEvent`. The plan first proposed an effect on the
       chronicle with a first-run guard; setting the sentence where the event is known is the same
       behaviour without the guard, so the effect was not written.
-- [ ] Render `<LiveStatus message={turnStatus} />` in the chronicle container and put
+- [x] Render `<LiveStatus message={turnStatus} />` in the chronicle container and put
       `aria-busy={turnInFlight}` on that container.
-- [ ] Assert the announced number is the turn that landed.
+- [x] Assert the announced number is the turn that landed.
 
 ## Task 5: The four banners
 
-- [ ] `fundsError` and `turnError` gain `role="alert"`.
-- [ ] The rate-limit notice and the content warnings gain `role="status"`.
-- [ ] Assert each where the surface is renderable, and say in the bead which one is left to the e2e
+- [x] `fundsError` and `turnError` gain `role="alert"`.
+- [x] The rate-limit notice and the content warnings gain `role="status"`.
+- [x] Assert each where the surface is renderable, and say in the bead which one is left to the e2e
       suite's launcher test.
 
 ## Task 6: Names for the icon-only buttons
 
-- [ ] `frontend/src/test/iconButtons.test.ts`: parse every `.tsx` under `src/` with the TypeScript
+- [x] `frontend/src/test/iconButtons.test.ts`: parse every `.tsx` under `src/` with the TypeScript
       compiler; fail on a `<button>` whose subtree has no text and no expression and which has no
       `aria-label` or `aria-labelledby`; report file and line.
-- [ ] Give the 7 that have no name one: `App.tsx:1236`, `:1251` ("Dismiss"),
+- [x] Give the 7 that have no name one: `App.tsx:1236`, `:1251` ("Dismiss"),
       `AddEntityModal.tsx:54` ("Close"), `OfflinePreset.tsx:128`, `:197` ("Dismiss"),
       `launcher/CampaignGallery.tsx:251` ("Clear the search"),
       `launcher/CampaignSettingsModal.tsx:238` ("Close").
-- [ ] Add `aria-label` beside the `title` on the 17 named only by a tooltip, taking the wording from the
+- [x] Add `aria-label` beside the `title` on the 17 named only by a tooltip, taking the wording from the
       title and keeping it for the tooltip.
-- [ ] Confirm the scan reports zero and the existing tests still pass.
+- [x] Confirm the scan reports zero and the existing tests still pass.
 
 ## Task 7: Documentation and gates
 
-- [ ] `AGENTS.md`: the progress rule, the announcement rule and the name rule, each with its reason.
-- [ ] `npx tsc --noEmit`, `npx prettier --write`, `npx eslint src` (0 errors), `npm run format:check`.
-- [ ] `npx vitest run --coverage` against the floors (statements 33, lines 34, functions 33,
+- [x] `AGENTS.md`: the progress rule, the announcement rule and the name rule, each with its reason.
+- [x] `npx tsc --noEmit`, `npx prettier --write`, `npx eslint src` (0 errors), `npm run format:check`.
+- [x] `npx vitest run --coverage` against the floors (statements 33, lines 34, functions 33,
       branches 30).
-- [ ] `npm run build`, `mise run test`, `mise run lint`.
-- [ ] Open the pull request, wait for CI, close the bead with the evidence.
+- [x] `npm run build`, `mise run test`, `mise run lint`.
+- [x] Open the pull request, wait for CI, close the bead with the evidence.
