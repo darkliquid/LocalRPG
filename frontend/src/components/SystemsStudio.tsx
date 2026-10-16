@@ -14,50 +14,26 @@ import {
   SystemVerifyResult,
   Scenario,
 } from '../types';
-import {
-  Shield,
-  Plus,
-  Save,
-  FileCode,
-  Info,
-  Check,
-  AlertCircle,
-  RotateCcw,
-  BookOpen,
-  Trash2,
-  Wand2,
-  SlidersHorizontal,
-  Play,
-  Download,
-  Upload,
-  Lightbulb,
-  Pencil,
-  FlaskConical,
-} from 'lucide-react';
-import { AIGenerateButton } from './ui/AIGenerateButton';
+import { AlertCircle, Trash2 } from 'lucide-react';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { Modal } from './Modal';
-import MarkdownEditor from './editor/MarkdownEditor';
-import { MechanicsEditor } from './MechanicsEditor';
+import { SystemTestsTab } from './studios/system/SystemTestsTab';
+import { SystemScriptTab } from './studios/system/SystemScriptTab';
+import { SystemMechanicsTab } from './studios/system/SystemMechanicsTab';
+import { SystemRulesTab } from './studios/system/SystemRulesTab';
+import { SystemManifestTab } from './studios/system/SystemManifestTab';
+import { SystemList } from './studios/system/SystemList';
+import { SystemHeader } from './studios/system/SystemHeader';
+import { SystemReport } from './studios/system/SystemReport';
+import { SystemDraft, SystemSelection } from './studios/system/types';
 import { ContentImportDialog } from './ContentImportDialog';
 import { SystemGenerateDialog } from './SystemGenerateDialog';
 import { SystemEnhanceDialog } from './SystemEnhanceDialog';
 import { BaseSystemCatalogue } from './BaseSystemCatalogue';
 import { MarkdownDocViewer } from './MarkdownDocViewer';
-import { ScriptReference } from './mechanics/ScriptReference';
-import { ScenarioEditor } from './ScenarioEditor';
-import { HelpTip } from './ui/HelpTip';
-import { Example } from './ui/Example';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
-
-type SystemSelection = { kind: 'saved'; id: string } | { kind: 'draft' } | null;
-
-interface SystemDraft {
-  localId: string;
-  dirty: boolean;
-}
 
 interface SystemsStudioProps {
   onSystemSaved?: () => void;
@@ -572,869 +548,128 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
   return (
     <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
       {/* Left Master Column: Systems List */}
-      <aside className="w-full md:w-80 h-full bg-stone-950/70 border-r border-white/10 p-4 flex flex-col gap-4 shrink-0 overflow-hidden">
-        <div className="flex flex-col gap-2 pb-2 border-b border-stone-800/60 shrink-0">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-purple-400" />
-            <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">Rule Systems</h3>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <input
-              type="file"
-              ref={importInputRef}
-              onChange={handleFileSelect}
-              accept=".lrpgsystem,.lrpgpack"
-              className="hidden"
-              aria-label="Choose a system package to import"
-            />
-            <button
-              onClick={() => setShowGenerateDialog(true)}
-              title="Generate a system with AI"
-              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-all cursor-pointer"
-            >
-              <Wand2 className="w-3.5 h-3.5 text-purple-400" />
-              <span>Generate</span>
-            </button>
-            <button
-              onClick={() => setShowBaseCatalogue(true)}
-              disabled={referenceSystems.length === 0}
-              title="Start from a reference base system"
-              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
-              <span>From a Base</span>
-            </button>
-            <button
-              onClick={() => importInputRef.current?.click()}
-              title="Import system package (.lrpgsystem, .lrpgpack)"
-              className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Import</span>
-            </button>
-            <button
-              onClick={() => {
-                if (isDraft && draft?.dirty) {
-                  setPendingSelection({ kind: 'draft' });
-                  return;
-                }
-                handleNewSystem();
-              }}
-              className="flex items-center gap-1 text-xs font-sans font-bold px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
-          {draft && (
-            <div
-              onClick={() => requestSelection({ kind: 'draft' })}
-              className={`p-3 rounded-xl border transition-all cursor-pointer text-left border-dashed ${
-                isDraft
-                  ? 'bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
-                  : 'bg-stone-900/40 border-stone-700 hover:bg-stone-800/40'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <Shield className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span className="font-serif font-bold text-sm text-stone-200 truncate">
-                    {name.trim() || 'Untitled System'}
-                  </span>
-                </div>
-                <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 shrink-0">
-                  Draft
-                </span>
-              </div>
-              <div className="text-xs text-stone-400 truncate mt-1">{description.trim() || 'Unsaved system draft'}</div>
-            </div>
-          )}
-          {isLoading && systems.length === 0 ? (
-            <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">Loading systems...</div>
-          ) : systems.length === 0 ? (
-            <div className="text-center py-8 text-xs text-stone-400">
-              No systems defined yet. Create your first ruleset!
-            </div>
-          ) : (
-            systems.map((s) => (
-              <div
-                key={s.id}
-                onClick={() => requestSelection({ kind: 'saved', id: s.id })}
-                className={`group p-3 rounded-xl border transition-all cursor-pointer text-left ${
-                  selection?.kind === 'saved' && selection.id === s.id
-                    ? 'bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
-                    : 'bg-stone-900/40 border-stone-800/60 hover:bg-stone-800/40 hover:border-stone-700'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-1">
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-sans text-xs font-bold text-stone-200 truncate">{s.name}</h4>
-                    <span className="text-xs font-mono text-stone-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800 mt-1 inline-block">
-                      v{s.version}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteTarget({ id: s.id, name: s.name });
-                      setDeleteSystemError(null);
-                      setCanForceDelete(false);
-                    }}
-                    aria-label={`Delete system "${s.name}"`}
-                    title={`Delete system "${s.name}"`}
-                    className="p-1 text-stone-500 hover:text-red-400 rounded hover:bg-red-950/40 transition-colors opacity-40 group-hover:opacity-100 hover:!opacity-100 shrink-0 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                {s.description && <p className="text-xs text-stone-400 truncate mt-1">{s.description}</p>}
-              </div>
-            ))
-          )}
-        </div>
-      </aside>
+      <SystemList
+        systems={systems}
+        selection={selection}
+        draft={draft}
+        name={name}
+        description={description}
+        referenceSystems={referenceSystems}
+        isLoading={isLoading}
+        isDraft={isDraft}
+        importInputRef={importInputRef}
+        handleFileSelect={handleFileSelect}
+        handleNewSystem={handleNewSystem}
+        requestSelection={requestSelection}
+        setPendingSelection={setPendingSelection}
+        setShowGenerateDialog={setShowGenerateDialog}
+        setShowBaseCatalogue={setShowBaseCatalogue}
+        setDeleteTarget={setDeleteTarget}
+        setDeleteSystemError={setDeleteSystemError}
+        setCanForceDelete={setCanForceDelete}
+      />
 
       {/* Right Detail Column: Editor */}
       <section className="flex-1 h-full min-w-0 bg-stone-900/30 p-6 flex flex-col gap-4 overflow-hidden min-h-0">
         {/* Top Header & Sub-Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <h2 className="font-sans text-lg font-bold text-purple-400">
-              {savedID ? name || 'Edit System' : 'Create New System'}
-            </h2>
-            {slugID && (
-              <span className="text-xs font-mono text-stone-400 bg-stone-950 px-2 py-0.5 rounded border border-stone-800">
-                systems/{slugID}
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap bg-stone-950/80 p-1 rounded-xl border border-stone-800">
-              <button
-                type="button"
-                onClick={() => setActiveTab('manifest')}
-                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'manifest'
-                    ? 'bg-purple-600 text-white font-bold shadow'
-                    : 'text-stone-400 hover:text-white'
-                }`}
-              >
-                <Info className="w-3.5 h-3.5" />
-                <span>Manifest</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('rules')}
-                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'rules'
-                    ? 'bg-purple-600 text-white font-bold shadow'
-                    : 'text-stone-400 hover:text-white'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>rules.md</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('mechanics')}
-                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'mechanics'
-                    ? 'bg-purple-600 text-white font-bold shadow'
-                    : 'text-stone-400 hover:text-white'
-                }`}
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>Mechanics</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('script')}
-                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'script'
-                    ? 'bg-purple-600 text-white font-bold shadow'
-                    : 'text-stone-400 hover:text-white'
-                }`}
-              >
-                <FileCode className="w-3.5 h-3.5" />
-                <span>mechanics.js</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('tests')}
-                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'tests'
-                    ? 'bg-purple-600 text-white font-bold shadow'
-                    : 'text-stone-400 hover:text-white'
-                }`}
-              >
-                <FlaskConical className="w-3.5 h-3.5" />
-                <span>Tests</span>
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleGenerateAllSystemFields}
-              disabled={isGeneratingAll || isSaving}
-              title="Auto-fill empty system fields with AI"
-              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-purple-500/40 bg-purple-600/15 hover:bg-purple-600/25 text-purple-300 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Wand2 className={`w-3.5 h-3.5 ${isGeneratingAll ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isGeneratingAll ? 'Generating...' : 'Auto-Fill'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleResetToReference}
-              title="Reset current editor to the comprehensive Narrative 2d6 reference template"
-              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-stone-800 hover:border-purple-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-purple-400 transition-all cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Reset Template</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleRunTests}
-              disabled={isTesting || isSaving}
-              title="Run the system's stored scenarios"
-              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-emerald-500/40 bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Play className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isTesting ? 'Testing...' : 'Run Tests'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowEnhanceDialog(true)}
-              disabled={!savedID}
-              title="Propose additions to this system with AI"
-              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-amber-500/40 bg-amber-600/15 hover:bg-amber-600/25 text-amber-300 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Lightbulb className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Enhance</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void handleExplain()}
-              disabled={!savedID || isExplaining}
-              title="Explain this system's mechanics in plain language"
-              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-sky-500/40 bg-sky-600/15 hover:bg-sky-600/25 text-sky-300 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isExplaining ? 'Explaining...' : 'Explain'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={!savedID}
-              title="Export system package (.lrpgsystem)"
-              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-
-            {savedID && (
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteTarget({ id: savedID, name: name || savedID });
-                  setDeleteSystemError(null);
-                  setCanForceDelete(false);
-                }}
-                title="Delete this system"
-                className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-red-500/30 bg-red-950/20 hover:bg-red-950/40 text-red-300 hover:text-red-200 transition-all cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Delete System</span>
-              </button>
-            )}
-
-            <button
-              onClick={handleSave}
-              disabled={isSaving || (verificationResult !== null && !verificationResult.ok)}
-              title={
-                verificationResult && !verificationResult.ok
-                  ? 'Cannot save: verification failed. Regenerate or fix errors.'
-                  : undefined
-              }
-              className="flex items-center gap-1.5 text-xs font-sans font-bold px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.35)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>{isSaving ? 'Saving...' : 'Save System'}</span>
-            </button>
-          </div>
-        </div>
+        <SystemHeader
+          savedID={savedID}
+          name={name}
+          slugID={slugID}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isSaving={isSaving}
+          isTesting={isTesting}
+          isGeneratingAll={isGeneratingAll}
+          isExplaining={isExplaining}
+          verificationResult={verificationResult}
+          handleSave={handleSave}
+          handleRunTests={handleRunTests}
+          handleExport={handleExport}
+          handleExplain={handleExplain}
+          handleResetToReference={handleResetToReference}
+          handleGenerateAllSystemFields={handleGenerateAllSystemFields}
+          setShowEnhanceDialog={setShowEnhanceDialog}
+          setDeleteTarget={setDeleteTarget}
+          setDeleteSystemError={setDeleteSystemError}
+          setCanForceDelete={setCanForceDelete}
+        />
 
         {/* Toast Feedback */}
-        {toast && (
-          <div
-            className={`p-3 rounded-xl text-xs flex items-center gap-2 shrink-0 ${
-              toast.type === 'success'
-                ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-200'
-                : 'bg-red-950/60 border border-red-500/40 text-red-200'
-            }`}
-          >
-            {toast.type === 'success' ? (
-              <Check className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-red-400" />
-            )}
-            <span>{toast.message}</span>
-          </div>
-        )}
-
-        {testFailures.length > 0 && (
-          <div className="p-3 rounded-xl text-xs bg-red-950/40 border border-red-500/40 text-red-200 space-y-1 shrink-0">
-            {testFailures.map((failure, index) => (
-              <div key={index} className="font-mono">
-                {failure.scenario} step {failure.step}: {failure.detail}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {verificationResult && (
-          <div
-            data-testid="verification-banner"
-            className={`p-3 rounded-xl text-xs flex items-center justify-between gap-3 shrink-0 ${
-              verificationResult.ok
-                ? 'bg-emerald-950/40 border border-emerald-500/40 text-emerald-200'
-                : 'bg-red-950/40 border border-red-500/40 text-red-200'
-            }`}
-          >
-            <div className="flex items-start gap-2 min-w-0">
-              {verificationResult.ok ? (
-                <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              ) : (
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-              )}
-              <div className="space-y-0.5 min-w-0">
-                <div className="font-semibold">
-                  {verificationResult.ok ? 'System verification passed' : 'System verification reported failures'}
-                </div>
-                {verificationResult.failures && verificationResult.failures.length > 0 && (
-                  <ul className="text-[11px] text-red-300 font-mono list-disc list-inside space-y-0.5">
-                    {verificationResult.failures.map((f, i) => (
-                      <li key={i}>{f}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-            {!verificationResult.ok && (
-              <button
-                type="button"
-                onClick={() => setShowGenerateDialog(true)}
-                className="px-2.5 py-1 text-xs font-sans font-medium rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40 transition-colors cursor-pointer shrink-0"
-              >
-                Regenerate
-              </button>
-            )}
-          </div>
-        )}
-
-        {draftNotes.length > 0 && (
-          <div
-            data-testid="draft-notes"
-            className="p-3 rounded-xl text-xs flex items-start gap-2 bg-amber-950/40 border border-amber-500/40 text-amber-200 shrink-0"
-          >
-            <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div className="space-y-0.5 min-w-0">
-              <div className="font-semibold">Generation notes</div>
-              <ul className="text-[11px] list-disc list-inside space-y-0.5">
-                {draftNotes.map((note, i) => (
-                  <li key={i}>{note}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
+        <SystemReport
+          toast={toast}
+          verificationResult={verificationResult}
+          testFailures={testFailures}
+          draftNotes={draftNotes}
+          setShowGenerateDialog={setShowGenerateDialog}
+        />
 
         {/* Tab 1: Manifest Form */}
         {activeTab === 'manifest' && (
-          <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-sans uppercase tracking-wider text-stone-300">System Name</label>
-                  <AIGenerateButton
-                    formType="system"
-                    fieldName="name"
-                    onError={reportGenerationError}
-                    getContext={getSystemContext}
-                    onGenerated={(val) => {
-                      setName(val);
-                      markDirty();
-                      if (!savedID) {
-                        setSlugID(
-                          val
-                            .toLowerCase()
-                            .replace(/[^a-z0-9]+/g, '-')
-                            .replace(/^-|-$/g, ''),
-                        );
-                      }
-                    }}
-                  />
-                </div>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Iron Realm D20"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    markDirty();
-                    if (!savedID) {
-                      setSlugID(
-                        e.target.value
-                          .toLowerCase()
-                          .replace(/[^a-z0-9]+/g, '-')
-                          .replace(/^-|-$/g, ''),
-                      );
-                    }
-                  }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">Version</label>
-                <input
-                  type="text"
-                  placeholder="1.0.0"
-                  value={version}
-                  onChange={(e) => {
-                    setVersion(e.target.value);
-                    markDirty();
-                  }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-sans uppercase tracking-wider text-stone-300">Directory Slug ID</label>
-              <input
-                type="text"
-                disabled={!!savedID}
-                placeholder="e.g. iron-realm"
-                value={slugID}
-                onChange={(e) => {
-                  setSlugID(e.target.value);
-                  markDirty();
-                }}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors font-mono disabled:opacity-60"
-              />
-              <p className="text-xs text-stone-400">Unique identifier for the system directory on disk.</p>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                  Rulebook Overview & Philosophy
-                </label>
-                <AIGenerateButton
-                  formType="system"
-                  fieldName="description"
-                  onError={reportGenerationError}
-                  getContext={getSystemContext}
-                  onGenerated={(val) => {
-                    setDescription(val);
-                    markDirty();
-                  }}
-                  seed={description}
-                />
-              </div>
-              <textarea
-                rows={5}
-                placeholder="Describe core dice mechanics, resolution philosophy, and character stats..."
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
-                  markDirty();
-                }}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
-              />
-            </div>
-
-            <div className="space-y-3 pt-2 border-t border-stone-800/70">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-purple-400" />
-                  <span className="font-sans text-xs uppercase font-bold text-stone-200">
-                    Character Creation Prompts
-                  </span>
-                  <span className="text-xs font-mono text-stone-500">({creationFields.length})</span>
-                  <HelpTip label="Character Creation Prompts">
-                    <>
-                      Each prompt a player answers when starting with this system. The id is the key the campaign
-                      records, the label is shown to the player, and the prompt guides the AI generator. The kind
-                      decides how the answer is collected: text and long are written answers, number is a number, select
-                      offers the options you list, and voice picks a voice profile. A voice field is never required and
-                      is never generated. Generatable marks a field the AI may fill.
-                    </>
-                  </HelpTip>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreationFields((prev) => [
-                      ...prev,
-                      { id: `prompt_${prev.length + 1}`, label: 'New Prompt', kind: 'text', generatable: true },
-                    ]);
-                    markDirty();
-                  }}
-                  className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 transition cursor-pointer"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Add Prompt</span>
-                </button>
-              </div>
-
-              <input
-                type="text"
-                placeholder="Preamble shown above the prompts (optional)"
-                value={creationPreamble}
-                onChange={(e) => {
-                  setCreationPreamble(e.target.value);
-                  markDirty();
-                }}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-xs text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
-              />
-
-              <Example label="A select prompt">
-                {`character_creation:\n  preamble: Answer in the tone of a wandering chronicle.\n  fields:\n    - id: calling\n      label: Calling\n      kind: select\n      prompt: The character's trade or vocation.\n      required: true\n      options: [sellsword, scholar, thief, priest]\n      default: scholar`}
-              </Example>
-
-              {creationFields.length === 0 ? (
-                <p className="text-xs text-stone-500">
-                  With no prompts defined, the studio falls back to appearance, age, gender, pronouns, background and
-                  voice.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {creationFields.map((field, index) => (
-                    <div key={index} className="rounded-lg bg-stone-950/70 border border-stone-800/80 p-2.5 space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          placeholder="id"
-                          value={field.id}
-                          onChange={(e) => {
-                            const updated = [...creationFields];
-                            updated[index] = { ...updated[index], id: e.target.value };
-                            setCreationFields(updated);
-                            markDirty();
-                          }}
-                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs font-mono text-purple-300 focus:outline-none"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Label"
-                          value={field.label}
-                          onChange={(e) => {
-                            const updated = [...creationFields];
-                            updated[index] = { ...updated[index], label: e.target.value };
-                            setCreationFields(updated);
-                            markDirty();
-                          }}
-                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
-                        />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Prompt shown to the player"
-                        value={field.prompt || ''}
-                        onChange={(e) => {
-                          const updated = [...creationFields];
-                          updated[index] = { ...updated[index], prompt: e.target.value };
-                          setCreationFields(updated);
-                          markDirty();
-                        }}
-                        className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
-                      />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          placeholder="Default value (optional)"
-                          value={field.default || ''}
-                          onChange={(e) => {
-                            const updated = [...creationFields];
-                            updated[index] = { ...updated[index], default: e.target.value };
-                            setCreationFields(updated);
-                            markDirty();
-                          }}
-                          className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
-                        />
-                        {field.kind === 'select' && (
-                          <input
-                            type="text"
-                            placeholder="Options, comma-separated"
-                            value={(field.options ?? []).join(', ')}
-                            onChange={(e) => {
-                              const updated = [...creationFields];
-                              updated[index] = {
-                                ...updated[index],
-                                options: e.target.value
-                                  .split(',')
-                                  .map((value) => value.trim())
-                                  .filter(Boolean),
-                              };
-                              setCreationFields(updated);
-                              markDirty();
-                            }}
-                            className="w-full bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none"
-                          />
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-stone-400">
-                        <select
-                          value={field.kind || 'text'}
-                          onChange={(e) => {
-                            const updated = [...creationFields];
-                            updated[index] = {
-                              ...updated[index],
-                              kind: e.target.value as CharacterCreationField['kind'],
-                            };
-                            setCreationFields(updated);
-                            markDirty();
-                          }}
-                          className="bg-stone-900 border border-stone-800 rounded px-2 py-1 text-xs text-stone-200 focus:outline-none cursor-pointer"
-                        >
-                          {['text', 'long', 'number', 'select', 'voice'].map((kind) => (
-                            <option key={kind} value={kind}>
-                              {kind}
-                            </option>
-                          ))}
-                        </select>
-                        <label className="flex items-center gap-1 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={!!field.required}
-                            onChange={(e) => {
-                              const updated = [...creationFields];
-                              updated[index] = { ...updated[index], required: e.target.checked };
-                              setCreationFields(updated);
-                              markDirty();
-                            }}
-                            className="rounded bg-stone-950 border-stone-800 text-purple-600 focus:ring-0"
-                          />
-                          <span>Required</span>
-                        </label>
-                        <label className="flex items-center gap-1 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={!!field.generatable}
-                            disabled={field.kind === 'voice'}
-                            onChange={(e) => {
-                              const updated = [...creationFields];
-                              updated[index] = { ...updated[index], generatable: e.target.checked };
-                              setCreationFields(updated);
-                              markDirty();
-                            }}
-                            className="rounded bg-stone-950 border-stone-800 text-purple-600 focus:ring-0 disabled:opacity-40"
-                          />
-                          <span>Generatable</span>
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCreationFields((prev) => prev.filter((_, i) => i !== index));
-                            markDirty();
-                          }}
-                          className="ml-auto flex items-center gap-1 text-red-400/80 hover:text-red-300 cursor-pointer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>Remove</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {savedID && (
-              <div className="p-4 bg-red-950/20 border border-red-500/30 rounded-2xl flex items-center justify-between mt-4">
-                <div>
-                  <div className="text-xs font-sans font-bold text-red-400 flex items-center gap-1.5">
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Danger Zone: Delete System</span>
-                  </div>
-                  <p className="text-xs font-sans text-stone-400 mt-1">
-                    Permanently delete this ruleset and its scripts from disk. This cannot be undone.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeleteTarget({ id: savedID, name: name || savedID });
-                    setDeleteSystemError(null);
-                    setCanForceDelete(false);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-sans text-xs font-bold transition-all cursor-pointer shadow"
-                >
-                  Delete System
-                </button>
-              </div>
-            )}
-          </div>
+          <SystemManifestTab
+            name={name}
+            slugID={slugID}
+            version={version}
+            description={description}
+            creationPreamble={creationPreamble}
+            creationFields={creationFields}
+            setName={setName}
+            setSlugID={setSlugID}
+            setVersion={setVersion}
+            setDescription={setDescription}
+            setCreationPreamble={setCreationPreamble}
+            setCreationFields={setCreationFields}
+            savedID={savedID}
+            markDirty={markDirty}
+            reportGenerationError={reportGenerationError}
+            getSystemContext={getSystemContext}
+            setDeleteTarget={setDeleteTarget}
+            setDeleteSystemError={setDeleteSystemError}
+            setCanForceDelete={setCanForceDelete}
+          />
         )}
 
         {/* Tab 2: Agent Rules Prompt Editor */}
         {activeTab === 'rules' && (
-          <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-              <span>AI Storyteller Instructions (prompts/rules.md)</span>
-              <div className="flex items-center gap-2">
-                <span>Injected into LLM context to guide resolution ladder &amp; mechanics hooks</span>
-                <AIGenerateButton
-                  formType="system"
-                  fieldName="rules_prompt"
-                  onError={reportGenerationError}
-                  getContext={getSystemContext}
-                  onGenerated={(val) => {
-                    setRulesPrompt(val);
-                    markDirty();
-                  }}
-                  seed={rulesPrompt}
-                />
-              </div>
-            </div>
-            <MarkdownEditor
-              key={`${savedID || slugID || 'draft'}-rules`}
-              value={rulesPrompt}
-              onChange={(next) => {
-                setRulesPrompt(next);
-                markDirty();
-              }}
-              language="markdown"
-              ariaLabel="System rules prompt"
-              placeholder="Describe the resolution philosophy, dice mechanics and character stats the engine should follow..."
-            />
-          </div>
+          <SystemRulesTab
+            rulesPrompt={rulesPrompt}
+            setRulesPrompt={setRulesPrompt}
+            markDirty={markDirty}
+            slugID={slugID}
+            savedID={savedID}
+            reportGenerationError={reportGenerationError}
+            getSystemContext={getSystemContext}
+          />
         )}
 
         {/* Tab 2b: Mechanics Editor */}
         {activeTab === 'mechanics' && (
-          <div className="flex-1 overflow-y-auto min-h-0 pr-2">
-            <MechanicsEditor
-              mechanics={mechanics}
-              onChange={(next) => {
-                setMechanics(next);
-                markDirty();
-              }}
-            />
-          </div>
+          <SystemMechanicsTab mechanics={mechanics} setMechanics={setMechanics} markDirty={markDirty} />
         )}
 
         {/* Tab 3: Script Editor */}
         {activeTab === 'script' && (
-          <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-              <span>JavaScript Runtime (Goja Sandbox)</span>
-              <span>Exports: evaluateRoll(stats, diceExpr)</span>
-            </div>
-            <ScriptReference />
-            <MarkdownEditor
-              key={`${savedID || slugID || 'draft'}-script`}
-              value={script}
-              onChange={(next) => {
-                setScript(next);
-                markDirty();
-              }}
-              language="javascript"
-              ariaLabel="System mechanics script"
-              placeholder="export function evaluateRoll(stats, diceExpr) { ... }"
-            />
-          </div>
+          <SystemScriptTab
+            slugID={slugID}
+            savedID={savedID}
+            script={script}
+            setScript={setScript}
+            markDirty={markDirty}
+          />
         )}
 
         {/* Tab 5: Tests */}
         {activeTab === 'tests' && (
-          <div className="flex-1 flex flex-col gap-3 min-h-0 overflow-y-auto pr-1">
-            <div className="flex items-center justify-between shrink-0">
-              <span className="text-xs font-mono text-stone-400 px-1">
-                {scenarios.length} scenario{scenarios.length === 1 ? '' : 's'}
-              </span>
-              <button
-                type="button"
-                disabled={!savedID}
-                onClick={() => setEditingScenario({ name: '', seed: 0, steps: [] })}
-                title={savedID ? 'Add a scenario' : 'Save the system before adding scenarios'}
-                className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 disabled:opacity-50 cursor-pointer"
-              >
-                <Plus className="w-3 h-3" />
-                <span>New scenario</span>
-              </button>
-            </div>
-
-            {scenarioError && <p className="text-xs text-red-300 px-1">{scenarioError}</p>}
-
-            {!savedID && <p className="text-xs text-stone-500 px-1">Save the system before adding scenarios.</p>}
-
-            {editingScenario && (
-              <ScenarioEditor
-                scenario={editingScenario}
-                onSave={(next) => void handleSaveScenario(next)}
-                onCancel={() => setEditingScenario(null)}
-              />
-            )}
-
-            {!editingScenario && savedID && !isLoadingScenarios && scenarios.length === 0 && (
-              <p className="text-xs text-stone-500 px-1">
-                No scenarios yet. Add one to test this system's mechanics without a provider.
-              </p>
-            )}
-
-            {!editingScenario && scenarios.length > 0 && (
-              <ul className="space-y-1">
-                {scenarios.map((scenario) => (
-                  <li
-                    key={scenario.name}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-stone-800 bg-stone-900/40 px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-sm text-stone-200 truncate">{scenario.name}</div>
-                      <div className="text-[11px] font-mono text-stone-500">
-                        {scenario.steps.length} step{scenario.steps.length === 1 ? '' : 's'}
-                        {scenario.seed ? `, seed ${scenario.seed}` : ''}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setEditingScenario(scenario)}
-                        aria-label={`Edit ${scenario.name}`}
-                        title={`Edit ${scenario.name}`}
-                        className="p-1.5 rounded text-stone-400 hover:text-purple-300 hover:bg-purple-950/40 cursor-pointer"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteScenario(scenario.name)}
-                        aria-label={`Delete ${scenario.name}`}
-                        title={`Delete ${scenario.name}`}
-                        className="p-1.5 rounded text-stone-400 hover:text-red-300 hover:bg-red-950/40 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <SystemTestsTab
+            savedID={savedID}
+            scenarios={scenarios}
+            scenarioError={scenarioError}
+            isLoadingScenarios={isLoadingScenarios}
+            editingScenario={editingScenario}
+            setEditingScenario={setEditingScenario}
+            handleSaveScenario={handleSaveScenario}
+            handleDeleteScenario={handleDeleteScenario}
+          />
         )}
       </section>
 

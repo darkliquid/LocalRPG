@@ -16,41 +16,25 @@ import {
   DraftCommitRequest,
   WorldDraftInfo,
 } from '../types';
-import {
-  Globe,
-  Plus,
-  Save,
-  Info,
-  FileText,
-  Check,
-  AlertCircle,
-  Trash2,
-  Tag,
-  Palette,
-  BookOpen,
-  Wand2,
-  Upload,
-  Sparkles,
-  Download,
-  PackagePlus,
-  Lightbulb,
-} from 'lucide-react';
-import { AIGenerateButton } from './ui/AIGenerateButton';
+import { AlertCircle, Trash2 } from 'lucide-react';
 import { formatGenerationError } from '../lib/generationError';
 import { useLightbox } from '../hooks/useLightbox';
 import { ImageLightbox } from './ImageLightbox';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { REFERENCE_WORLD_TEMPLATE } from '../templates/referenceTemplates';
-import EntityTree from './EntityTree';
-import MarkdownEditor from './editor/MarkdownEditor';
 import { NewEntityWizard } from './NewEntityWizard';
-import { safeImagePreview } from '../utils/security';
 import { ContentImportDialog } from './ContentImportDialog';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { useSaveFilePicker } from '../hooks/useSaveFilePicker';
 import { WorldGenerateDialog } from './WorldGenerateDialog';
 import { WorldDraftReview } from './WorldDraftReview';
 import { Modal } from './Modal';
+import { WorldList } from './studios/world/WorldList';
+import { WorldHeader } from './studios/world/WorldHeader';
+import { WorldReport } from './studios/world/WorldReport';
+import { WorldPromptTab } from './studios/world/WorldPromptTab';
+import { WorldEntitiesTab } from './studios/world/WorldEntitiesTab';
+import { WorldLoreTab } from './studios/world/WorldLoreTab';
 import { EntityBatchDialog } from './EntityBatchDialog';
 import { WorldEnhanceDialog } from './WorldEnhanceDialog';
 
@@ -703,770 +687,124 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
   return (
     <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
       {/* Left Master Column: Worlds List */}
-      <aside className="w-full md:w-80 h-full bg-stone-950/70 border-r border-white/10 p-4 flex flex-col gap-4 shrink-0 overflow-hidden">
-        <div className="flex flex-col gap-2 pb-2 border-b border-stone-800/60 shrink-0">
-          <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-purple-400" />
-            <h3 className="font-sans text-sm font-bold text-stone-200 uppercase tracking-wider">Worlds Studio</h3>
-          </div>
-          <input
-            type="file"
-            ref={importInputRef}
-            onChange={handleFileSelect}
-            accept=".lrpgworld,.lrpgpack"
-            className="hidden"
-          />
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setShowGenerate(true)}
-              title="Generate a world with AI"
-              className="flex-1 flex items-center justify-center gap-1 text-xs font-sans px-2 py-1.5 rounded-lg border border-purple-500/40 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 transition-all cursor-pointer whitespace-nowrap"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Generate</span>
-            </button>
-            <button
-              onClick={() => importInputRef.current?.click()}
-              title="Import world package (.lrpgworld, .lrpgpack)"
-              className="flex-1 flex items-center justify-center gap-1 text-xs font-sans px-2 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer whitespace-nowrap"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Import</span>
-            </button>
-            <button
-              onClick={() => requestSelection({ kind: 'draft' })}
-              className="flex-1 flex items-center justify-center gap-1 text-xs font-sans font-bold px-2 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer shadow whitespace-nowrap"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
-          {draft && (
-            <div
-              onClick={() => requestSelection({ kind: 'draft' })}
-              className={`p-3 rounded-xl border transition-all cursor-pointer text-left border-dashed ${
-                selection?.kind === 'draft'
-                  ? 'bg-purple-950/30 border-purple-500/50'
-                  : 'bg-stone-900/40 border-stone-700 hover:bg-stone-800/40'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="font-sans text-xs font-bold text-stone-200 truncate">
-                  {name.trim() || 'Untitled World'}
-                </h4>
-                <span className="text-xs font-mono text-amber-300 bg-amber-950/40 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                  unsaved
-                </span>
-              </div>
-            </div>
-          )}
-          {isLoading && worlds.length === 0 ? (
-            <div className="text-center py-8 text-xs font-mono text-stone-500 animate-pulse">Loading worlds...</div>
-          ) : worlds.length === 0 ? (
-            <div className="text-center py-8 text-xs text-stone-400">
-              No worlds created yet. Craft your first setting!
-            </div>
-          ) : (
-            worlds.map((w) => (
-              <div
-                key={w.id}
-                onClick={() => requestSelection({ kind: 'saved', id: w.id })}
-                className={`group p-3 rounded-xl border transition-all cursor-pointer text-left ${
-                  selection?.kind === 'saved' && selection.id === w.id
-                    ? 'bg-purple-950/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
-                    : 'bg-stone-900/40 border-stone-800/60 hover:bg-stone-800/40 hover:border-stone-700'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-1">
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-sans text-xs font-bold text-stone-200 truncate">{w.name}</h4>
-                    {w.genre && (
-                      <div className="mt-1">
-                        <span className="inline-block text-xs font-mono text-purple-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
-                          {w.genre}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteTarget({ id: w.id, name: w.name });
-                      setDeleteWorldError(null);
-                      setCanForceDelete(false);
-                    }}
-                    aria-label={`Delete world "${w.name}"`}
-                    title={`Delete world "${w.name}"`}
-                    className="p-1 text-stone-500 hover:text-red-400 rounded hover:bg-red-950/40 transition-colors opacity-40 group-hover:opacity-100 hover:!opacity-100 shrink-0 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                {w.description && <p className="text-xs text-stone-400 truncate mt-1">{w.description}</p>}
-              </div>
-            ))
-          )}
-        </div>
-      </aside>
+      <WorldList
+        worlds={worlds}
+        selection={selection}
+        draft={draft}
+        name={name}
+        isLoading={isLoading}
+        importInputRef={importInputRef}
+        handleFileSelect={handleFileSelect}
+        requestSelection={requestSelection}
+        setShowGenerate={setShowGenerate}
+        setDeleteTarget={setDeleteTarget}
+        setDeleteWorldError={setDeleteWorldError}
+        setCanForceDelete={setCanForceDelete}
+      />
 
       {/* Right Detail Column: Editor */}
       <section className="flex-1 h-full min-w-0 bg-stone-900/30 p-6 flex flex-col gap-4 overflow-hidden min-h-0">
         {/* Top Header & Sub-Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <h2 className="font-sans text-lg font-bold text-purple-400">
-              {selection?.kind === 'saved' ? name || 'Edit World' : 'Create New World'}
-            </h2>
-            {slugID && (
-              <span className="text-xs font-mono text-stone-400 bg-stone-950 px-2 py-0.5 rounded border border-stone-800">
-                worlds/{slugID}
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {savedID && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setBatchWorldId(savedID)}
-                  title="Generate a batch of entities for this world"
-                  className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl border border-sky-500/40 bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 transition-all cursor-pointer"
-                >
-                  <PackagePlus className="w-3.5 h-3.5" />
-                  <span>Generate entities</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEnhanceWorldId(savedID)}
-                  title="Propose lore, entities, and hooks for this world"
-                  className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 transition-all cursor-pointer"
-                >
-                  <Lightbulb className="w-3.5 h-3.5" />
-                  <span>Enhance</span>
-                </button>
-              </>
-            )}
-            <div className="flex flex-wrap bg-stone-950/80 p-1 rounded-xl border border-stone-800">
-              <button
-                type="button"
-                onClick={() => setActiveTab('lore')}
-                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'lore' ? 'bg-purple-600 text-white font-bold shadow' : 'text-stone-400 hover:text-white'
-                }`}
-              >
-                <Info className="w-3.5 h-3.5" />
-                <span>Lore & Atmosphere</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('prompt')}
-                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'prompt'
-                    ? 'bg-purple-600 text-white font-bold shadow'
-                    : 'text-stone-400 hover:text-white'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>lore.md</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('entities')}
-                className={`flex items-center gap-1.5 text-xs font-sans px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'entities'
-                    ? 'bg-purple-600 text-white font-bold shadow'
-                    : 'text-stone-400 hover:text-white'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Starter Entities ({entities.length})</span>
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleGenerateAllWorldFields}
-              disabled={isGeneratingAll || isSaving}
-              title="Auto-fill empty world fields with AI"
-              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-purple-500/40 bg-purple-600/15 hover:bg-purple-600/25 text-purple-300 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Wand2 className={`w-3.5 h-3.5 ${isGeneratingAll ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isGeneratingAll ? 'Generating...' : 'Auto-Fill'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleLoadReferenceTemplate}
-              title="Load the comprehensive Ashen Reach reference template"
-              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-stone-800 hover:border-purple-500/50 bg-stone-900/60 hover:bg-stone-800 text-stone-300 hover:text-purple-400 transition-all cursor-pointer"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Load Reference Template</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={!savedID}
-              title="Export world package (.lrpgworld)"
-              className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-
-            {savedID && (
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteTarget({ id: savedID, name: name || savedID });
-                  setDeleteWorldError(null);
-                  setCanForceDelete(false);
-                }}
-                title="Delete this world"
-                className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-red-500/30 bg-red-950/20 hover:bg-red-950/40 text-red-300 hover:text-red-200 transition-all cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Delete World</span>
-              </button>
-            )}
-
-            <button
-              onClick={handleSaveWorld}
-              disabled={isSaving}
-              className="flex items-center gap-1.5 text-xs font-sans font-bold px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.35)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>{isSaving ? 'Saving...' : 'Save World'}</span>
-            </button>
-          </div>
-        </div>
+        <WorldHeader
+          savedID={savedID}
+          name={name}
+          slugID={slugID}
+          selection={selection}
+          entities={entities}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isSaving={isSaving}
+          isGeneratingAll={isGeneratingAll}
+          handleSaveWorld={handleSaveWorld}
+          handleExport={handleExport}
+          handleLoadReferenceTemplate={handleLoadReferenceTemplate}
+          handleGenerateAllWorldFields={handleGenerateAllWorldFields}
+          setEnhanceWorldId={setEnhanceWorldId}
+          setBatchWorldId={setBatchWorldId}
+          setDeleteTarget={setDeleteTarget}
+          setDeleteWorldError={setDeleteWorldError}
+          setCanForceDelete={setCanForceDelete}
+        />
 
         {/* Toast Feedback */}
-        {toast && (
-          <div
-            className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
-              toast.type === 'success'
-                ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-200'
-                : 'bg-red-950/60 border border-red-500/40 text-red-200'
-            }`}
-          >
-            {toast.type === 'success' ? (
-              <Check className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-red-400" />
-            )}
-            <span>{toast.message}</span>
-          </div>
-        )}
-
+        <WorldReport toast={toast} />
         {/* Tab 1: Lore & Atmosphere Form */}
         {activeTab === 'lore' && (
-          <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                    World Setting Name
-                  </label>
-                  <AIGenerateButton
-                    formType="world"
-                    fieldName="name"
-                    onError={reportGenerationError}
-                    getContext={getWorldContext}
-                    onGenerated={(val) => {
-                      setName(val);
-                      markDirty();
-                      if (isDraft) {
-                        setSlugID(
-                          val
-                            .toLowerCase()
-                            .replace(/[^a-z0-9_]+/g, '_')
-                            .replace(/^_+|_+$/g, ''),
-                        );
-                      }
-                    }}
-                    systemID={defaultSystem}
-                  />
-                </div>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Solitary Defiance"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    markDirty();
-                    setSlugError(false);
-                    if (isDraft) {
-                      setSlugID(
-                        e.target.value
-                          .toLowerCase()
-                          .replace(/[^a-z0-9_]+/g, '_')
-                          .replace(/^_+|_+$/g, ''),
-                      );
-                    }
-                  }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                    Genre / Setting Style
-                  </label>
-                  <AIGenerateButton
-                    formType="world"
-                    fieldName="genre"
-                    onError={reportGenerationError}
-                    getContext={getWorldContext}
-                    onGenerated={(val) => {
-                      setGenre(val);
-                      markDirty();
-                    }}
-                    systemID={defaultSystem}
-                  />
-                </div>
-                <input
-                  type="text"
-                  placeholder="e.g. Gothic Fantasy, Cyberpunk"
-                  value={genre}
-                  onChange={(e) => {
-                    setGenre(e.target.value);
-                    markDirty();
-                  }}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">Directory Slug ID</label>
-                <input
-                  type="text"
-                  disabled={selection?.kind === 'saved'}
-                  placeholder="e.g. solitary_defiance"
-                  value={slugID}
-                  onChange={(e) => {
-                    setSlugID(e.target.value);
-                    setSlugError(false);
-                  }}
-                  className={`w-full bg-stone-950 border rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
-                    slugError ? 'border-red-500/70 focus:border-red-500' : 'border-stone-800 focus:border-purple-500/50'
-                  }`}
-                />
-                {slugError && <p className="text-xs text-red-400">That id already exists. Change the name or slug.</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">Default Rule System</label>
-                <select
-                  value={defaultSystem}
-                  onChange={(e) => setDefaultSystem(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3.5 pr-9 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-purple-500/50 transition-colors cursor-pointer"
-                >
-                  {systems.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.id})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Visual Art Style Prompt Guide</span>
-                </label>
-                <AIGenerateButton
-                  formType="world"
-                  fieldName="art_style"
-                  onError={reportGenerationError}
-                  getContext={getWorldContext}
-                  onGenerated={(val) => {
-                    setArtStyle(val);
-                    markDirty();
-                  }}
-                  systemID={defaultSystem}
-                  seed={artStyle}
-                />
-              </div>
-              <input
-                type="text"
-                placeholder="e.g. Dark watercolor gothic, mist, gaslight, copper accents, muted palette"
-                value={artStyle}
-                onChange={(e) => {
-                  setArtStyle(e.target.value);
-                  markDirty();
-                }}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
-              />
-              <p className="text-xs text-stone-400">
-                Injected into image generation prompts to create consistent scene illustrations in this world.
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-sans uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-purple-400" />
-                <span>World Tags (Comma-separated)</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. gothic, horror, city, rebellion"
-                value={tags}
-                onChange={(e) => {
-                  setTags(e.target.value);
-                  markDirty();
-                }}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-sans uppercase tracking-wider text-stone-300">
-                  World Synopsis & Lore
-                </label>
-                <AIGenerateButton
-                  formType="world"
-                  fieldName="description"
-                  onError={reportGenerationError}
-                  getContext={getWorldContext}
-                  onGenerated={(val) => {
-                    setDescription(val);
-                    markDirty();
-                  }}
-                  systemID={defaultSystem}
-                  seed={description}
-                />
-              </div>
-              <textarea
-                rows={4}
-                placeholder="Describe the setting, major conflicts, factions, and atmosphere..."
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
-                  markDirty();
-                }}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
-              />
-            </div>
-
-            {/* World Artwork (Banner & Icon) */}
-            <div className="space-y-3 pt-2">
-              <label className="text-xs font-sans uppercase tracking-wider text-stone-300">World Artwork</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Banner */}
-                <div className="p-3 bg-stone-950 border border-stone-800 rounded-xl space-y-2">
-                  <span className="text-xs font-sans font-semibold text-stone-400">World Banner</span>
-                  <input
-                    type="file"
-                    ref={bannerInputRef}
-                    onChange={() => {
-                      const file = bannerInputRef.current?.files?.[0];
-                      if (file) {
-                        setBannerFile(file);
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          if (typeof reader.result === 'string') {
-                            setBannerPreview(reader.result);
-                          }
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                    className="hidden"
-                  />
-                  <div
-                    onClick={() =>
-                      bannerPreview ? openLightbox(bannerPreview, 'World banner') : bannerInputRef.current?.click()
-                    }
-                    className={`h-24 rounded-lg overflow-hidden border border-stone-800 bg-stone-900/40 flex items-center justify-center ${
-                      bannerPreview ? 'cursor-zoom-in' : 'cursor-pointer'
-                    }`}
-                  >
-                    {safeImagePreview(bannerPreview) ? (
-                      <img
-                        src={safeImagePreview(bannerPreview)}
-                        alt="Banner Preview"
-                        className="w-full h-full object-cover"
-                        onError={() => setBannerPreview(null)}
-                      />
-                    ) : (
-                      <span className="text-stone-600 text-xs">Click to upload banner</span>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => bannerInputRef.current?.click()}
-                      disabled={isSaving || generatingKind === 'banner'}
-                      className="flex-1 py-1.5 px-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-sans font-semibold text-stone-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAIGenerate('banner')}
-                      disabled={isSaving || generatingKind === 'banner'}
-                      className="flex-1 py-1.5 px-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-xs font-sans font-semibold text-purple-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>{generatingKind === 'banner' ? 'Gen...' : 'AI Gen'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Icon */}
-                <div className="p-3 bg-stone-950 border border-stone-800 rounded-xl space-y-2">
-                  <span className="text-xs font-sans font-semibold text-stone-400">World Icon</span>
-                  <input
-                    type="file"
-                    ref={iconInputRef}
-                    onChange={() => {
-                      const file = iconInputRef.current?.files?.[0];
-                      if (file) {
-                        setIconFile(file);
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          if (typeof reader.result === 'string') {
-                            setIconPreview(reader.result);
-                          }
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                    className="hidden"
-                  />
-                  <div
-                    onClick={() =>
-                      iconPreview ? openLightbox(iconPreview, 'World icon') : iconInputRef.current?.click()
-                    }
-                    className={`h-24 rounded-lg overflow-hidden border border-stone-800 bg-stone-900/40 flex items-center justify-center ${
-                      iconPreview ? 'cursor-zoom-in' : 'cursor-pointer'
-                    }`}
-                  >
-                    {safeImagePreview(iconPreview) ? (
-                      <img
-                        src={safeImagePreview(iconPreview)}
-                        alt="Icon Preview"
-                        className="w-16 h-16 rounded-xl object-cover"
-                        onError={() => setIconPreview(null)}
-                      />
-                    ) : (
-                      <span className="text-stone-600 text-xs">Click to upload icon</span>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => iconInputRef.current?.click()}
-                      disabled={isSaving || generatingKind === 'icon'}
-                      className="flex-1 py-1.5 px-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-sans font-semibold text-stone-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAIGenerate('icon')}
-                      disabled={isSaving || generatingKind === 'icon'}
-                      className="flex-1 py-1.5 px-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-xs font-sans font-semibold text-purple-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>{generatingKind === 'icon' ? 'Gen...' : 'AI Gen'}</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {savedID && (
-                <div className="p-4 bg-red-950/20 border border-red-500/30 rounded-2xl flex items-center justify-between mt-4">
-                  <div>
-                    <div className="text-xs font-sans font-bold text-red-400 flex items-center gap-1.5">
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Danger Zone: Delete World</span>
-                    </div>
-                    <p className="text-xs font-sans text-stone-400 mt-1">
-                      Permanently delete this world and all of its lore and entities from disk. This cannot be undone.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDeleteTarget({ id: savedID, name: name || savedID });
-                      setDeleteWorldError(null);
-                      setCanForceDelete(false);
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-sans text-xs font-bold transition-all cursor-pointer shadow"
-                  >
-                    Delete World
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          <WorldLoreTab
+            name={name}
+            slugID={slugID}
+            slugError={slugError}
+            genre={genre}
+            artStyle={artStyle}
+            description={description}
+            tags={tags}
+            defaultSystem={defaultSystem}
+            systems={systems}
+            selection={selection}
+            isDraft={isDraft}
+            isSaving={isSaving}
+            savedID={savedID}
+            generatingKind={generatingKind}
+            bannerPreview={bannerPreview}
+            iconPreview={iconPreview}
+            bannerInputRef={bannerInputRef}
+            iconInputRef={iconInputRef}
+            setName={setName}
+            setSlugID={setSlugID}
+            setSlugError={setSlugError}
+            setGenre={setGenre}
+            setArtStyle={setArtStyle}
+            setDescription={setDescription}
+            setTags={setTags}
+            setDefaultSystem={setDefaultSystem}
+            setBannerFile={setBannerFile}
+            setBannerPreview={setBannerPreview}
+            setIconFile={setIconFile}
+            setIconPreview={setIconPreview}
+            markDirty={markDirty}
+            reportGenerationError={reportGenerationError}
+            getWorldContext={getWorldContext}
+            handleAIGenerate={handleAIGenerate}
+            openLightbox={openLightbox}
+            setDeleteTarget={setDeleteTarget}
+            setDeleteWorldError={setDeleteWorldError}
+            setCanForceDelete={setCanForceDelete}
+          />
         )}
 
         {/* Tab 2: Agent Lore Prompt Editor */}
         {activeTab === 'prompt' && (
-          <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-              <span>AI Storyteller Atmosphere Instructions (prompts/lore.md)</span>
-              <div className="flex items-center gap-2">
-                <span>Injected into LLM context to guide sensory tone &amp; faction conflicts</span>
-                <AIGenerateButton
-                  formType="world"
-                  fieldName="lore_prompt"
-                  onError={reportGenerationError}
-                  getContext={getWorldContext}
-                  onGenerated={(val) => {
-                    setLorePrompt(val);
-                    markDirty();
-                  }}
-                  systemID={defaultSystem}
-                  seed={lorePrompt}
-                />
-              </div>
-            </div>
-            <MarkdownEditor
-              key={`${savedID || slugID || 'draft'}-lore`}
-              value={lorePrompt}
-              onChange={(next) => {
-                setLorePrompt(next);
-                markDirty();
-              }}
-              language="markdown"
-              ariaLabel="World lore prompt"
-              placeholder="Describe the sensory tone, factions and conflicts the storyteller should hold in mind..."
-            />
-          </div>
+          <WorldPromptTab
+            lorePrompt={lorePrompt}
+            setLorePrompt={setLorePrompt}
+            defaultSystem={defaultSystem}
+            markDirty={markDirty}
+            slugID={slugID}
+            savedID={savedID}
+            reportGenerationError={reportGenerationError}
+            getWorldContext={getWorldContext}
+          />
         )}
 
         {/* Tab 3: Starter Entities Manager */}
         {activeTab === 'entities' && (
-          <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
-            {/* Entity List */}
-            <div className="w-64 shrink-0 bg-stone-950/60 rounded-xl border border-stone-800/80 p-3 flex flex-col gap-2 min-h-0 h-full">
-              <div className="flex items-center justify-between pb-2 border-b border-stone-800/60 shrink-0">
-                <span className="text-xs font-sans uppercase tracking-wider text-stone-400">Templates</span>
-                <button
-                  type="button"
-                  onClick={() => setIsNewEntityModal(true)}
-                  className="text-xs font-sans font-bold px-2 py-0.5 rounded bg-purple-600 text-white cursor-pointer hover:bg-purple-500"
-                >
-                  + Add
-                </button>
-              </div>
-
-              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                {entities.length === 0 ? (
-                  <div className="text-xs text-stone-500 py-6 text-center">
-                    No starter templates. Click + Add to create one!
-                  </div>
-                ) : (
-                  <EntityTree
-                    folders={worldFolders}
-                    entities={entities}
-                    selectedId={selectedEntityID ?? undefined}
-                    onSelect={(id) => void handleSelectEntity(id)}
-                    onMoveEntity={async (id, folder) => {
-                      if (!savedID) {
-                        setToast({ type: 'error', message: 'Save the world before organising its templates.' });
-                        return;
-                      }
-                      const note = await APIClient.getWorldEntity(savedID, id);
-                      await APIClient.saveWorldEntity(savedID, id, note.markdown, folder);
-                      await loadWorldDetail(savedID);
-                      await refreshWorldFolders();
-                    }}
-                    onMoveFolder={async (from, to) => {
-                      if (!savedID) return;
-                      await APIClient.moveWorldFolder(savedID, from, to);
-                      await refreshWorldFolders();
-                    }}
-                    onCreateFolder={async (path) => {
-                      if (!savedID) {
-                        setToast({ type: 'error', message: 'Save the world before creating folders.' });
-                        return;
-                      }
-                      await APIClient.createWorldFolder(savedID, path);
-                      await refreshWorldFolders();
-                    }}
-                    onDeleteFolder={async (path) => {
-                      if (!savedID) return;
-                      await APIClient.deleteWorldFolder(savedID, path, true);
-                      await refreshWorldFolders();
-                    }}
-                    onDeleteEntity={(id) => void handleDeleteEntity(id)}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Entity Markdown Editor */}
-            <div className="flex-1 min-w-0 flex flex-col gap-2 min-h-0 overflow-hidden">
-              {selectedEntityID ? (
-                <>
-                  <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-                    <span>
-                      worlds/{savedID || slugID || 'draft'}/entities/
-                      {entities.find((e) => e.id === selectedEntityID)?.folder
-                        ? `${entities.find((e) => e.id === selectedEntityID)?.folder}/`
-                        : ''}
-                      {selectedEntityID}.md
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteEntity(selectedEntityID)}
-                        title="Delete entity template"
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-950/40 font-bold text-xs cursor-pointer transition-all"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Delete</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSaveEntity}
-                        className="flex items-center gap-1 px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer shadow transition-all"
-                      >
-                        <Save className="w-3 h-3" />
-                        <span>{savedID ? 'Save Entity' : 'Update Draft'}</span>
-                      </button>
-                    </div>
-                  </div>
-                  <MarkdownEditor
-                    key={`${savedID || slugID || 'draft'}-${selectedEntityID}`}
-                    value={entityMarkdown}
-                    onChange={(next) => {
-                      setEntityMarkdown(next);
-                      markDirty();
-                    }}
-                    language="markdown-frontmatter"
-                    ariaLabel="World entity template markdown"
-                  />
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-xs text-stone-500 font-mono">
-                  Select or create an entity template to edit its Markdown.
-                </div>
-              )}
-            </div>
-          </div>
+          <WorldEntitiesTab
+            entities={entities}
+            entityMarkdown={entityMarkdown}
+            setEntityMarkdown={setEntityMarkdown}
+            selectedEntityID={selectedEntityID}
+            worldFolders={worldFolders}
+            savedID={savedID}
+            slugID={slugID}
+            setIsNewEntityModal={setIsNewEntityModal}
+            markDirty={markDirty}
+            handleSelectEntity={handleSelectEntity}
+            handleSaveEntity={handleSaveEntity}
+            handleDeleteEntity={handleDeleteEntity}
+            refreshWorldFolders={refreshWorldFolders}
+            loadWorldDetail={loadWorldDetail}
+            setToast={setToast}
+          />
         )}
       </section>
 
