@@ -103,6 +103,31 @@ because they read what they need from the context rather than receiving it.
 handler and read by the same components; splitting it out would leave two providers doing one job. The
 name of the provider says audio, so the field carries a comment saying what it is.
 
+### Why the playback provider did not land with the other two
+
+The audio state is **written by the turn stream**, and the turn stream lives in `App.tsx` with the
+campaign's own state: `handleTurnEvent` sets the audio progress, the streamed keys and the ledger, and
+`beginTurnStream` resets them. A provider that owns the audio state therefore has to wrap the code that
+writes it, and that code is the campaign's, not the audio's.
+
+That leaves two shapes, and the first one is a trap:
+
+- **Two providers, audio inside App.** `App` cannot consume a provider it renders, so the stream's
+  writes would have to be passed *into* the provider as callbacks, which is a prop list wearing a
+  context's clothes.
+- **One campaign provider**, owning the campaign's data, the turn stream and the playback together,
+  mounted above `App` and consumed by the screen. This is what the review meant by a campaign
+  context, and it is the shape the two landed providers do not need because neither of them is written
+  by the stream.
+
+So the state layer is **one campaign provider, not three**, and it carries the App split with it: while
+the stream lives in `App.tsx`, no context can own what the stream writes. The settings and the portraits
+landed first because they are not written by the stream, and they are what the provider will read.
+
+The provider is mounted in `main.tsx` and is told which campaign is active by the shell, because the
+campaign is chosen below it; every action that needs the campaign is either bound to it by the shell or
+takes it as an argument.
+
 ### App becomes a shell
 
 `CampaignScreen.tsx` takes the campaign screen's chrome: the header, the drawer pills, the chronicle
