@@ -1,5 +1,6 @@
 import type { TestProviderRequest } from '../types';
 import { useFailures } from '../context/FailuresContext';
+import { useSettings } from '../context/SettingsContext';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { DebugPanel } from './DebugPanel';
 import { APIClient } from '../api/client';
@@ -58,18 +59,21 @@ const presetsToMap = <T,>(
 
 export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSaved, activeGameID, onOpenDocs }) => {
   const { report } = useFailures();
+  // The provider holds the settings the app is running on; this studio edits a
+  // draft of the config and applies a save back, so the rest of the app sees the
+  // accepted copy without a second request.
+  const { settings, isLoading: isLoadingSettings, applySettings } = useSettings();
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [activeFilePath, setActiveFilePath] = useState<string>('');
-  const [isOverride, setIsOverride] = useState(false);
+  const activeFilePath = settings?.config_file_path ?? '';
+  const isOverride = settings?.is_local_override ?? false;
+  const configWarnings = settings?.warnings ?? [];
   const [activeSubTab, setActiveSubTab] = useState<
     'paths' | 'providers' | 'agents' | 'media' | 'batch' | 'preferences' | 'usage' | 'debug'
   >('paths');
   // The Providers area splits into credentials, embeddings, and the offline preset,
   // so the tab leads with one job rather than all three.
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [configWarnings, setConfigWarnings] = useState<string[]>([]);
   // The style packs the config directory holds, so the picker lists what exists
   // rather than only what is configured.
   const [stylePacks, setStylePacks] = useState<StylePacks | null>(null);
@@ -106,7 +110,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     sizeBytes: number;
   } | null>(null);
   useEffect(() => {
-    loadSettings();
     APIClient.getModels()
       .then(setModels)
       .catch((err) =>
@@ -152,26 +155,27 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     });
   };
 
-  const loadSettings = async () => {
-    setIsLoading(true);
+  // The style packs are the studio's own listing rather than part of the settings
+  // response, so they are still loaded here; everything else comes from the
+  // provider.
+  const loadStylePacks = async () => {
     try {
-      const res = await APIClient.getSettings();
-      setConfig(res.config);
-      setActiveFilePath(res.config_file_path);
-      setIsOverride(res.is_local_override);
-      setConfigWarnings(res.warnings ?? []);
-      try {
-        setStylePacks(await APIClient.getStylePacks());
-      } catch {
-        // A missing pack listing must not stop the settings from loading.
-        setStylePacks(null);
-      }
-    } catch (err) {
-      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Failed to load settings' });
-    } finally {
-      setIsLoading(false);
+      setStylePacks(await APIClient.getStylePacks());
+    } catch {
+      // A missing pack listing must not stop the settings from loading.
+      setStylePacks(null);
     }
   };
+
+  // The draft follows the provider's copy: it is seeded when the settings arrive
+  // and re-seeded when a save is applied, which are the two moments it is stale.
+  useEffect(() => {
+    if (settings) setConfig(settings.config);
+  }, [settings]);
+
+  useEffect(() => {
+    void loadStylePacks();
+  }, []);
 
   const handleSave = async () => {
     if (!config) return;
@@ -179,15 +183,10 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     setFeedback(null);
     try {
       const res = await APIClient.saveSettings(config);
-      setConfig(res.config);
-      setActiveFilePath(res.config_file_path);
-      setIsOverride(res.is_local_override);
-      setConfigWarnings(res.warnings ?? []);
-      try {
-        setStylePacks(await APIClient.getStylePacks());
-      } catch {
-        setStylePacks(null);
-      }
+      // The server's answer is the freshest copy, so the whole app is given it
+      // rather than asked to fetch the same settings again.
+      applySettings(res);
+      void loadStylePacks();
       setFeedback({ type: 'success', message: 'Settings saved and live-reloaded successfully.' });
       if (onSaved) onSaved();
     } catch (err) {
@@ -246,7 +245,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
     }
   };
 
-  if (isLoading || !config) {
+  if (isLoadingSettings || !config) {
     return (
       <div className="p-8 text-center text-stone-400 font-mono text-sm animate-pulse">
         Loading system configuration...

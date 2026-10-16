@@ -9,12 +9,12 @@ import {
   EntitySummary,
   Recap,
   GraphData,
-  AppConfig,
   LimitState,
   AudioProgressEvent,
   PlaybackEntry,
 } from './types';
 import { FailuresRegion, useFailures } from './context/FailuresContext';
+import { useSettings } from './context/SettingsContext';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
 import { TurnAudioState, segmentAudioKey } from './components/TurnSegments';
@@ -88,8 +88,11 @@ export const App: React.FC = () => {
   const [recap, setRecap] = useState<Recap | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<EntityNote | null>(null);
   // TTS playback preferences live in the global settings, so the chronicle and
-  // the story theater honour the same switches as the settings studio.
-  const [config, setConfig] = useState<AppConfig | null>(null);
+  // the story theater honour the same switches as the settings studio. One
+  // provider owns them for the whole app.
+  const { settings, applySettings } = useSettings();
+  const config = settings?.config ?? null;
+  const appVersion = settings?.app_version;
 
   // Active drawer tab: null, 'character', 'graph', 'codex', 'world'
   // The application plays audio itself when it can, which is the only way to
@@ -128,7 +131,6 @@ export const App: React.FC = () => {
   const [docsArticleID, setDocsArticleID] = useState<string | undefined>(undefined);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   // The build version the About dialog reports, read from the settings endpoint.
-  const [appVersion, setAppVersion] = useState<string | undefined>(undefined);
   const [addressed, setAddressed] = useState<Set<number>>(new Set());
   const [modalEntity, setModalEntity] = useState<{ name: string; turnNumber: number } | null>(null);
   const [wizardEntity, setWizardEntity] = useState<{ name: string; turnNumber: number } | null>(null);
@@ -194,14 +196,6 @@ export const App: React.FC = () => {
   const isRateLimited = activeRateLimitSeconds > 0;
 
   useEffect(() => {
-    APIClient.getSettings()
-      .then((res) => {
-        setConfig(res.config);
-        setAppVersion(res.app_version);
-      })
-      .catch((err) =>
-        report({ text: 'Could not load the settings.', detail: err instanceof Error ? err.message : String(err) }),
-      );
     APIClient.audioStatus()
       .then((status) => {
         setServerAudio(status.available);
@@ -1345,7 +1339,7 @@ export const App: React.FC = () => {
                         tts: { ...config.media.tts, voice_profiles: [...existing, profile] },
                       },
                     };
-                    setConfig(next);
+                    applySettings({ ...settings!, config: next });
                     APIClient.saveSettings(next).catch(() => undefined);
                   }}
                   onSelect={handleOpenWikilink}
@@ -1387,20 +1381,7 @@ export const App: React.FC = () => {
               className="max-w-4xl"
             >
               <Suspense fallback={null}>
-                <SettingsStudio
-                  activeGameID={activeGameID ?? undefined}
-                  onOpenDocs={openDocs}
-                  onSaved={() =>
-                    APIClient.getSettings()
-                      .then((res) => setConfig(res.config))
-                      .catch((err) =>
-                        report({
-                          text: 'Could not load the settings.',
-                          detail: err instanceof Error ? err.message : String(err),
-                        }),
-                      )
-                  }
-                />
+                <SettingsStudio activeGameID={activeGameID ?? undefined} onOpenDocs={openDocs} />
               </Suspense>
             </Modal>
 
