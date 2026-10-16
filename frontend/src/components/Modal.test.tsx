@@ -2,8 +2,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Modal } from './Modal';
+import { expectNoViolations } from '../test/a11y';
 
 describe('Modal', () => {
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <Modal open onClose={() => undefined} title="Campaign settings">
+        <label htmlFor="name">Name</label>
+        <input id="name" />
+        <button type="button">Save</button>
+      </Modal>,
+    );
+
+    await expectNoViolations(container);
+  });
+
   it('announces itself as a dialog and labels it with its title', () => {
     render(
       <Modal open onClose={() => undefined} title="Campaign settings">
