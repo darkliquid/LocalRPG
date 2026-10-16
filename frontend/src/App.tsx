@@ -14,6 +14,7 @@ import {
   PlaybackEntry,
 } from './types';
 import { FailuresRegion, useFailures } from './context/FailuresContext';
+import { useCharacterPortraits } from './hooks/useCharacterPortraits';
 import { useSettings } from './context/SettingsContext';
 import { ChronicleView } from './components/ChronicleView';
 import { TurnSegments } from './components/TurnSegments';
@@ -120,7 +121,13 @@ export const App: React.FC = () => {
   const [playbackLedger, setPlaybackLedger] = useState<Record<string, PlaybackEntry>>({});
   const [audioProgress, setAudioProgress] = useState<AudioProgressEvent | null>(null);
   const [segmentAudioProgress, setSegmentAudioProgress] = useState<Record<number, string>>({});
-  const [characterPortraits, setCharacterPortraits] = useState<Record<string, { url: string; hasCustom: boolean }>>({});
+  // Every character's portrait, from the two places one can arrive: the segments of
+  // a turn and the entity list.
+  const { portraits: characterPortraits, notePortrait } = useCharacterPortraits({
+    chronicle,
+    entities,
+    activeGameID,
+  });
 
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [isTheaterOpen, setIsTheaterOpen] = useState(false);
@@ -320,7 +327,6 @@ export const App: React.FC = () => {
       setAddressed(new Set());
       setAudioProgress(null);
       setSegmentAudioProgress({});
-      setCharacterPortraits({});
       setDismissedContentWarnings(false);
       return;
     }
@@ -341,66 +347,6 @@ export const App: React.FC = () => {
       );
     refreshCorpus();
   }, [report, client, refreshCorpus]);
-
-  useEffect(() => {
-    if (chronicle.length === 0) return;
-    const portraits: Record<string, { url: string; hasCustom: boolean }> = {};
-    for (const turn of chronicle) {
-      for (const seg of turn.segments || []) {
-        const charId = seg.speaker_id || (seg.speaker ? slugify(seg.speaker) : undefined);
-        if (charId && seg.portrait_url) {
-          if (!portraits[charId] || seg.has_custom_portrait) {
-            portraits[charId] = {
-              url:
-                seg.has_custom_portrait && !seg.portrait_url.includes('?')
-                  ? `${seg.portrait_url}?t=${Date.now()}`
-                  : seg.portrait_url,
-              hasCustom: !!seg.has_custom_portrait,
-            };
-          }
-        }
-      }
-    }
-    setCharacterPortraits((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const [id, p] of Object.entries(portraits)) {
-        if (!next[id] || (!next[id].hasCustom && p.hasCustom)) {
-          next[id] = p;
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [chronicle]);
-
-  useEffect(() => {
-    if (entities.length === 0) return;
-    const portraits: Record<string, { url: string; hasCustom: boolean }> = {};
-    for (const ent of entities) {
-      if (ent.type === 'character' && ent.has_portrait) {
-        portraits[ent.id] = {
-          url: ent.portrait_url
-            ? `${ent.portrait_url}?t=${Date.now()}`
-            : `/api/game/${encodeURIComponent(activeGameID || '')}/character/${encodeURIComponent(ent.id)}/portrait?t=${Date.now()}`,
-          hasCustom: true,
-        };
-      }
-    }
-    if (Object.keys(portraits).length > 0) {
-      setCharacterPortraits((prev) => {
-        const next = { ...prev };
-        let changed = false;
-        for (const [id, p] of Object.entries(portraits)) {
-          if (!next[id] || (!next[id].hasCustom && p.hasCustom)) {
-            next[id] = p;
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    }
-  }, [entities, activeGameID]);
 
   // Poll for background portrait completion when characters in chronicle lack custom portraits
   useEffect(() => {
@@ -509,13 +455,10 @@ export const App: React.FC = () => {
         }));
       }
     } else if (event.type === 'portrait' && event.character_id) {
-      setCharacterPortraits((prev) => ({
-        ...prev,
-        [event.character_id!]: {
-          url: event.portrait_url || '',
-          hasCustom: !!event.has_custom_portrait,
-        },
-      }));
+      notePortrait(event.character_id, {
+        url: event.portrait_url || '',
+        hasCustom: !!event.has_custom_portrait,
+      });
     } else if (event.type === 'scene_image_pending' && event.turn_number) {
       // The server withheld an illustration and said why: the budget is spent, or
       // the approval policy held it back. Nothing else carries that reason, so it
