@@ -1248,6 +1248,7 @@ export const App: React.FC = () => {
                     </div>
                     <button
                       onClick={() => setFundsError(null)}
+                      aria-label="Dismiss"
                       className="text-stone-400 hover:text-white p-1 rounded hover:bg-white/10 ml-2 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -1266,6 +1267,7 @@ export const App: React.FC = () => {
                     </div>
                     <button
                       onClick={() => setDismissedContentWarnings(true)}
+                      aria-label="Dismiss"
                       className="text-stone-400 hover:text-white p-1 rounded hover:bg-white/10 ml-2 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />

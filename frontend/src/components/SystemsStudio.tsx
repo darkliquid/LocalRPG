@@ -684,6 +684,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                       setDeleteSystemError(null);
                       setCanForceDelete(false);
                     }}
+                    aria-label={`Delete system "${s.name}"`}
                     title={`Delete system "${s.name}"`}
                     className="p-1 text-stone-500 hover:text-red-400 rounded hover:bg-red-950/40 transition-colors opacity-40 group-hover:opacity-100 hover:!opacity-100 shrink-0 cursor-pointer"
                   >
@@ -1413,6 +1414,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                       <button
                         type="button"
                         onClick={() => setEditingScenario(scenario)}
+                        aria-label={`Edit ${scenario.name}`}
                         title={`Edit ${scenario.name}`}
                         className="p-1.5 rounded text-stone-400 hover:text-purple-300 hover:bg-purple-950/40 cursor-pointer"
                       >
@@ -1421,6 +1423,7 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
                       <button
                         type="button"
                         onClick={() => void handleDeleteScenario(scenario.name)}
+                        aria-label={`Delete ${scenario.name}`}
                         title={`Delete ${scenario.name}`}
                         className="p-1.5 rounded text-stone-400 hover:text-red-300 hover:bg-red-950/40 cursor-pointer"
                       >

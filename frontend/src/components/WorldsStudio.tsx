@@ -799,6 +799,7 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
                       setDeleteWorldError(null);
                       setCanForceDelete(false);
                     }}
+                    aria-label={`Delete world "${w.name}"`}
                     title={`Delete world "${w.name}"`}
                     className="p-1 text-stone-500 hover:text-red-400 rounded hover:bg-red-950/40 transition-colors opacity-40 group-hover:opacity-100 hover:!opacity-100 shrink-0 cursor-pointer"
                   >

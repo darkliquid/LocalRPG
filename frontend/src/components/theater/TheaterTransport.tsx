@@ -63,6 +63,7 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
           onClick={onPrev}
           data-transport="prev"
           className="p-2 rounded-full hover:bg-white/10 text-stone-300 cursor-pointer"
+          aria-label={prevLabel}
           title={prevLabel}
         >
           <SkipBack className="w-5 h-5" />
@@ -79,6 +80,7 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
           onClick={onNext}
           data-transport="next"
           className="p-2 rounded-full hover:bg-white/10 text-stone-300 cursor-pointer"
+          aria-label={nextLabel}
           title={nextLabel}
         >
           <SkipForward className="w-5 h-5" />

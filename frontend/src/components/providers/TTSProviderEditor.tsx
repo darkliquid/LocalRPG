@@ -785,6 +785,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                     )
                   }
                   className="p-1.5 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 hover:border-purple-500/40 cursor-pointer"
+                  aria-label="Test Voice Profile"
                   title="Test Voice Profile"
                 >
                   <Play className="w-3.5 h-3.5" />
@@ -795,6 +796,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                     onChange({ ...entry, voice_profiles: updated });
                   }}
                   className="p-1.5 rounded bg-stone-900 border border-stone-800 text-stone-500 hover:text-red-400 hover:border-red-500/40 cursor-pointer"
+                  aria-label="Delete Profile"
                   title="Delete Profile"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

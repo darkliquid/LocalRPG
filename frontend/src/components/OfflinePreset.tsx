@@ -125,7 +125,7 @@ export const OfflinePreset: React.FC<OfflinePresetProps> = ({ onChange }) => {
             <AlertCircle className="w-4 h-4 text-red-400" />
             {applyError}
           </span>
-          <button type="button" onClick={() => setApplyError(null)}>
+          <button type="button" aria-label="Dismiss" onClick={() => setApplyError(null)}>
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -194,7 +194,7 @@ export const OfflinePreset: React.FC<OfflinePresetProps> = ({ onChange }) => {
             <AlertCircle className="w-4 h-4 text-red-400" />
             {checkError}
           </span>
-          <button type="button" onClick={() => setCheckError(null)}>
+          <button type="button" aria-label="Dismiss" onClick={() => setCheckError(null)}>
             <X className="w-3.5 h-3.5" />
           </button>
         </div>

@@ -53,6 +53,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({ src, alt, onClose,
         <button
           onClick={onClose}
           className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors cursor-pointer"
+          aria-label="Close"
           title="Close"
         >
           <X className="w-5 h-5" />
