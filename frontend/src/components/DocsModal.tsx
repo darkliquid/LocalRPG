@@ -182,6 +182,7 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose, initialAr
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 flex items-center justify-center text-stone-400 hover:text-white transition-all cursor-pointer"
+            aria-label="Close"
             title="Close (Escape)"
           >
             <X className="w-4 h-4" />

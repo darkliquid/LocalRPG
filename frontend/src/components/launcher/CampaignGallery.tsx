@@ -250,6 +250,7 @@ export const CampaignGallery: React.FC<CampaignGalleryProps> = ({
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
+              aria-label="Clear the search"
               className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-white"
             >
               <X className="w-4 h-4" />

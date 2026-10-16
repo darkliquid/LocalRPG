@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2, Pause, Play, SkipBack, SkipForward, Volume2 } from 'lucide-react';
 import { TurnAudioState } from '../TurnSegments';
+import { ProgressBar } from '../ui/ProgressBar';
 
 interface TheaterTransportProps {
   progress: number;
@@ -49,18 +50,20 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col items-center gap-2 pointer-events-auto">
-      <div className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden border border-white/5">
-        <div
-          className="h-full bg-purple-500 transition-all duration-300"
-          style={{ width: `${Math.min(100, progress)}%` }}
-        />
-      </div>
+      {/* The rail is the only statement of the position, so it states it. */}
+      <ProgressBar
+        value={progress}
+        label="Playback position"
+        className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden border border-white/5"
+        barClassName="h-full bg-purple-500 transition-all duration-300"
+      />
 
       <div className="flex flex-wrap items-center justify-center gap-3">
         <button
           onClick={onPrev}
           data-transport="prev"
           className="p-2 rounded-full hover:bg-white/10 text-stone-300 cursor-pointer"
+          aria-label={prevLabel}
           title={prevLabel}
         >
           <SkipBack className="w-5 h-5" />
@@ -77,6 +80,7 @@ export const TheaterTransport: React.FC<TheaterTransportProps> = ({
           onClick={onNext}
           data-transport="next"
           className="p-2 rounded-full hover:bg-white/10 text-stone-300 cursor-pointer"
+          aria-label={nextLabel}
           title={nextLabel}
         >
           <SkipForward className="w-5 h-5" />

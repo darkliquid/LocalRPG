@@ -71,6 +71,7 @@ export const Drawers: React.FC<DrawersProps> = ({ isOpen, onClose, title, childr
             <button
               onClick={onClose}
               className="p-1 hover:text-purple-300 cursor-pointer text-stone-400 transition-colors"
+              aria-label="Close drawer"
               title="Close drawer"
             >
               <X className="w-5 h-5" />

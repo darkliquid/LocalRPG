@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Download, Layers, Loader2, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import { APIClient } from '../api/client';
 import type { GameSummary, TTSBatchJob } from '../types';
+import { ProgressBar } from './ui/ProgressBar';
 
 // A job in one of these phases is still in flight (or was left needing a
 // download), so the manager keeps polling and the start button stays disabled.
@@ -361,17 +362,17 @@ export const TTSBatchPanel: React.FC = () => {
 
                 {job.request_count > 0 && (
                   <div className="px-3 pb-2">
-                    <div
+                    {/* Nothing else in the row states how much of the job is stored,
+                        and the title this replaces was never read on a div. */}
+                    <ProgressBar
+                      value={job.completed}
+                      max={job.request_count}
+                      label={`Clips stored for ${job.game_name || job.game_id}`}
                       className="h-1 w-full overflow-hidden rounded-full bg-stone-800"
-                      title={`${job.completed} of ${job.request_count} clips stored`}
-                    >
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          job.status === 'completed' ? 'bg-emerald-500' : 'bg-purple-500'
-                        }`}
-                        style={{ width: `${Math.min(100, (job.completed / job.request_count) * 100)}%` }}
-                      />
-                    </div>
+                      barClassName={`h-full rounded-full transition-all ${
+                        job.status === 'completed' ? 'bg-emerald-500' : 'bg-purple-500'
+                      }`}
+                    />
                   </div>
                 )}
 

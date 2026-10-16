@@ -62,6 +62,7 @@ export default function RowMenu({ items, label = 'More actions' }: RowMenuProps)
       <button
         ref={buttonRef}
         type="button"
+        aria-label={label}
         title={label}
         aria-haspopup="menu"
         aria-expanded={open}

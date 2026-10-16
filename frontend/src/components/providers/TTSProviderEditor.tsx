@@ -334,7 +334,8 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
           ) : kokoroStatus?.downloading ? (
             <div className="flex items-center gap-2 text-purple-400 font-mono text-xs">
               <span>Downloading {Math.round(kokoroStatus.progress * 100)}%</span>
-              <div className="w-20 h-1.5 bg-stone-800 rounded-full overflow-hidden">
+              {/* Decoration: the percentage is written beside it. */}
+              <div aria-hidden="true" className="w-20 h-1.5 bg-stone-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-purple-500"
                   style={{ width: `${Math.round(kokoroStatus.progress * 100)}%` }}
@@ -784,6 +785,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                     )
                   }
                   className="p-1.5 rounded bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 hover:border-purple-500/40 cursor-pointer"
+                  aria-label="Test Voice Profile"
                   title="Test Voice Profile"
                 >
                   <Play className="w-3.5 h-3.5" />
@@ -794,6 +796,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
                     onChange({ ...entry, voice_profiles: updated });
                   }}
                   className="p-1.5 rounded bg-stone-900 border border-stone-800 text-stone-500 hover:text-red-400 hover:border-red-500/40 cursor-pointer"
+                  aria-label="Delete Profile"
                   title="Delete Profile"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

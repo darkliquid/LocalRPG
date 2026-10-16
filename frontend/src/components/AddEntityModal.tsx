@@ -53,6 +53,7 @@ export const AddEntityModal: React.FC<AddEntityModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />

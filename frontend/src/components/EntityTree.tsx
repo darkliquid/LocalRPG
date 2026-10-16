@@ -275,6 +275,7 @@ export default function EntityTree({
         <button
           type="button"
           onClick={() => setDialog({ kind: 'create', parent: '' })}
+          aria-label="New folder"
           title="New folder"
           className="cursor-pointer rounded-lg border border-white/10 bg-black/40 p-1.5 text-stone-300 hover:text-purple-300"
         >

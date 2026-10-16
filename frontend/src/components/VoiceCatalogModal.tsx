@@ -274,6 +274,7 @@ export const VoiceCatalogModal: React.FC<VoiceCatalogModalProps> = ({
                         type="button"
                         onClick={() => playVoicePreview(voice.preview_url as string)}
                         className="p-2 rounded-lg bg-stone-900 border border-stone-800 text-purple-400 hover:text-purple-300 hover:bg-stone-800 cursor-pointer"
+                        aria-label="Audition"
                         title="Audition"
                       >
                         <Play className="w-3.5 h-3.5" />

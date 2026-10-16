@@ -301,6 +301,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               <button
                 onClick={() => setIsSidebarOpen(false)}
                 className="text-stone-400 hover:text-stone-200 p-1 rounded hover:bg-stone-800 cursor-pointer"
+                aria-label="Hide notes list"
                 title="Hide notes list"
               >
                 <PanelLeftClose className="w-4 h-4" />

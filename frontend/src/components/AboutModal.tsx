@@ -91,6 +91,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, onOpenD
           <button
             onClick={() => openExternal(PROJECT_REPO_URL)}
             className="py-2 px-3 bg-stone-800 hover:bg-stone-700 text-stone-200 text-sm rounded-lg flex items-center justify-center gap-2 transition cursor-pointer"
+            aria-label="Project Repository"
             title="Project Repository"
           >
             <Github className="w-4 h-4" />
@@ -98,6 +99,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, onOpenD
           <button
             onClick={() => openExternal(PROJECT_ISSUES_URL)}
             className="py-2 px-3 bg-stone-800 hover:bg-stone-700 text-stone-200 text-sm rounded-lg flex items-center justify-center gap-2 transition cursor-pointer"
+            aria-label="Report an Issue"
             title="Report an Issue"
           >
             <Bug className="w-4 h-4" />
