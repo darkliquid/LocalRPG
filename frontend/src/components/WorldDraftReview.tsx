@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Check, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { DraftCommitRequest, WorldDraftEntity, WorldDraftInfo } from '../types';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 export interface WorldDraftReviewProps {
   draft: WorldDraftInfo;
@@ -37,6 +38,11 @@ export const WorldDraftReview: React.FC<WorldDraftReviewProps> = ({
   const [rejectedEntities, setRejectedEntities] = useState<Set<string>>(new Set());
   const [edits, setEdits] = useState<Record<string, WorldDraftEntity>>({});
   const [editing, setEditing] = useState<string | null>(null);
+
+  // Escape is this screen's cancel. A review accepts two answers, commit and
+  // discard, and Escape takes the recoverable one: a world created by accident
+  // is a surprise, a draft discarded by accident regenerates.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, () => onDiscard(draft.id));
 
   const sections = draft.sections ?? [];
   const entities = useMemo(
@@ -108,7 +114,15 @@ export const WorldDraftReview: React.FC<WorldDraftReviewProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={draft.name || draft.id}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+    >
       <div className="relative w-full max-w-3xl overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
