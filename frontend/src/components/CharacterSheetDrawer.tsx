@@ -51,7 +51,8 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({
             {hp} / {maxHp}
           </span>
         </div>
-        <div className="w-full h-3 bg-stone-900 rounded-full overflow-hidden border border-white/5">
+        {/* Decoration: the health is written above as "{hp} / {maxHp}". */}
+        <div aria-hidden="true" className="w-full h-3 bg-stone-900 rounded-full overflow-hidden border border-white/5">
           <div
             className="h-full bg-red-600 transition-all duration-300"
             style={{ width: `${Math.min(100, (hp / maxHp) * 100)}%` }}
@@ -71,7 +72,11 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({
 
           {advancement.track && (
             <div className="space-y-1">
-              <div className="w-full h-2 bg-stone-900 rounded-full overflow-hidden border border-white/5">
+              {/* Decoration: the track's fill is written below as "{filled} / {size}". */}
+              <div
+                aria-hidden="true"
+                className="w-full h-2 bg-stone-900 rounded-full overflow-hidden border border-white/5"
+              >
                 <div
                   className="h-full bg-purple-500 transition-all duration-300"
                   style={{ width: `${Math.min(100, (advancement.track.filled / advancement.track.size) * 100)}%` }}

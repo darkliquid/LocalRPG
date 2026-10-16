@@ -134,7 +134,8 @@ export const ModelDownloadModal: React.FC<ModelDownloadModalProps> = ({
                   <span>Downloading...</span>
                   <span>{Math.round(progress * 100)}%</span>
                 </div>
-                <div className="w-full h-2 bg-stone-800 rounded-full overflow-hidden">
+                {/* Decoration: the percentage and the byte counts are written above it. */}
+                <div aria-hidden="true" className="w-full h-2 bg-stone-800 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-purple-500 transition-all duration-200"
                     style={{ width: `${Math.round(progress * 100)}%` }}

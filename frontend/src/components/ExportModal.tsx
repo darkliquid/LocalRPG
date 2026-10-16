@@ -294,7 +294,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, gameID, onClos
                 </span>
                 {percent !== null && <span>{percent}%</span>}
               </div>
-              <div className="h-2 rounded-full bg-stone-800 overflow-hidden">
+              {/* Decoration: the percentage is written above when there is one, and a
+                  bar that drew a fixed 10% must not claim a value it does not have. */}
+              <div aria-hidden="true" className="h-2 rounded-full bg-stone-800 overflow-hidden">
                 <div
                   className="h-full bg-purple-500 transition-all"
                   style={{ width: percent !== null ? `${percent}%` : '10%' }}

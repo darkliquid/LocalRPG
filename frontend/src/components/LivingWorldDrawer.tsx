@@ -99,7 +99,8 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
                   {arc.progress}/{arc.max_progress}
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden">
+              {/* Decoration: the counts are written above as "{progress}/{max_progress}". */}
+              <div aria-hidden="true" className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden">
                 <div className="h-full bg-purple-500" style={{ width: percent(arc.progress, arc.max_progress) }} />
               </div>
             </div>
@@ -127,7 +128,8 @@ export const LivingWorldDrawer: React.FC<LivingWorldDrawerProps> = ({
                   {clock.ticks}/{clock.max_ticks}
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden">
+              {/* Decoration: the ticks are written above as "{ticks}/{max_ticks}". */}
+              <div aria-hidden="true" className="w-full h-1.5 bg-stone-900 rounded-full overflow-hidden">
                 <div className="h-full bg-red-600" style={{ width: percent(clock.ticks, clock.max_ticks) }} />
               </div>
             </div>

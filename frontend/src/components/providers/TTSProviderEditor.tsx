@@ -334,7 +334,8 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
           ) : kokoroStatus?.downloading ? (
             <div className="flex items-center gap-2 text-purple-400 font-mono text-xs">
               <span>Downloading {Math.round(kokoroStatus.progress * 100)}%</span>
-              <div className="w-20 h-1.5 bg-stone-800 rounded-full overflow-hidden">
+              {/* Decoration: the percentage is written beside it. */}
+              <div aria-hidden="true" className="w-20 h-1.5 bg-stone-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-purple-500"
                   style={{ width: `${Math.round(kokoroStatus.progress * 100)}%` }}
