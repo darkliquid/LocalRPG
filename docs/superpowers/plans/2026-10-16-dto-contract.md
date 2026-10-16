@@ -30,31 +30,31 @@
 
 ## Task 1: The Go manifest
 
-- [ ] `pkg/gui/dto_manifest_test.go`: walk `pkg/gui`'s own source with `go/parser`, collect every exported struct with at least one JSON tag, and emit `{json, go, optional}` per field.
-- [ ] `optional` is true when the tag carries `omitempty` or the field is a pointer.
-- [ ] Write `pkg/gui/testdata/dto.json` under `-update-dto`, with a trailing newline, and fail on a stale manifest naming the flag.
-- [ ] A test that the walk finds `GameStateDTO` and `PlayerDTO.state`, so a broken parser fails rather than writing an empty manifest.
-- [ ] A test that a second run over unchanged source produces an identical manifest.
+- [x] `pkg/gui/dto_manifest_test.go`: walk `pkg/gui`'s own source with `go/parser`, collect every exported struct with at least one JSON tag, and emit `{json, go, optional}` per field.
+- [x] `optional` is true when the tag carries `omitempty` or the field is a pointer.
+- [x] Write `pkg/gui/testdata/dto.json` under `-update-dto`, with a trailing newline, and fail on a stale manifest naming the flag.
+- [x] A test that the walk finds `GameStateDTO` and `PlayerDTO.state`, so a broken parser fails rather than writing an empty manifest.
+- [x] A test that a second run over unchanged source produces an identical manifest.
 
 ## Task 2: The TypeScript comparison
 
-- [ ] `frontend/src/test/dtoContract.test.ts`: read `../../../pkg/gui/testdata/dto.json`, parse `frontend/src/types.ts` with the TypeScript compiler into `{name -> properties}`.
-- [ ] For each manifest entry not in `NOT_MIRRORED`, resolve the mirror as the interface whose property set is exactly the JSON names, and fail when there is none.
-- [ ] Fail on a JSON name the interface does not declare; on a property with no JSON name unless it is in `TS_ONLY`; on TypeScript required where Go is optional; on TypeScript optional where Go is required unless it is in `WIRE_REQUIRED`.
-- [ ] Both exception maps carry a reason per entry, and a test fails on an entry naming a type or field absent from the manifest.
-- [ ] A test that a seeded difference is reported, so the comparator is exercised against a fixture and not only against a green file.
+- [x] `frontend/src/test/dtoContract.test.ts`: read `../../../pkg/gui/testdata/dto.json`, parse `frontend/src/types.ts` with the TypeScript compiler into `{name -> properties}`.
+- [x] For each manifest entry not in `NOT_MIRRORED`, resolve the mirror as the interface whose property set is exactly the JSON names, and fail when there is none.
+- [x] Fail on a JSON name the interface does not declare; on a property with no JSON name unless it is in `TS_ONLY`; on TypeScript required where Go is optional; on TypeScript optional where Go is required unless it is in `WIRE_REQUIRED`.
+- [x] Both exception maps carry a reason per entry, and a test fails on an entry naming a type or field absent from the manifest.
+- [x] A test that a seeded difference is reported, so the comparator is exercised against a fixture and not only against a green file.
 
 ## Task 3: Resolve what the check reports
 
-- [ ] The thirteen optionality disagreements: `omitempty` in Go where the client may omit the field (the request DTOs), otherwise the `?` in TypeScript goes.
-- [ ] The seven Go fields absent from TypeScript are declared.
-- [ ] The four TypeScript-only properties: three are decided, one (`Turn.negotiations`) is recorded in `TS_ONLY` with its reason.
-- [ ] The eighteen DTOs with no counterpart are listed in `NOT_MIRRORED` with a reason each.
-- [ ] Re-run until the comparator is green, and record the count of each kind of difference in the bead.
+- [x] The thirteen optionality disagreements: `omitempty` in Go where the client may omit the field (the request DTOs), otherwise the `?` in TypeScript goes.
+- [x] The seven Go fields absent from TypeScript are declared.
+- [x] The four TypeScript-only properties: three are decided, one (`Turn.negotiations`) is recorded in `TS_ONLY` with its reason.
+- [x] The eighteen DTOs with no counterpart are listed in `NOT_MIRRORED` with a reason each.
+- [x] Re-run until the comparator is green, and record the count of each kind of difference in the bead.
 
 ## Task 4: Documentation and gates
 
-- [ ] `AGENTS.md`: the manifest, its flag, the two exception lists, and why the TypeScript file is not generated.
-- [ ] `gofmt`, `go vet ./...`, `npx tsc --noEmit`, `npx prettier --write`, `npx eslint src` (0 errors).
-- [ ] `mise run test` and `mise run lint`.
-- [ ] Open the pull request, wait for CI, close the bead with the evidence.
+- [x] `AGENTS.md`: the manifest, its flag, the two exception lists, and why the TypeScript file is not generated.
+- [x] `gofmt`, `go vet ./...`, `npx tsc --noEmit`, `npx prettier --write`, `npx eslint src` (0 errors).
+- [x] `mise run test` and `mise run lint`.
+- [x] Open the pull request, wait for CI, close the bead with the evidence.
