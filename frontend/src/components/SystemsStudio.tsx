@@ -40,7 +40,7 @@ import { Modal } from './Modal';
 import { SystemTestsTab } from './studios/system/SystemTestsTab';
 import { SystemScriptTab } from './studios/system/SystemScriptTab';
 import { SystemMechanicsTab } from './studios/system/SystemMechanicsTab';
-import MarkdownEditor from './editor/MarkdownEditor';
+import { SystemRulesTab } from './studios/system/SystemRulesTab';
 import { ContentImportDialog } from './ContentImportDialog';
 import { SystemGenerateDialog } from './SystemGenerateDialog';
 import { SystemEnhanceDialog } from './SystemEnhanceDialog';
@@ -1291,36 +1291,15 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
         {/* Tab 2: Agent Rules Prompt Editor */}
         {activeTab === 'rules' && (
-          <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-              <span>AI Storyteller Instructions (prompts/rules.md)</span>
-              <div className="flex items-center gap-2">
-                <span>Injected into LLM context to guide resolution ladder &amp; mechanics hooks</span>
-                <AIGenerateButton
-                  formType="system"
-                  fieldName="rules_prompt"
-                  onError={reportGenerationError}
-                  getContext={getSystemContext}
-                  onGenerated={(val) => {
-                    setRulesPrompt(val);
-                    markDirty();
-                  }}
-                  seed={rulesPrompt}
-                />
-              </div>
-            </div>
-            <MarkdownEditor
-              key={`${savedID || slugID || 'draft'}-rules`}
-              value={rulesPrompt}
-              onChange={(next) => {
-                setRulesPrompt(next);
-                markDirty();
-              }}
-              language="markdown"
-              ariaLabel="System rules prompt"
-              placeholder="Describe the resolution philosophy, dice mechanics and character stats the engine should follow..."
-            />
-          </div>
+          <SystemRulesTab
+            rulesPrompt={rulesPrompt}
+            setRulesPrompt={setRulesPrompt}
+            markDirty={markDirty}
+            slugID={slugID}
+            savedID={savedID}
+            reportGenerationError={reportGenerationError}
+            getSystemContext={getSystemContext}
+          />
         )}
 
         {/* Tab 2b: Mechanics Editor */}
