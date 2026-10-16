@@ -30,6 +30,7 @@ import { ContextDrawer } from './components/ContextDrawer';
 import { LauncherHub } from './components/LauncherHub';
 import { ProloguePanel } from './components/ProloguePanel';
 import { AddEntityModal } from './components/AddEntityModal';
+import { Modal } from './components/Modal';
 import { NewEntityWizard } from './components/NewEntityWizard';
 import { ModelDownloadModal } from './components/ModelDownloadModal';
 import { LimitChip } from './components/LimitChip';
@@ -1358,42 +1359,29 @@ export const App: React.FC = () => {
             </Drawers>
 
             {/* Global Settings Modal Dialog */}
-            {isSettingsOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm anim-fade-in">
-                <div className="relative w-full max-w-4xl max-h-[88vh] bg-stone-900/95 border border-purple-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-                  <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <Settings className="w-5 h-5 text-purple-400" />
-                      <h2 className="font-sans text-lg font-bold text-purple-400">Global Configuration</h2>
-                    </div>
-                    <button
-                      onClick={() => setIsSettingsOpen(false)}
-                      className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <div className="flex-1 min-h-0 overflow-y-auto p-6">
-                    <Suspense fallback={null}>
-                      <SettingsStudio
-                        activeGameID={activeGameID ?? undefined}
-                        onOpenDocs={openDocs}
-                        onSaved={() =>
-                          APIClient.getSettings()
-                            .then((res) => setConfig(res.config))
-                            .catch((err) =>
-                              report({
-                                text: 'Could not load the settings.',
-                                detail: err instanceof Error ? err.message : String(err),
-                              }),
-                            )
-                        }
-                      />
-                    </Suspense>
-                  </div>
-                </div>
-              </div>
-            )}
+            <Modal
+              open={isSettingsOpen}
+              onClose={() => setIsSettingsOpen(false)}
+              title="Global Configuration"
+              className="max-w-4xl"
+            >
+              <Suspense fallback={null}>
+                <SettingsStudio
+                  activeGameID={activeGameID ?? undefined}
+                  onOpenDocs={openDocs}
+                  onSaved={() =>
+                    APIClient.getSettings()
+                      .then((res) => setConfig(res.config))
+                      .catch((err) =>
+                        report({
+                          text: 'Could not load the settings.',
+                          detail: err instanceof Error ? err.message : String(err),
+                        }),
+                      )
+                  }
+                />
+              </Suspense>
+            </Modal>
 
             {/* Full-Screen Visual Novel Story Theater */}
             <Suspense fallback={null}>
