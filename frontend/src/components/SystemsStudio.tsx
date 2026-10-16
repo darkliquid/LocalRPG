@@ -31,13 +31,13 @@ import {
   Download,
   Upload,
   Lightbulb,
-  X,
   Pencil,
   FlaskConical,
 } from 'lucide-react';
 import { AIGenerateButton } from './ui/AIGenerateButton';
 import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
+import { Modal } from './Modal';
 import MarkdownEditor from './editor/MarkdownEditor';
 import { MechanicsEditor } from './MechanicsEditor';
 import { ContentImportDialog } from './ContentImportDialog';
@@ -1463,15 +1463,20 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
-          <div className="w-full max-w-md bg-stone-900 border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center gap-2 text-red-400">
-              <Trash2 className="w-5 h-5 shrink-0" />
-              <h3 className="font-sans text-sm font-bold text-white">
-                Delete system &ldquo;{deleteTarget.name}&rdquo;?
-              </h3>
-            </div>
-            <p className="text-xs font-sans text-stone-300">
+        <Modal
+          open
+          onClose={() => {
+            setDeleteTarget(null);
+            setDeleteSystemError(null);
+            setCanForceDelete(false);
+          }}
+          title={`Delete system "${deleteTarget.name}"?`}
+          dismissable={!isDeletingSystem}
+          className="max-w-md"
+        >
+          <div className="space-y-4">
+            <p className="flex items-center gap-2 text-xs font-sans text-stone-300">
+              <Trash2 className="w-4 h-4 shrink-0 text-red-400" aria-hidden="true" />
               This will permanently delete the system directory and all of its mechanics and prompts. This action cannot
               be undone.
             </p>
@@ -1523,40 +1528,26 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
               )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {showBaseCatalogue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="relative w-full max-w-2xl overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
-            <div className="flex items-center justify-between p-6 border-b border-white/10">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Start from a base system</h3>
-                <p className="text-xs text-neutral-400">
-                  Clone a tested reference to edit by hand, or derive a variant from it.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowBaseCatalogue(false)}
-                aria-label="Close"
-                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 max-h-[65vh] overflow-y-auto">
-              <BaseSystemCatalogue
-                bases={referenceSystems}
-                busy={isDeriving}
-                onClone={(base) => {
-                  const reference = referenceSystems.find((r) => r.id === base.id);
-                  if (reference) handleStartFromBase(reference);
-                }}
-                onDerive={handleDerive}
-              />
-            </div>
+        <Modal open onClose={() => setShowBaseCatalogue(false)} title="Start from a base system" className="max-w-2xl">
+          <p className="mb-4 text-xs text-neutral-400">
+            Clone a tested reference to edit by hand, or derive a variant from it.
+          </p>
+          <div className="max-h-[65vh] overflow-y-auto">
+            <BaseSystemCatalogue
+              bases={referenceSystems}
+              busy={isDeriving}
+              onClone={(base) => {
+                const reference = referenceSystems.find((r) => r.id === base.id);
+                if (reference) handleStartFromBase(reference);
+              }}
+              onDerive={handleDerive}
+            />
           </div>
-        </div>
+        </Modal>
       )}
 
       {showGenerateDialog && (
@@ -1578,23 +1569,11 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
       )}
 
       {explanation !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="relative w-full max-w-2xl overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
-            <div className="flex items-center justify-between p-6 border-b border-white/10">
-              <h3 className="text-lg font-semibold text-white">How this system works</h3>
-              <button
-                onClick={() => setExplanation(null)}
-                aria-label="Close"
-                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 max-h-[65vh] overflow-y-auto">
-              <MarkdownDocViewer content={explanation} />
-            </div>
+        <Modal open onClose={() => setExplanation(null)} title="How this system works" className="max-w-2xl">
+          <div className="max-h-[65vh] overflow-y-auto">
+            <MarkdownDocViewer content={explanation} />
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
