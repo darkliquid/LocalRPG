@@ -4,6 +4,10 @@ import { SystemsStudio } from './SystemsStudio';
 import { APIClient } from '../api/client';
 import { expectNoViolations } from '../test/a11y';
 
+// The rules and script tabs mount CodeMirror, which needs a real layout; the
+// studio's own rendering does not depend on it, so it is replaced with a stub.
+vi.mock('./editor/MarkdownEditor', () => ({ default: () => <div data-testid="editor" /> }));
+
 function mockStudio() {
   vi.spyOn(APIClient, 'listSystems').mockResolvedValue([
     { id: 'osric', name: 'OSRIC', description: '', version: '1.0' },
@@ -45,5 +49,25 @@ describe('SystemsStudio dialogs', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Start from a base system' })).not.toBeInTheDocument(),
     );
+  });
+});
+
+describe('SystemsStudio tabs', () => {
+  it('renders every tab with its own content', async () => {
+    mockStudio();
+    render(<SystemsStudio />);
+
+    // The manifest is the tab it opens on.
+    expect(await screen.findByText('System Name')).toBeInTheDocument();
+
+    for (const [tab, landmark] of [
+      ['rules.md', /AI Storyteller Instructions/],
+      ['Mechanics', /Mechanics/],
+      ['mechanics.js', /JavaScript Runtime/],
+      ['Tests', /0 scenarios/],
+    ] as const) {
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${tab}$`, 'i') }));
+      expect(await screen.findByText(landmark)).toBeInTheDocument();
+    }
   });
 });
