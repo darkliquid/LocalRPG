@@ -38,14 +38,14 @@ import { formatGenerationError } from '../lib/generationError';
 import { DiscardDraftConfirm } from './launcher/DiscardDraftConfirm';
 import { Modal } from './Modal';
 import { SystemTestsTab } from './studios/system/SystemTestsTab';
+import { SystemScriptTab } from './studios/system/SystemScriptTab';
+import { SystemMechanicsTab } from './studios/system/SystemMechanicsTab';
 import MarkdownEditor from './editor/MarkdownEditor';
-import { MechanicsEditor } from './MechanicsEditor';
 import { ContentImportDialog } from './ContentImportDialog';
 import { SystemGenerateDialog } from './SystemGenerateDialog';
 import { SystemEnhanceDialog } from './SystemEnhanceDialog';
 import { BaseSystemCatalogue } from './BaseSystemCatalogue';
 import { MarkdownDocViewer } from './MarkdownDocViewer';
-import { ScriptReference } from './mechanics/ScriptReference';
 import { HelpTip } from './ui/HelpTip';
 import { Example } from './ui/Example';
 import { inspectPackageFile } from '../lib/packageInspect';
@@ -1325,37 +1325,18 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
         {/* Tab 2b: Mechanics Editor */}
         {activeTab === 'mechanics' && (
-          <div className="flex-1 overflow-y-auto min-h-0 pr-2">
-            <MechanicsEditor
-              mechanics={mechanics}
-              onChange={(next) => {
-                setMechanics(next);
-                markDirty();
-              }}
-            />
-          </div>
+          <SystemMechanicsTab mechanics={mechanics} setMechanics={setMechanics} markDirty={markDirty} />
         )}
 
         {/* Tab 3: Script Editor */}
         {activeTab === 'script' && (
-          <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between text-xs font-mono text-stone-400 px-1 shrink-0">
-              <span>JavaScript Runtime (Goja Sandbox)</span>
-              <span>Exports: evaluateRoll(stats, diceExpr)</span>
-            </div>
-            <ScriptReference />
-            <MarkdownEditor
-              key={`${savedID || slugID || 'draft'}-script`}
-              value={script}
-              onChange={(next) => {
-                setScript(next);
-                markDirty();
-              }}
-              language="javascript"
-              ariaLabel="System mechanics script"
-              placeholder="export function evaluateRoll(stats, diceExpr) { ... }"
-            />
-          </div>
+          <SystemScriptTab
+            slugID={slugID}
+            savedID={savedID}
+            script={script}
+            setScript={setScript}
+            markDirty={markDirty}
+          />
         )}
 
         {/* Tab 5: Tests */}
