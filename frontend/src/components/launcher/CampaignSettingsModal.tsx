@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import React, { useState, useEffect, useRef } from 'react';
 import { useFailures } from '../../context/FailuresContext';
 import { GameSummary, TTSConfig, VoiceProfile } from '../../types';
@@ -46,6 +47,10 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [ttsConfig, setTtsConfig] = useState<TTSConfig | null>(null);
+  // Its own header, so it takes the dialog behaviour rather than the shell: it
+  // declares itself, moves focus in and returns it, holds Tab, and closes on
+  // Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
 
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
@@ -208,6 +213,12 @@ export const CampaignSettingsModal: React.FC<CampaignSettingsModalProps> = ({
   return (
     <div
       data-state={state}
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Campaign Settings"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md select-none ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
       }`}

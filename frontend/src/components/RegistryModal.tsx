@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -41,6 +42,10 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({ isOpen, onClose, o
   const [isInstalling, setIsInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
   const [justInstalledIDs, setJustInstalledIDs] = useState<Set<string>>(new Set());
+  // Its own header, so it takes the dialog behaviour rather than the shell: it
+  // declares itself, moves focus in and returns it, holds Tab, and closes on
+  // Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
 
   const fetchPackages = useCallback(
     async (query: string) => {
@@ -183,7 +188,15 @@ export const RegistryModal: React.FC<RegistryModalProps> = ({ isOpen, onClose, o
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md anim-fade-in">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Content Registry"
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md anim-fade-in"
+      >
         <div className="relative w-full max-w-4xl bg-stone-900 border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
           {/* Header */}
           <div className="p-4 px-6 border-b border-white/10 flex items-center justify-between bg-stone-950/60">

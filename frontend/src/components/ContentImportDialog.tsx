@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import React, { useState } from 'react';
 import { AlertTriangle, Package, Shield, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import { ContentManifestInfo } from '../types';
@@ -20,6 +21,10 @@ export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
   error = null,
 }) => {
   const [conflictMode, setConflictMode] = useState<'refuse' | 'rename' | 'overwrite'>('refuse');
+  // Its own header, so it takes the dialog behaviour rather than the shell: it
+  // declares itself, moves focus in and returns it, holds Tab, and closes on
+  // Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onCancel);
 
   if (!manifest) {
     return null;
@@ -28,7 +33,15 @@ export const ContentImportDialog: React.FC<ContentImportDialogProps> = ({
   const isTypeMismatch = Boolean(expectedType && manifest.type && manifest.type !== expectedType);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Import Content Package"
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+    >
       <div className="relative w-full max-w-lg overflow-hidden border border-white/10 rounded-2xl bg-neutral-900/90 shadow-2xl backdrop-blur-xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
