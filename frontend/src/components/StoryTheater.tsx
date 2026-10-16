@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Turn, TurnSegment, LimitState, PlaybackEntry } from '../types';
 import { TurnAudioState, segmentAudioKey } from './TurnSegments';
@@ -82,6 +83,10 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   // Captions are off by default so they do not duplicate the dialogue for a
   // hearing viewer.
   const [captions, setCaptions] = useState(false);
+  // Its own layout, so it takes the dialog behaviour rather than the shell: it
+  // declares itself, moves focus in and returns it, holds Tab, and closes on
+  // Escape.
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
 
   const currentTurn = turns[currentIdx];
   const segments = useMemo(() => segmentsOf(currentTurn), [currentTurn]);
@@ -367,6 +372,10 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   return (
     <div
       data-state={state}
+      aria-modal="true"
+      ref={dialogRef}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       className={`fixed inset-0 z-50 overflow-hidden bg-stone-950 text-stone-100 ${
         state === 'enter' ? 'anim-fade-in' : 'anim-fade-out pointer-events-none'
       }`}
