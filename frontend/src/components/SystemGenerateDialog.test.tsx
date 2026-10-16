@@ -12,6 +12,8 @@ const draft: SystemDraftInfo = {
   script: 'onAction("do", function(ctx) {});',
   rules_prompt: '# Rules Guide',
   verify: { ok: true, script: true },
+  calls: 1,
+  oracle: false,
 };
 
 afterEach(() => {

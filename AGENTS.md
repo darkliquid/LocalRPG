@@ -487,6 +487,17 @@ The floors sit just below what the suite reaches today — 73.3% and 33.36% at t
 - Identifiers: `entity.Slugify` (display name -> kebab-case ID) and `entity.WikilinkTarget` (unwraps `[[target|label]]`) are the shared helpers — reuse them instead of writing local slug/link parsing.
 - TypeScript: React 19 + Tailwind v4 (config lives in CSS via `@import "tailwindcss"` in `frontend/src/index.css`, there is no `tailwind.config.js`). `tsconfig.json` has `strict`, `noUnusedLocals`, `noUnusedParameters`, so `npm run build`/`tsc --noEmit` fails on unused imports. Components live in `frontend/src/components/`, icons come from `lucide-react`.
 - **The frontend's lint is ESLint plus Prettier, run by `mise run lint:frontend`.** `frontend/eslint.config.mjs` is the flat config and `frontend/prettier.config.mjs` the formatter's; both carry the reasoning for every non-default choice. Prettier's `format:check` and ESLint's **error** level gate a build; ESLint's **warnings** print without failing it. That split is the same shape as the prose lint, and each warning group names the proposal that fixes it and promotes it: accessibility to FE-6, React Compiler readiness (refs during render, setState in an effect) to FE-3 and FE-2, and `no-explicit-any` to FE-8. One a11y rule is off rather than warned: `control-has-associated-label` reports the same unlabelled inputs as `label-has-associated-control`, from the control's side, so the two together gave 258 findings for one class of defect.
+- **The Go and TypeScript DTO contract is checked, not trusted.** `pkg/gui/types.go` and
+  `frontend/src/types.ts` are two hand-maintained mirrors of one wire contract, so
+  `pkg/gui/testdata/dto.json` is generated from the Go structs by
+  `go test ./pkg/gui -update-dto` and `frontend/src/test/dtoContract.test.ts` compares it against
+  `types.ts`, parsed with the TypeScript compiler. A rename on either side, a field the client cannot
+  see, a property the server never sends, or a changed `omitempty` fails naming the type and the
+  field. The pairing is not a table: a mirror is the interface whose property set is exactly the
+  DTO's fields, so a rename breaks the match. Two exception maps in that test carry the deliberate
+  differences, each with a reason, and an entry whose type or field is gone fails the suite.
+  `types.ts` is not generated from Go: it carries discriminated unions, view models and comments a
+  generator would drop, and it is read by the frontend more than by the backend.
 - **Three accessibility rules have a gate behind them.** A drawn progress bar is either the only
   statement of its value, in which case it is a `ui/ProgressBar` with a required label, or it repeats a
   number written beside it, in which case it is `aria-hidden` and says which text it defers to; two

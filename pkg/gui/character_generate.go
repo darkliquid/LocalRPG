@@ -43,9 +43,11 @@ func (s *Server) handleCharacterGenerateRoute(w http.ResponseWriter, r *http.Req
 // creation fields. It is side-effect free: no campaign is created and no files
 // are written.
 type GenerateCharacterRequest struct {
-	SystemID string                        `json:"system_id"`
-	WorldID  string                        `json:"world_id"`
-	Name     string                        `json:"name"`
+	// The three identities are context rather than input: the client sends the one
+	// it has and omits the rest, so the encoder does the same.
+	SystemID string                        `json:"system_id,omitempty"`
+	WorldID  string                        `json:"world_id,omitempty"`
+	Name     string                        `json:"name,omitempty"`
 	Fields   []core.CharacterCreationField `json:"fields"`
 	Seed     map[string]string             `json:"seed,omitempty"`
 }

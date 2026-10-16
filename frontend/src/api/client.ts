@@ -58,15 +58,28 @@ import {
   SaveFileChoice,
   ExportContentResult,
   GenerationLimitsOverride,
+  AudioStatus,
+  Findings,
+  Transcription,
+  FolderRequest,
+  GenerateAssetRequest,
+  GenerateAssetPreviewRequest,
+  MergeEntityRequest,
+  TTSBatchCancelRequest,
+  TTSBatchClearRequest,
+  RenegotiateRequest,
+  ResolveCheckRequest,
+  TurnRequest,
+  ChooseDirectoryRequest,
+  ExportContentRequest,
+  RegistryInstallRequest,
   AppConfig,
-  CounterProposal,
   RenegotiateResult,
   StylePacks,
   SettingsResponse,
   TestProviderRequest,
   TestProviderResponse,
   TraceEvent,
-  AddressedFinding,
   ModelStatus,
   TTSInspectRequest,
   TTSInspectResponse,
@@ -252,7 +265,7 @@ export class APIClient {
     const res = await fetch('/api/dialog/directory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title ?? '' }),
+      body: JSON.stringify({ title: title ?? '' } satisfies ChooseDirectoryRequest),
     });
     if (res.ok) return;
     if (res.status === 501) throw new HTTPError(res.status, 'No native directory dialog is available');
@@ -469,7 +482,7 @@ export class APIClient {
     const res = await fetch(`/api/game/${encodeURIComponent(gameId)}/generate-asset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, prompt }),
+      body: JSON.stringify({ kind, prompt } satisfies GenerateAssetRequest),
     });
     if (!res.ok) return throwGenerationError(res);
     return res.json();
@@ -479,7 +492,7 @@ export class APIClient {
     const res = await fetch(`/api/world/${encodeURIComponent(worldId)}/generate-asset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, prompt }),
+      body: JSON.stringify({ kind, prompt } satisfies GenerateAssetRequest),
     });
     if (!res.ok) return throwGenerationError(res);
     return res.json();
@@ -499,13 +512,20 @@ export class APIClient {
     const res = await fetch('/api/generate-asset-preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, name, description, art_style: artStyle, genre, usage_token: usageToken }),
+      body: JSON.stringify({
+        kind,
+        name,
+        description,
+        art_style: artStyle,
+        genre,
+        usage_token: usageToken,
+      } satisfies GenerateAssetPreviewRequest),
     });
     if (!res.ok) return throwGenerationError(res);
     return res.blob();
   }
 
-  static async audioStatus(): Promise<{ available: boolean; playing: boolean; owner?: string }> {
+  static async audioStatus(): Promise<AudioStatus> {
     const res = await fetch('/api/audio/status');
     if (!res.ok) throw await errorFromResponse(res, 'audioStatus');
     return res.json();
@@ -705,7 +725,7 @@ export class APIClient {
     const res = await fetch(`/api/world/${worldId}/folders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path }),
+      body: JSON.stringify({ path } satisfies FolderRequest),
     });
     if (!res.ok) throw await errorFromResponse(res, 'createWorldFolder');
   }
@@ -714,7 +734,7 @@ export class APIClient {
     const res = await fetch(`/api/world/${worldId}/folders`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, path: to }),
+      body: JSON.stringify({ from, path: to } satisfies FolderRequest),
     });
     if (!res.ok) throw await errorFromResponse(res, 'moveWorldFolder');
   }
@@ -997,11 +1017,7 @@ export class APIClient {
 
   // renegotiate asks the GM to rule on a counter-proposal to a pending check. It
   // returns the ruling and the terms now in force, so the card can re-render.
-  static async renegotiate(
-    gameID: string,
-    turnNumber: number,
-    body: { pending_check_ref: string; counter: CounterProposal },
-  ): Promise<RenegotiateResult> {
+  static async renegotiate(gameID: string, turnNumber: number, body: RenegotiateRequest): Promise<RenegotiateResult> {
     const res = await fetch(`/api/game/${gameID}/turn/${turnNumber}/renegotiate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1145,7 +1161,7 @@ export class APIClient {
     const res = await fetch('/api/tts/batch/cancel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ game_id: gameID, job_id: jobID }),
+      body: JSON.stringify({ game_id: gameID, job_id: jobID } satisfies TTSBatchCancelRequest),
     });
     if (!res.ok) throw new HTTPError(res.status, await res.text());
   }
@@ -1155,7 +1171,7 @@ export class APIClient {
     const res = await fetch('/api/tts/batch/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ game_id: gameID, job_id: jobID }),
+      body: JSON.stringify({ game_id: gameID, job_id: jobID } satisfies TTSBatchCancelRequest),
     });
     if (!res.ok) throw new HTTPError(res.status, await res.text());
   }
@@ -1166,7 +1182,7 @@ export class APIClient {
     const res = await fetch('/api/tts/batch/clear', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ game_id: gameID ?? '' }),
+      body: JSON.stringify({ game_id: gameID ?? '' } satisfies TTSBatchClearRequest),
     });
     if (!res.ok) throw new HTTPError(res.status, await res.text());
     const body = (await res.json()) as { removed?: number };
@@ -1186,7 +1202,7 @@ export class APIClient {
     return res.json();
   }
 
-  static async transcribeAudio(audioBlob: Blob): Promise<{ text: string }> {
+  static async transcribeAudio(audioBlob: Blob): Promise<Transcription> {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'speech.webm');
 
@@ -1208,7 +1224,7 @@ export class APIClient {
   // response produces the same events in the same order.
   static async streamTurn(
     gameID: string,
-    body: { mode: string; input: string; pending_check_ref?: string; scene_only?: boolean },
+    body: TurnRequest,
     onEvent: (event: TurnEvent) => void,
     signal?: AbortSignal,
   ): Promise<void> {
@@ -1250,7 +1266,7 @@ export class APIClient {
   static async resolveCheck(
     gameID: string,
     turnNumber: number,
-    body: { pending_check_ref: string; manual_result?: number; manual_dice?: number[] },
+    body: ResolveCheckRequest,
     onEvent: (event: TurnEvent) => void,
     signal?: AbortSignal,
   ): Promise<void> {
@@ -1359,7 +1375,7 @@ export class APIClient {
     const res = await fetch(`/api/game/${this.gameID}/folders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path }),
+      body: JSON.stringify({ path } satisfies FolderRequest),
     });
     if (!res.ok) throw await errorFromResponse(res, 'createFolder');
   }
@@ -1368,7 +1384,7 @@ export class APIClient {
     const res = await fetch(`/api/game/${this.gameID}/folders`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, path: to }),
+      body: JSON.stringify({ from, path: to } satisfies FolderRequest),
     });
     if (!res.ok) throw await errorFromResponse(res, 'moveFolder');
   }
@@ -1385,13 +1401,13 @@ export class APIClient {
     const res = await fetch(`/api/game/${this.gameID}/entity/${sourceID}/merge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ into: intoID, confirm: true }),
+      body: JSON.stringify({ into: intoID, confirm: true } satisfies MergeEntityRequest),
     });
     if (!res.ok) throw await errorFromResponse(res, 'mergeEntity');
     return res.json();
   }
 
-  async getFindings(): Promise<{ addressed: AddressedFinding[] }> {
+  async getFindings(): Promise<Findings> {
     const res = await fetch(`/api/game/${this.gameID}/findings`);
     if (!res.ok) throw await errorFromResponse(res, 'getFindings');
     return res.json();
@@ -1456,7 +1472,7 @@ export class APIClient {
     const res = await fetch('/api/content/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, id, target_path: targetPath }),
+      body: JSON.stringify({ type, id, target_path: targetPath } satisfies ExportContentRequest),
     });
     if (!res.ok) {
       const text = await res.text();
@@ -1509,7 +1525,7 @@ export class APIClient {
     const res = await fetch('/api/registry/install', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ref, on_conflict: onConflict }),
+      body: JSON.stringify({ ref, on_conflict: onConflict } satisfies RegistryInstallRequest),
     });
     if (!res.ok) {
       const text = await res.text();

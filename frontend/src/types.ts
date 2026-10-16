@@ -37,8 +37,8 @@ export interface GameState {
   game_id: string;
   game_name: string;
   player: PlayerState;
-  arcs: Array<{ id: string; name: string; progress: number; max_progress: number; status: string }>;
-  clocks: Array<{ faction: string; name: string; ticks: number; max_ticks: number }>;
+  arcs: NarrativeArc[];
+  clocks: FactionClock[];
   locations: string[];
   // The player's own instruction for the campaign's opening scene, when set.
   opening_prompt?: string;
@@ -123,7 +123,7 @@ export interface PendingCheckRequest {
 export interface PendingCheck {
   ref: string;
   proposed_by?: string;
-  request?: PendingCheckRequest;
+  request: PendingCheckRequest;
   notation?: string;
   bonuses?: { source: string; value: number }[];
   actor_values?: Record<string, number>;
@@ -186,9 +186,12 @@ export interface Turn {
   // Whether the action was rejected as impossible, and the checks it resolved.
   rejected?: boolean;
   checks?: TurnCheck[];
+  // The resolved mechanics policy in force this turn (off, auto or ask), so the
+  // reason mechanics ran or did not can be explained.
+  engagement?: string;
   // A declared health stat reaching zero this turn, and the directive an
   // on-world-tick run injected, so the mechanical consequence is visible.
-  health_effects?: { entity: string; effect: string }[];
+  health_effects?: HealthEffect[];
   world_tick?: string;
   // A GM-proposed check awaiting the player's roll (ask policy).
   pending_check?: PendingCheck;
@@ -646,7 +649,7 @@ export interface GameSummary {
   player_name: string;
   turn_count: number;
   last_played: string;
-  thumbnail_url?: string;
+  thumbnail_url: string;
   banner_url?: string;
   icon_url?: string;
   // Where the displayed artwork comes from: 'campaign', 'world', or undefined
@@ -790,8 +793,8 @@ export interface SystemDetail {
   version: string;
   description: string;
   script: string;
-  rules_prompt?: string;
-  character_creation?: CharacterCreationSpec;
+  rules_prompt: string;
+  character_creation: CharacterCreationSpec;
   mechanics?: MechanicsSpec;
   warnings?: string[];
 }
@@ -805,6 +808,8 @@ export interface CreateSystemRequest {
   rules_prompt?: string;
   character_creation?: CharacterCreationSpec;
   mechanics?: MechanicsSpec;
+  // strict asks the server to refuse a save that carries a warning rather than accept it.
+  strict?: boolean;
 }
 
 export interface SystemVerifyResult {
@@ -824,8 +829,8 @@ export interface SystemDraftInfo {
   verify: SystemVerifyResult;
   notes?: string[];
   estimate?: WorldEstimate;
-  calls?: number;
-  oracle?: boolean;
+  calls: number;
+  oracle: boolean;
 }
 
 export interface ProfileAddition {
@@ -939,7 +944,7 @@ export interface Scenario {
 }
 
 export interface SystemTestRequest {
-  system: { id: string; script: string; mechanics?: MechanicsSpec };
+  system: SystemTestSystem;
   scenarios: Scenario[];
 }
 
@@ -954,7 +959,7 @@ export interface SystemTestResponse {
 }
 
 export interface SystemScenariosResponse {
-  scenarios?: Scenario[];
+  scenarios: Scenario[];
 }
 
 export interface StatSpec {
@@ -1089,7 +1094,7 @@ export interface WorldDetail {
   default_system: string;
   art_style: string;
   tags: string[];
-  lore_prompt?: string;
+  lore_prompt: string;
   entities: WorldEntitySummary[];
 }
 
@@ -1259,7 +1264,7 @@ export interface TTSInspectResponse {
   key_present: boolean;
   key_required: boolean;
   error?: string;
-  speech_cues?: SpeechCueCapabilities;
+  speech_cues: SpeechCueCapabilities;
 }
 
 // MediaInspectRequest names the family to describe: "tts", "stt", or "image".
@@ -1559,6 +1564,7 @@ export interface TestProviderResponse {
   audio_data_uri?: string;
   model_missing?: boolean;
   model_id?: string;
+  failure?: GenerationFailure;
 }
 
 export interface GeminiModel {
@@ -1815,7 +1821,7 @@ export interface ImportResultDTO {
   file_count: number;
   has_script: boolean;
   action: 'installed' | 'renamed' | 'overwritten';
-  trust?: TrustInfo;
+  trust: TrustInfo;
 }
 
 export interface ContentManifestInfo {
@@ -1856,4 +1862,154 @@ export interface RegistrySourceDTO {
   name?: string;
   package_count: number;
   error?: string;
+}
+
+// --- Request and response shapes the client used to declare inline ---
+//
+// Each of these mirrors a Go DTO in pkg/gui, and the drift check in
+// src/test/dtoContract.test.ts resolves the mirror by its property set, so a
+// rename on either side fails a test rather than reaching the browser as an
+// undefined.
+
+// AudioStatus is what the microphone pipeline is doing: whether a device is
+// available, whether it is playing, and which turn and segment it is on.
+export interface AudioStatus {
+  available: boolean;
+  playing: boolean;
+  turn: number;
+  segment: number;
+  owner?: string;
+  error?: string;
+  stage?: string;
+}
+
+// Findings is the addressed-findings ledger the codex shows.
+export interface Findings {
+  addressed: AddressedFinding[];
+}
+
+// Transcription is the text a speech-to-text provider returned.
+export interface Transcription {
+  text: string;
+}
+
+// HealthEffect is a declared health stat reaching zero this turn, or the
+// directive an on-world-tick run injected.
+export interface HealthEffect {
+  entity: string;
+  effect: string;
+}
+
+// FolderRequest is a folder's creation, or a move out of another folder.
+export interface FolderRequest {
+  path: string;
+  from?: string;
+}
+
+// GenerateAssetRequest asks for a banner or an icon from a prompt.
+export interface GenerateAssetRequest {
+  kind: 'banner' | 'icon';
+  prompt?: string;
+}
+
+// GenerateAssetPreviewRequest renders from form metadata without persisting
+// anything, so a creation flow can show a result before the campaign exists.
+export interface GenerateAssetPreviewRequest {
+  kind: 'banner' | 'icon';
+  name: string;
+  description: string;
+  art_style: string;
+  genre?: string;
+  usage_token?: string;
+}
+
+// MergeEntityRequest folds one note into another and confirms it.
+export interface MergeEntityRequest {
+  into: string;
+  confirm: boolean;
+}
+
+// OpenURLRequest asks the desktop window to open a link in the system browser.
+export interface OpenURLRequest {
+  url: string;
+}
+
+// TTSBatchCancelRequest cancels one submitted batch job.
+export interface TTSBatchCancelRequest {
+  game_id: string;
+  job_id: string;
+}
+
+// TTSBatchClearRequest removes every finished batch job, for one campaign or all.
+export interface TTSBatchClearRequest {
+  game_id?: string;
+}
+
+// RenegotiateRequest is a player's counter-proposal to a pending check.
+export interface RenegotiateRequest {
+  pending_check_ref: string;
+  counter: CounterProposal;
+}
+
+// ResolveCheckRequest settles a pending check by hand.
+export interface ResolveCheckRequest {
+  pending_check_ref: string;
+  manual_result?: number;
+  manual_dice?: number[];
+  note?: string;
+}
+
+// SystemTestSystem is the system a scenario run is exercised against: its id
+// and the script under test.
+export interface SystemTestSystem {
+  id: string;
+  script: string;
+  mechanics?: MechanicsSpec;
+}
+
+// TurnRequest is the body of a turn.
+export interface TurnRequest {
+  mode: string;
+  input: string;
+  pending_check_ref?: string;
+  scene_only?: boolean;
+  forced_total?: number;
+  manual_dice?: number[];
+}
+
+// ChooseDirectoryRequest asks the desktop window for a folder.
+export interface ChooseDirectoryRequest {
+  title?: string;
+  default_dir?: string;
+}
+
+// ExportContentRequest writes a system, world or pack into a folder.
+export interface ExportContentRequest {
+  type: string;
+  id: string;
+  target_path?: string;
+}
+
+// RegistryInstallRequest installs a package from a registry source.
+export interface RegistryInstallRequest {
+  ref: PackageRefDTO;
+  on_conflict: string;
+}
+
+// NarrativeArc is one story arc's progress, for the arc list.
+export interface NarrativeArc {
+  id: string;
+  name: string;
+  progress: number;
+  max_progress: number;
+  status: string;
+}
+
+// FactionClock is one faction clock's fill: the ticks it has and the ticks it
+// needs before the faction acts.
+export interface FactionClock {
+  faction: string;
+  name: string;
+  ticks: number;
+  max_ticks: number;
 }

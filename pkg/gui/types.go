@@ -219,8 +219,6 @@ type TurnDTO struct {
 	InputText   string       `json:"input_text"`
 	Mode        string       `json:"mode"`
 	Prose       string       `json:"prose"`
-	Speaker     string       `json:"speaker,omitempty"`
-	Dialogue    string       `json:"dialogue,omitempty"`
 	ImageURL    string       `json:"image_url,omitempty"`
 	EntitiesHit []string     `json:"entities_hit,omitempty"`
 	Segments    []SegmentDTO `json:"segments,omitempty"`
