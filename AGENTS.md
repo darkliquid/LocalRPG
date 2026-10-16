@@ -474,6 +474,17 @@ The floors sit just below what the suite reaches today — 73.3% and 33.36% at t
 **What to argue a behaviour-preserving change with** is `mise run coverage:diff BEFORE.prof AFTER.prof` (`scripts/coverage-diff.sh`), which compares the *functions* that were fully covered before the change and are not after. No comment, blank line or expression layout can make a function lose that, so a name in its output is a block that stopped running. Generate the two profiles from the two revisions with `go test -count=1 -covermode=atomic -coverprofile=….prof ./pkg/…`, and see the script's header for the reasoning in full.
 
 - **Frontend unit and component tests: Vitest + React Testing Library + jsdom.** The runner is configured in `frontend/vitest.config.ts` (not the app's `vite.config.ts`, which sets an output directory and loads Tailwind). Tests live beside the code as `*.test.ts`/`*.test.tsx` and import `describe`/`it`/`expect` from `vitest` explicitly; there are no globals. `frontend/src/test/setup.ts` installs the jest-dom matchers, stubs the browser APIs jsdom lacks, and calls RTL's `cleanup`. The old `frontend/scripts/check*.mjs` files are gone, and the docs lint is no longer a Node script at all: `mise run lint:docs` runs `rumdl` over `pkg/gui/docs`.
+- **A campaign has one owner: `CampaignProvider`.** It is mounted in `App.tsx`, above the component
+  that chooses a campaign, and it owns the campaign's data, the turn stream that writes it and the
+  playback that reads it, because the three are written by the same code. `App.tsx` is a shell (under
+  100 lines): the launcher-or-campaign switch, the chrome that sits above both (the menu bar, the help
+  reader, the content studio, the About dialog) and the providers. `CampaignScreen.tsx` is the
+  campaign's chrome and the flows that drive it. A consumer reads `useCampaign()` rather than receiving
+  the value as a prop, and the provider exposes **actions, not setters**: `leaveCampaign`,
+  `openEntity`, `spendAdvancement`, `dismissTurnError` and their neighbours, because a context that
+  hands out setters is a prop list wearing a context's clothes. The value comes from a
+  `useCampaignValue()` hook, so the value object and the hook's return type are provably the same
+  thing rather than two hand-written lists.
 - **A studio is a container and a set of views.** `components/SystemsStudio.tsx` and
   `components/WorldsStudio.tsx` hold the state, the API calls, the handlers, the layout and the
   dialogs; their regions live in `components/studios/system/` and `components/studios/world/`, one
