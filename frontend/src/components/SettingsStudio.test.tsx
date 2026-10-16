@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { SettingsStudio } from './SettingsStudio';
+import { SettingsProvider } from '../context/SettingsContext';
 
 const { config } = vi.hoisted(() => ({
   config: {
@@ -44,8 +45,14 @@ describe('SettingsStudio secondary tabs', () => {
     localStorage.clear();
   });
 
+  // The studio reads the configuration from the provider now, so a test renders it
+  // inside one; the provider is what fetches the settings.
   const openAgents = async () => {
-    render(<SettingsStudio />);
+    render(
+      <SettingsProvider>
+        <SettingsStudio />
+      </SettingsProvider>,
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'AI Agents' }));
   };
 
@@ -95,7 +102,11 @@ describe('SettingsStudio secondary tabs', () => {
   });
 
   it('shows one media engine at a time', async () => {
-    render(<SettingsStudio />);
+    render(
+      <SettingsProvider>
+        <SettingsStudio />
+      </SettingsProvider>,
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'Media Engines' }));
 
     expect(screen.getByRole('tab', { name: 'TTS' })).toHaveAttribute('aria-selected', 'true');
