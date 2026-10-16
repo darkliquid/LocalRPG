@@ -372,7 +372,6 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   return (
     <div
       data-state={state}
-      role="dialog"
       aria-modal="true"
       ref={dialogRef}
       tabIndex={-1}
