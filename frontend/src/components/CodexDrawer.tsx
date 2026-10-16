@@ -16,7 +16,6 @@ import {
   PanelLeftClose,
   PanelLeft,
   GitMerge,
-  X,
   Loader2,
   RotateCw,
   AlertCircle,
@@ -31,6 +30,7 @@ import MarkdownEditor from './editor/MarkdownEditor';
 import { loadEntityIndex, invalidateEntityIndex } from './editor/entityIndex';
 import { isCharacterType } from '../lib/entityTypes';
 import { NewEntityWizard } from './NewEntityWizard';
+import { Modal } from './Modal';
 
 interface CodexDrawerProps {
   gameID?: string;
@@ -555,21 +555,8 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
       </div>
 
       {isMergeOpen && entity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm anim-fade-in">
-          <div className="relative w-full max-w-md bg-stone-900 border border-red-500/40 rounded-2xl p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
-              <div className="flex items-center gap-2">
-                <GitMerge className="w-5 h-5 text-red-400" />
-                <h3 className="font-sans text-base font-bold text-red-300">Merge Note</h3>
-              </div>
-              <button
-                onClick={() => setIsMergeOpen(false)}
-                className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
+        <Modal open onClose={() => setIsMergeOpen(false)} title="Merge Note" className="max-w-md">
+          <div className="space-y-5">
             <p className="text-xs text-stone-300 leading-relaxed">
               <span className="font-bold text-purple-300">{entity.name}</span> will be folded into the note you choose.
               Its prose, tags, aliases, and turn history move across, and{' '}
@@ -616,7 +603,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
       {gameID && (
         <NewEntityWizard
