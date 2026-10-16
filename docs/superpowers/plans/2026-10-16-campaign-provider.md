@@ -34,54 +34,54 @@
 
 ## Task 1: The provider and its state
 
-- [ ] `CampaignContext.tsx`: move the campaign's data (`activeGameID` and its storage, `gameState`,
+- [x] `CampaignContext.tsx`: move the campaign's data (`activeGameID` and its storage, `gameState`,
       `chronicle`, `graph`, `entities`, `recap`, `selectedEntity`, `addressed`, `campaignStatus`,
       `campaignError`, `limits`, `rateLimitUntil`, `fundsError`).
-- [ ] Move the load effects verbatim: the corpus refresh, the chronicle, the findings, the campaign
+- [x] Move the load effects verbatim: the corpus refresh, the chronicle, the findings, the campaign
       verification and the rate-limit poll.
-- [ ] Move `selectGame`, `handleReturnToLauncher` and the storage keys.
-- [ ] Tests: the provider loads a campaign's chronicle and entities against a mocked client; a
+- [x] Move `selectGame`, `handleReturnToLauncher` and the storage keys.
+- [x] Tests: the provider loads a campaign's chronicle and entities against a mocked client; a
       dangling id is reported as unavailable rather than trusted.
 
 ## Task 2: The turn stream
 
-- [ ] Move `turnInFlight`, `turnStatus`, `pendingAction`, `streamedSegments`, `toolActivity`,
+- [x] Move `turnInFlight`, `turnStatus`, `pendingAction`, `streamedSegments`, `toolActivity`,
       `turnError`, `pendingCheck`, the stream processor ref and the abort ref.
-- [ ] Move `handleTurnEvent`, `beginTurnStream`, `handleActionSubmit`, `handleStopTurn`,
+- [x] Move `handleTurnEvent`, `beginTurnStream`, `handleActionSubmit`, `handleStopTurn`,
       `handleResolveCheck`, `handleRenegotiate`, `handleBeginStory`, `handleBeginWithAction` verbatim.
-- [ ] Tests: a streamed turn appends to the chronicle; a rejected turn reports and does not append;
+- [x] Tests: a streamed turn appends to the chronicle; a rejected turn reports and does not append;
       stopping a turn clears what is in flight.
 
 ## Task 3: The playback
 
-- [ ] Move the audio state and `handlePlayTurnAudio` / `handleStopAudio` verbatim, with
+- [x] Move the audio state and `handlePlayTurnAudio` / `handleStopAudio` verbatim, with
       `audioPollingRef`.
-- [ ] `autoPlay` and `volume` are derived from the settings context.
-- [ ] Tests: marking a turn heard lists its keys; stopping closes every subscription and idles the
+- [x] `autoPlay` and `volume` are derived from the settings context.
+- [x] Tests: marking a turn heard lists its keys; stopping closes every subscription and idles the
       statuses.
 
 ## Task 4: The consumers
 
-- [ ] `ChronicleView` reads `useCampaign()`; its eleven playback props go.
-- [ ] `StoryTheater` reads `useCampaign()`; its nine go.
-- [ ] `ActionConsole` takes what it needs from the context.
-- [ ] The existing tests for each keep passing; a test that renders one of them outside a provider is
+- [x] `ChronicleView` reads `useCampaign()`; its eleven playback props go.
+- [x] `StoryTheater` reads `useCampaign()`; its nine go.
+- [x] `ActionConsole` takes what it needs from the context.
+- [x] The existing tests for each keep passing; a test that renders one of them outside a provider is
       updated to render it inside one.
 
 ## Task 5: The screen and the shell
 
-- [ ] `CampaignScreen.test.tsx`: render the screen against the provider and assert the chronicle, the
+- [x] `CampaignScreen.test.tsx`: render the screen against the provider and assert the chronicle, the
       console and the drawer pills, against the code as it stands.
-- [ ] `CampaignScreen.tsx`: the header, the drawer pills, the chronicle container, the action console
+- [x] `CampaignScreen.tsx`: the header, the drawer pills, the chronicle container, the action console
       and the report strip move in.
-- [ ] `App.tsx` keeps the launcher/campaign switch, the UI flags, the modals and the menu bar, and
+- [x] `App.tsx` keeps the launcher/campaign switch, the UI flags, the modals and the menu bar, and
       measures what is left.
-- [ ] `main.tsx` mounts `CampaignProvider` inside `SettingsProvider`.
+- [x] `main.tsx` mounts `CampaignProvider` inside `SettingsProvider`.
 
 ## Task 6: Gates and the record
 
-- [ ] `AGENTS.md`: what the campaign provider owns, what the shell keeps, and the rule that a provider
+- [x] `AGENTS.md`: what the campaign provider owns, what the shell keeps, and the rule that a provider
       is mounted above the component that chooses its subject.
-- [ ] `npx prettier --write`, `npx tsc --noEmit`, `npx eslint src`, `npm run build`.
-- [ ] `npx vitest run --coverage` against the floors, `mise run test`, `mise run lint`.
-- [ ] Open the pull request, wait for CI, close this bead and FE-3 with the evidence.
+- [x] `npx prettier --write`, `npx tsc --noEmit`, `npx eslint src`, `npm run build`.
+- [x] `npx vitest run --coverage` against the floors, `mise run test`, `mise run lint`.
+- [x] Open the pull request, wait for CI, close this bead and FE-3 with the evidence.
