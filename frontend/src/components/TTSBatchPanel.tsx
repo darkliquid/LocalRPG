@@ -141,10 +141,10 @@ export const TTSBatchPanel: React.FC = () => {
     setError(null);
     try {
       const job = await APIClient.startTTSBatch(startGame, force);
+      await refresh();
       if (!job) {
         setError('Every clip is already cached for that campaign.');
       }
-      await refresh();
     } catch (err) {
       setError(messageOf(err));
     }
@@ -184,10 +184,10 @@ export const TTSBatchPanel: React.FC = () => {
     setError(null);
     try {
       const removed = await APIClient.clearTTSBatchJobs(filter || undefined);
+      await refresh();
       if (removed === 0) {
         setError('No finished jobs to clear.');
       }
-      await refresh();
     } catch (err) {
       setError(messageOf(err));
     }
