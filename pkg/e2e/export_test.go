@@ -139,7 +139,7 @@ func TestExportedBundlePlaysTheTheatre(t *testing.T) {
 	if !strings.Contains(before, "Play") {
 		t.Errorf("expected a play control, got:\n%s", before)
 	}
-	time.Sleep(2 * time.Second)
+	<-time.After(2 * time.Second)
 	if after := bundleDom(t, b); after != before {
 		t.Errorf("the story advanced without being started:\nbefore: %s\nafter:  %s", before, after)
 	}
@@ -168,7 +168,7 @@ func TestExportedBundlePlaysTheTheatre(t *testing.T) {
 	// A beat is never shortened by audio: the card holds for its own pace, so it is
 	// still on screen a second into playback. Before this, a clip the browser refused
 	// to start advanced every beat at once and the story flashed past.
-	time.Sleep(time.Second)
+	<-time.After(time.Second)
 	if mid := bundleDom(t, b); strings.Contains(mid, "NARRATOR") {
 		t.Fatalf("the opening beat was skipped instead of being held:\n%s", mid)
 	}
@@ -262,7 +262,9 @@ func failedRequests(console []string) []string {
 // WaitFor it can see an inlined portrait, whose src is not part of the page text.
 func waitForShape(t *testing.T, b *Browser, needles ...string) {
 	t.Helper()
-	deadline := time.Now().Add(15 * time.Second)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(15 * time.Second)
 	for {
 		shape := bundleDom(t, b)
 		missing := ""
@@ -275,10 +277,11 @@ func waitForShape(t *testing.T, b *Browser, needles ...string) {
 		if missing == "" {
 			return
 		}
-		if time.Now().After(deadline) {
+		select {
+		case <-ticker.C:
+		case <-timeout:
 			t.Fatalf("the bundle never showed %q:\n%s", missing, shape)
 		}
-		time.Sleep(200 * time.Millisecond)
 	}
 }
 

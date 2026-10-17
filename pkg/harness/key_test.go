@@ -8,6 +8,7 @@ import (
 )
 
 func TestKeyFor(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		cfg  harness.ProviderConfig
 		want provider.Key
@@ -30,6 +31,7 @@ func TestKeyFor(t *testing.T) {
 }
 
 func TestKeyForPrefersInstance(t *testing.T) {
+	t.Parallel()
 	base := harness.ProviderConfig{Type: "http", Endpoint: "https://api.openai.com"}
 	a, _ := harness.KeyFor(base)
 	base.Instance = "good"
@@ -51,6 +53,7 @@ func TestKeyForPrefersInstance(t *testing.T) {
 // TestKeyForUnsetInstanceIsUnchanged guards the backward-compatible case: a
 // configuration with no instance produces exactly the key it produced before.
 func TestKeyForUnsetInstanceIsUnchanged(t *testing.T) {
+	t.Parallel()
 	got, ok := harness.KeyFor(harness.ProviderConfig{Type: "http", Endpoint: "https://api.openai.com"})
 	if !ok || got != "llm:openaichat@api.openai.com" {
 		t.Fatalf("unset instance key = %q/%v, want llm:openaichat@api.openai.com", got, ok)

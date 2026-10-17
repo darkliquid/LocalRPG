@@ -9,6 +9,7 @@ import (
 )
 
 func TestCostFromTokens(t *testing.T) {
+	t.Parallel()
 	p := Price{PerMillionInput: 1_000_000, PerMillionOutput: 2_000_000} // 1 and 2 per 1M
 	u := harness.Usage{InputTokens: 1_000_000, OutputTokens: 500_000}
 	if got := CostMicros(u, p); got != 2_000_000 {
@@ -17,6 +18,7 @@ func TestCostFromTokens(t *testing.T) {
 }
 
 func TestCostFromCharactersAndRequests(t *testing.T) {
+	t.Parallel()
 	p := Price{PerCharacter: 30, PerRequest: 1000}
 	u := harness.Usage{Characters: 100, Requests: 1}
 	if got := CostMicros(u, p); got != 4000 {
@@ -25,12 +27,14 @@ func TestCostFromCharactersAndRequests(t *testing.T) {
 }
 
 func TestCostOfAnUnpricedCallIsZero(t *testing.T) {
+	t.Parallel()
 	if got := CostMicros(harness.Usage{InputTokens: 999, Characters: 999}, Price{}); got != 0 {
 		t.Fatalf("CostMicros = %d, want 0 for an unpriced call", got)
 	}
 }
 
 func TestResolvePrefersModelThenProviderThenZero(t *testing.T) {
+	t.Parallel()
 	cfg := &config.Config{Providers: config.ProvidersConfig{Prices: []config.PriceConfig{
 		{Provider: "tts:gemini", PerMillionInput: 1},
 		{Provider: "tts:gemini", Model: "gemini-2.5-pro", PerMillionInput: 2},
@@ -47,6 +51,7 @@ func TestResolvePrefersModelThenProviderThenZero(t *testing.T) {
 }
 
 func TestResolveFallsBackFromInstanceToAdapter(t *testing.T) {
+	t.Parallel()
 	cfg := &config.Config{Providers: config.ProvidersConfig{Prices: []config.PriceConfig{
 		{Provider: "tts:http", PerRequest: 10},
 		{Provider: "tts:http@host-a", PerRequest: 99},
@@ -60,6 +65,7 @@ func TestResolveFallsBackFromInstanceToAdapter(t *testing.T) {
 }
 
 func TestResolvePrefersInstanceModelOverAdapterWide(t *testing.T) {
+	t.Parallel()
 	cfg := &config.Config{Providers: config.ProvidersConfig{Prices: []config.PriceConfig{
 		{Provider: "llm:openaichat", PerMillionInput: 1},
 		{Provider: "llm:openaichat@host", PerMillionInput: 5},
@@ -77,6 +83,7 @@ func TestResolvePrefersInstanceModelOverAdapterWide(t *testing.T) {
 }
 
 func TestCostMicrosAppliesBatchDiscount(t *testing.T) {
+	t.Parallel()
 	price := Price{PerCharacter: 100}
 	interactive := CostMicros(harness.Usage{Characters: 1000}, price)
 	batch := CostMicros(harness.Usage{Characters: 1000, Batch: true}, price)
@@ -90,6 +97,7 @@ func TestCostMicrosAppliesBatchDiscount(t *testing.T) {
 }
 
 func TestResolveIgnoresAKeyThatIsNotCanonical(t *testing.T) {
+	t.Parallel()
 	cfg := &config.Config{Providers: config.ProvidersConfig{Prices: []config.PriceConfig{
 		{Provider: "openaichat", PerMillionInput: 1},
 	}}}
@@ -102,6 +110,7 @@ func TestResolveIgnoresAKeyThatIsNotCanonical(t *testing.T) {
 }
 
 func TestBuiltinsAreScopedToTheVendorEndpoint(t *testing.T) {
+	t.Parallel()
 	if got := Resolve("llm:openaichat@api.openai.com", "gpt-4o", nil); got.PerMillionInput != 2_500_000 {
 		t.Errorf("endpoint-scoped built-in input = %d, want 2500000", got.PerMillionInput)
 	}
@@ -117,6 +126,7 @@ func TestBuiltinsAreScopedToTheVendorEndpoint(t *testing.T) {
 }
 
 func TestWeightRanksCheaperBelowPricier(t *testing.T) {
+	t.Parallel()
 	cheap := Price{PerCharacter: 15}
 	dear := Price{PerCharacter: 80}
 	if cheap.Weight() >= dear.Weight() {
@@ -125,6 +135,7 @@ func TestWeightRanksCheaperBelowPricier(t *testing.T) {
 }
 
 func TestWeightUnknownPriceIsNotPriced(t *testing.T) {
+	t.Parallel()
 	if _, ok := Weight(string(provider.KeyTTSSherpaONNX), "", &config.Config{}); ok {
 		t.Fatal("a local adapter the ledger does not price must report ok = false")
 	}
@@ -134,6 +145,7 @@ func TestWeightUnknownPriceIsNotPriced(t *testing.T) {
 }
 
 func TestRouterChainPriceRanksByModel(t *testing.T) {
+	t.Parallel()
 	cfg := &config.Config{}
 	cfg.Agents.Roles = map[string]config.AgentRoleConfig{
 		"expensive": {Model: "gemini-3.8-flash"},

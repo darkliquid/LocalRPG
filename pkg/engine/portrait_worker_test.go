@@ -70,18 +70,16 @@ func TestPortraitWorker_Enqueue(t *testing.T) {
 	pngBytes := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00}
 	gen := &mockPortraitGenerator{returnBytes: pngBytes}
 	worker := NewPortraitWorker(resolver, nil, gen)
-
+	done := make(chan struct{})
+	worker.SetOnReady(func(_, _, _ string) { close(done) })
 	worker.Enqueue(gameID, char, "oil painting")
 
-	// Wait briefly for goroutine
-	deadline := time.Now().Add(2 * time.Second)
-	portraitPath := filepath.Join(gameDir, "assets", "portraits", "elena-v1.png")
-	for time.Now().Before(deadline) {
-		if _, err := os.Stat(portraitPath); err == nil {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for portrait generation")
 	}
+	portraitPath := filepath.Join(gameDir, "assets", "portraits", "elena-v1.png")
 
 	if _, err := os.Stat(portraitPath); err != nil {
 		t.Fatalf("expected portrait image file to be created at %s", portraitPath)
@@ -188,23 +186,20 @@ func TestPortraitWorker_SetOnReady(t *testing.T) {
 	gen := &mockPortraitGenerator{returnBytes: pngBytes}
 	worker := NewPortraitWorker(resolver, nil, gen)
 
-	readyCalled := false
+	readyCh := make(chan struct{})
 	var readyGame, readyChar, readyRel string
 	worker.SetOnReady(func(gID, charID, relPath string) {
-		readyCalled = true
 		readyGame = gID
 		readyChar = charID
 		readyRel = relPath
+		close(readyCh)
 	})
 
 	worker.Enqueue(gameID, char, "sketch")
 
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && !readyCalled {
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	if !readyCalled {
+	select {
+	case <-readyCh:
+	case <-time.After(2 * time.Second):
 		t.Fatal("expected SetOnReady callback to be called")
 	}
 	if readyGame != gameID || readyChar != "garrick" || readyRel != filepath.Join("assets", "portraits", "garrick-v1.png") {

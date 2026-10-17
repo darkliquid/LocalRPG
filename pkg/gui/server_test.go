@@ -1233,12 +1233,25 @@ func TestModelDownloadEndpointOutlivesRequestCancellation(t *testing.T) {
 	sum := sha256.Sum256(tarData)
 	checksum := hex.EncodeToString(sum[:])
 
+	downloadStarted := make(chan struct{})
+	releaseDownload := make(chan struct{})
 	mockHTTP := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(30 * time.Millisecond) // ensure download is still running when request finishes
+		select {
+		case downloadStarted <- struct{}{}:
+		default:
+		}
+		<-releaseDownload
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(tarData)))
 		_, _ = w.Write(tarData)
 	}))
 	defer mockHTTP.Close()
+	defer func() {
+		select {
+		case <-releaseDownload:
+		default:
+			close(releaseDownload)
+		}
+	}()
 
 	svc.modelsManager.RegisterSpec(models.ModelSpec{
 		ID:            "test-outlive",
@@ -1263,8 +1276,15 @@ func TestModelDownloadEndpointOutlivesRequestCancellation(t *testing.T) {
 		t.Fatalf("expected 202 Accepted, got %d", rec.Code)
 	}
 
+	select {
+	case <-downloadStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("download did not start")
+	}
+
 	// Immediately cancel request context to simulate net/http request termination
 	cancelReq()
+	close(releaseDownload)
 
 	// Wait for download to finish
 	var finalStatus models.ModelStatus

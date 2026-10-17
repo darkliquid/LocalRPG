@@ -6,6 +6,7 @@ import (
 )
 
 func TestEvaluateRoll(t *testing.T) {
+	t.Parallel()
 	// Standard polyhedral roll
 	res, err := EvaluateRoll("1d20+5")
 	if err != nil {
@@ -38,6 +39,7 @@ func TestEvaluateRoll(t *testing.T) {
 // landed rather than only their total: two dice totalling four could be 1+3 or
 // 2+2, and neither is the die's size.
 func TestEvaluateRollCarriesTheFacesThatLanded(t *testing.T) {
+	t.Parallel()
 	res, err := EvaluateRoll("2d6")
 	if err != nil {
 		t.Fatalf("EvaluateRoll: %v", err)
@@ -80,6 +82,7 @@ func TestEvaluateRollCarriesTheFacesThatLanded(t *testing.T) {
 // A Fate die is not a number to show, so the face carries the symbol its own
 // rules use for it.
 func TestEvaluateRollKeepsAFateDiceSymbol(t *testing.T) {
+	t.Parallel()
 	res, err := EvaluateRoll("3dF")
 	if err != nil {
 		t.Fatalf("EvaluateRoll: %v", err)
@@ -95,6 +98,7 @@ func TestEvaluateRollKeepsAFateDiceSymbol(t *testing.T) {
 }
 
 func TestRollSummaryCarriesTheFaces(t *testing.T) {
+	t.Parallel()
 	res, err := EvaluateRoll("2d6")
 	if err != nil {
 		t.Fatalf("EvaluateRoll: %v", err)

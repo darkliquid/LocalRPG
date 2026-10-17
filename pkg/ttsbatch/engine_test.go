@@ -141,17 +141,13 @@ func TestEngineRunRespectsMaxPerJob(t *testing.T) {
 func TestEnginePollStopsOnCancellation(t *testing.T) {
 	client := &fakeBatch{states: []string{"running", "running", "running"}}
 	engine := New(client, media.NewContentCache(t.TempDir()), &memJobs{})
-	// Never returns on its own, so only cancellation can end the wait.
+	ctx, cancel := context.WithCancel(context.Background())
+	// Cancels on the first poll sleep attempt.
 	engine.sleep = func(ctx context.Context, _ time.Duration) error {
+		cancel()
 		<-ctx.Done()
 		return ctx.Err()
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(10 * time.Millisecond)
-		cancel()
-	}()
 
 	if _, err := engine.Run(ctx, Options{}, []media.ClipGroup{{Key: "k"}}); err == nil {
 		t.Fatalf("expected a cancelled run to stop with an error")

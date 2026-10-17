@@ -7,6 +7,7 @@ import (
 )
 
 func TestReadingDurationFollowsWordRate(t *testing.T) {
+	t.Parallel()
 	// 180 words per minute means three words a second.
 	text := strings.Repeat("word ", 180)
 
@@ -17,6 +18,7 @@ func TestReadingDurationFollowsWordRate(t *testing.T) {
 }
 
 func TestReadingDurationClampsToTheFloor(t *testing.T) {
+	t.Parallel()
 	for _, text := range []string{"Wait.", "", "   ", "Three small words"} {
 		if got := ReadingDuration(text); got != MinimumBeatDuration {
 			t.Errorf("ReadingDuration(%q) = %v, want the %v floor", text, got, MinimumBeatDuration)
@@ -25,6 +27,7 @@ func TestReadingDurationClampsToTheFloor(t *testing.T) {
 }
 
 func TestReadingDurationUsesCharactersForUnspacedScripts(t *testing.T) {
+	t.Parallel()
 	// Forty characters with no spaces would read as a single word, which would
 	// collapse to the floor; the character rate gives it real time instead.
 	text := strings.Repeat("語", 40)
@@ -39,6 +42,7 @@ func TestReadingDurationUsesCharactersForUnspacedScripts(t *testing.T) {
 }
 
 func TestBeatDurationPrefersAudio(t *testing.T) {
+	t.Parallel()
 	short := Beat{Text: strings.Repeat("word ", 180), AudioDuration: 2 * time.Second}
 	if got := BeatDuration(short); got != 2*time.Second+BeatGap {
 		t.Errorf("BeatDuration = %v, want the clip length plus the gap", got)
@@ -52,6 +56,7 @@ func TestBeatDurationPrefersAudio(t *testing.T) {
 }
 
 func TestFramesForRoundsUpToAtLeastOne(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		duration time.Duration
 		fps      int

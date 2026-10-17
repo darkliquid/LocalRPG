@@ -9,6 +9,7 @@ import (
 )
 
 func TestValidateID(t *testing.T) {
+	t.Parallel()
 	valid := []string{
 		"game-1",
 		"aldon_harbour",
@@ -46,6 +47,7 @@ func TestValidateID(t *testing.T) {
 }
 
 func TestSanitizeID(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input    string
 		expected string
@@ -70,6 +72,7 @@ func TestSanitizeID(t *testing.T) {
 }
 
 func TestResolveSafeChild(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 
 	validChild, err := pathutil.ResolveSafeChild(tmp, "sub/file.txt")
@@ -94,6 +97,7 @@ func TestResolveSafeChild(t *testing.T) {
 }
 
 func TestValidateUserPath(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	cleaned, err := pathutil.ValidateUserPath(filepath.Join(tmp, "custom", "export.html"))
 	if err != nil {

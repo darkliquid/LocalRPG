@@ -222,12 +222,18 @@ func TestApprovalAskDoesNotWaitOnALocalProvider(t *testing.T) {
 // without a fixed sleep.
 func waitFor(t *testing.T, done func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(5 * time.Second)
+	for {
 		if done() {
 			return
 		}
-		time.Sleep(5 * time.Millisecond)
+		select {
+		case <-ticker.C:
+		case <-timeout:
+			t.Fatal("the condition was never met")
+			return
+		}
 	}
-	t.Fatal("the condition was never met")
 }

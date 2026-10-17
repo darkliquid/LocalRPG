@@ -9,6 +9,7 @@ import (
 )
 
 func TestTTSKeyFor(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		cfg  config.TTSConfig
 		want provider.Key
@@ -36,6 +37,7 @@ func TestTTSKeyFor(t *testing.T) {
 }
 
 func TestTTSKeyForHTTPIsAnInstance(t *testing.T) {
+	t.Parallel()
 	got, ok := media.TTSKeyFor(config.TTSConfig{Type: "http", Endpoint: "http://localhost:8880"})
 	if !ok {
 		t.Fatal("expected a key")
@@ -49,6 +51,7 @@ func TestTTSKeyForHTTPIsAnInstance(t *testing.T) {
 }
 
 func TestTTSKeyForCLIIsAnInstance(t *testing.T) {
+	t.Parallel()
 	got, ok := media.TTSKeyFor(config.TTSConfig{Type: "cli", Command: "/usr/bin/piper"})
 	if !ok || got != "tts:piper@piper" {
 		t.Errorf("TTSKeyFor(cli) = %q/%v, want tts:piper@piper", got, ok)
@@ -56,6 +59,7 @@ func TestTTSKeyForCLIIsAnInstance(t *testing.T) {
 }
 
 func TestTTSKeyForFishAudio(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		cfg  config.TTSConfig
@@ -77,7 +81,9 @@ func TestTTSKeyForFishAudio(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, ok := media.TTSKeyFor(tc.cfg)
 			if ok != tc.ok {
 				t.Fatalf("TTSKeyFor(%+v) ok = %v, want %v", tc.cfg, ok, tc.ok)
@@ -90,6 +96,7 @@ func TestTTSKeyForFishAudio(t *testing.T) {
 }
 
 func TestSTTKeyForSkipsBrowserOnly(t *testing.T) {
+	t.Parallel()
 	if _, ok := media.STTKeyFor(config.STTConfig{Type: "web-speech"}); ok {
 		t.Error("web-speech must have no key")
 	}
@@ -112,6 +119,7 @@ func TestSTTKeyForSkipsBrowserOnly(t *testing.T) {
 }
 
 func TestImageKeyFor(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		cfg  config.ImageConfig
 		want provider.Key
@@ -132,6 +140,7 @@ func TestImageKeyFor(t *testing.T) {
 }
 
 func TestCartesiaKeyFor(t *testing.T) {
+	t.Parallel()
 	ttsCases := []config.TTSConfig{
 		{Type: "cartesia"},
 		{Type: "builtin", BuiltinName: "cartesia"},
@@ -156,6 +165,7 @@ func TestCartesiaKeyFor(t *testing.T) {
 }
 
 func TestTTSKeyForPrefersInstance(t *testing.T) {
+	t.Parallel()
 	cfg := config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs", Instance: "narrator"}
 	k, ok := media.TTSKeyFor(cfg)
 	if !ok || k != "tts:elevenlabs@narrator" {
@@ -169,6 +179,7 @@ func TestTTSKeyForPrefersInstance(t *testing.T) {
 }
 
 func TestSTTAndImageKeyForPreferInstance(t *testing.T) {
+	t.Parallel()
 	stt, ok := media.STTKeyFor(config.STTConfig{Type: "http", Endpoint: "http://localhost:8000", Instance: "far"})
 	if !ok || stt != "stt:whisper-http@far" {
 		t.Fatalf("stt key = %s ok = %v", stt, ok)

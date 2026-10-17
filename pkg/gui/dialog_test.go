@@ -201,7 +201,9 @@ func TestDirectoryChoiceRouteStartsAndPolls(t *testing.T) {
 		t.Fatalf("start body = %+v", started)
 	}
 
-	deadline := time.Now().Add(2 * time.Second)
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(2 * time.Second)
 	for {
 		poll := httptest.NewRequest(http.MethodGet, "/api/dialog/directory", nil)
 		pollRec := httptest.NewRecorder()
@@ -219,10 +221,11 @@ func TestDirectoryChoiceRouteStartsAndPolls(t *testing.T) {
 			}
 			return
 		}
-		if time.Now().After(deadline) {
+		select {
+		case <-ticker.C:
+		case <-timeout:
 			t.Fatalf("the choice never completed: %+v", choice)
 		}
-		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -380,7 +383,9 @@ func TestSaveFileChoiceRouteStartsAndPolls(t *testing.T) {
 		t.Fatalf("start status = %d, want 202", startRec.Code)
 	}
 
-	deadline := time.Now().Add(500 * time.Millisecond)
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(2 * time.Second)
 	for {
 		pollReq := httptest.NewRequest(http.MethodGet, "/api/dialog/save-file", nil)
 		pollRec := httptest.NewRecorder()
@@ -398,10 +403,11 @@ func TestSaveFileChoiceRouteStartsAndPolls(t *testing.T) {
 			}
 			return
 		}
-		if time.Now().After(deadline) {
+		select {
+		case <-ticker.C:
+		case <-timeout:
 			t.Fatalf("the choice never completed: %+v", choice)
 		}
-		time.Sleep(5 * time.Millisecond)
 	}
 }
 

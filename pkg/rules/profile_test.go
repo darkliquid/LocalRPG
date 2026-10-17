@@ -7,6 +7,7 @@ import (
 )
 
 func TestResolveProfile(t *testing.T) {
+	t.Parallel()
 	pbta := core.ResolutionProfile{Ladder: []core.LadderStep{
 		{Min: 10, Outcome: "strong"}, {Min: 7, Outcome: "weak"}, {Min: 0, Outcome: "miss"}}}
 	cases := []struct {
@@ -39,6 +40,7 @@ func TestResolveProfile(t *testing.T) {
 }
 
 func TestResolveProfileLadderIsOrderIndependent(t *testing.T) {
+	t.Parallel()
 	unsorted := core.ResolutionProfile{Ladder: []core.LadderStep{
 		{Min: 0, Outcome: "miss"}, {Min: 10, Outcome: "strong"}, {Min: 7, Outcome: "weak"}}}
 	for total, want := range map[int]string{12: "strong", 10: "strong", 9: "weak", 6: "miss"} {
@@ -49,6 +51,7 @@ func TestResolveProfileLadderIsOrderIndependent(t *testing.T) {
 }
 
 func TestResolveProfileLadderCoversEveryTotal(t *testing.T) {
+	t.Parallel()
 	// A ladder covering all totals must map every total to exactly one outcome.
 	// "Exactly one" is asserted by the outcome always being a member of the set.
 	p := core.ResolutionProfile{Ladder: []core.LadderStep{
@@ -66,6 +69,7 @@ func TestResolveProfileLadderCoversEveryTotal(t *testing.T) {
 }
 
 func TestClampTo(t *testing.T) {
+	t.Parallel()
 	if got := ClampTo([]string{"risky", "controlled"}, "risky"); got != "risky" {
 		t.Errorf("clamp kept: got %q", got)
 	}

@@ -3,6 +3,7 @@ package jsonrepair
 import "testing"
 
 func TestBraceDepth(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   string
 		want int

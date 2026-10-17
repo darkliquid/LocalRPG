@@ -3,6 +3,7 @@ package provider
 import "testing"
 
 func TestParseKeyAcceptsAdapterAndInstance(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		in       string
 		family   Family
@@ -33,6 +34,7 @@ func TestParseKeyAcceptsAdapterAndInstance(t *testing.T) {
 }
 
 func TestParseKeyRejectsMalformed(t *testing.T) {
+	t.Parallel()
 	for _, in := range []string{"", "llm", ":gemini", "llm:", "LLM:gemini", "llm:Gemini", "llm:gemini@@", "llm:gemini@", "tts:http@Localhost"} {
 		if _, err := ParseKey(in); err == nil {
 			t.Errorf("ParseKey(%q) = nil error, want rejection", in)
@@ -41,6 +43,7 @@ func TestParseKeyRejectsMalformed(t *testing.T) {
 }
 
 func TestInstanceOrSelf(t *testing.T) {
+	t.Parallel()
 	base, err := NewKey(FamilyTTS, "http")
 	if err != nil {
 		t.Fatalf("NewKey: %v", err)
@@ -58,6 +61,7 @@ func TestInstanceOrSelf(t *testing.T) {
 }
 
 func TestInstanceDiscriminator(t *testing.T) {
+	t.Parallel()
 	if got := InstanceDiscriminator("", "localhost:8880"); got != "localhost:8880" {
 		t.Fatalf("derived = %q", got)
 	}
@@ -70,6 +74,7 @@ func TestInstanceDiscriminator(t *testing.T) {
 }
 
 func TestDiscriminators(t *testing.T) {
+	t.Parallel()
 	if got := HostDiscriminator("http://localhost:11434/v1"); got != "localhost:11434" {
 		t.Errorf("HostDiscriminator = %q, want localhost:11434", got)
 	}

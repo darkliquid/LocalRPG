@@ -34,6 +34,7 @@ func writeTestPNG(t *testing.T, w, h int) string {
 }
 
 func TestKenBurnsIsBoundedAndSeeded(t *testing.T) {
+	t.Parallel()
 	if got := KenBurns(1, 0); got != (KenBurnsTransform{Scale: 1}) {
 		t.Fatalf("progress zero should be the identity, got %+v", got)
 	}
@@ -52,6 +53,7 @@ func TestKenBurnsIsBoundedAndSeeded(t *testing.T) {
 // TestKenBurnsMatchesTheAppRule pins the exact values the frontend's kenBurns
 // produces for the same inputs, so the two renderers cannot drift apart.
 func TestKenBurnsMatchesTheAppRule(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		seed     int
 		progress float64
@@ -76,6 +78,7 @@ func TestKenBurnsMatchesTheAppRule(t *testing.T) {
 }
 
 func TestParallaxMovesTheForegroundMore(t *testing.T) {
+	t.Parallel()
 	if got := ParallaxOffset(0, 1); got != 0 {
 		t.Fatalf("the background should not move, got %v", got)
 	}
@@ -85,6 +88,7 @@ func TestParallaxMovesTheForegroundMore(t *testing.T) {
 }
 
 func TestMoodTintFollowsOutcome(t *testing.T) {
+	t.Parallel()
 	if MoodTint("miss").Opacity <= 0 {
 		t.Fatal("a failure should tint the picture")
 	}
@@ -97,6 +101,7 @@ func TestMoodTintFollowsOutcome(t *testing.T) {
 }
 
 func TestWeatherOverlayOnlyForKnownWeather(t *testing.T) {
+	t.Parallel()
 	for _, want := range []WeatherKind{WeatherRain, WeatherSnow, WeatherFog} {
 		if got := WeatherOverlay(string(want)); got != want {
 			t.Errorf("WeatherOverlay(%q) = %q", want, got)
@@ -112,6 +117,7 @@ func TestWeatherOverlayOnlyForKnownWeather(t *testing.T) {
 // TestTintAndOverlayDrawn proves the tint and the weather overlay reach the
 // frame: a failure scene and a rainy scene each differ from a plain one.
 func TestTintAndOverlayDrawn(t *testing.T) {
+	t.Parallel()
 	renderer, err := NewRenderer(64, 36)
 	if err != nil {
 		t.Fatalf("NewRenderer: %v", err)
@@ -141,6 +147,7 @@ func TestTintAndOverlayDrawn(t *testing.T) {
 // TestKenBurnsMovesTheFrame proves an animated beat's frame differs across its
 // span, which is what makes the export drift rather than sit still.
 func TestKenBurnsMovesTheFrame(t *testing.T) {
+	t.Parallel()
 	renderer, err := NewRenderer(64, 36)
 	if err != nil {
 		t.Fatalf("NewRenderer: %v", err)
