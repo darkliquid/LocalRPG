@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -193,12 +194,12 @@ func TestApprovalAskSkipsAMeteredProvider(t *testing.T) {
 	worker := NewSceneWorker(core.NewPathResolver(dir), provider)
 	worker.SetApproval(ImageApprovalAsk, true)
 
-	var pending int
-	worker.SetOnPending(func(string, int, SceneJob) { pending++ })
+	var pending atomic.Int32
+	worker.SetOnPending(func(string, int, SceneJob) { pending.Add(1) })
 
 	// The job is not generated, so wait for the pending callback instead.
 	worker.EnqueueScene("campaign", 8, SceneJob{Prompt: "a hall"})
-	waitFor(t, func() bool { return pending > 0 })
+	waitFor(t, func() bool { return pending.Load() > 0 })
 
 	if provider.calls != 0 {
 		t.Fatalf("an unapproved generation called the provider %d times", provider.calls)

@@ -8,8 +8,9 @@ import (
 )
 
 func TestRegisterLookupAndDuplicatePanics(t *testing.T) {
+	restore := provider.Snapshot()
+	t.Cleanup(restore)
 	provider.Reset()
-	t.Cleanup(provider.Reset)
 
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{ID: "probe", Family: provider.FamilyLLM, Label: "Probe"},
@@ -39,8 +40,9 @@ func TestRegisterLookupAndDuplicatePanics(t *testing.T) {
 }
 
 func TestValidateRejectsMissingFamily(t *testing.T) {
+	restore := provider.Snapshot()
+	t.Cleanup(restore)
 	provider.Reset()
-	t.Cleanup(provider.Reset)
 	provider.Register(provider.Registration{
 		Descriptor: provider.Descriptor{ID: "bad"},
 	})

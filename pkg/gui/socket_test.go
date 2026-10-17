@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -37,9 +38,11 @@ func TestListenUnix(t *testing.T) {
 		t.Fatalf("stat socket file failed: %v", err)
 	}
 
-	// Verify file mode is 0600
-	if perm := info.Mode().Perm(); perm != 0600 {
-		t.Errorf("expected socket permissions 0600, got %o", perm)
+	// Verify file mode is 0600 on platforms supporting POSIX file modes
+	if runtime.GOOS != "windows" {
+		if perm := info.Mode().Perm(); perm != 0600 {
+			t.Errorf("expected socket permissions 0600, got %o", perm)
+		}
 	}
 
 	// Test stale socket cleanup: close listener without removing file
