@@ -188,6 +188,41 @@ func (b *Browser) SetFileInput(selector, path string) {
 	}
 }
 
+// Activate clicks an element through its own click handler. A coordinate click is
+// no use to a control the layout has left outside the viewport: headless Chrome
+// starts at 780x437, which is narrower than the campaign header, and a time-based
+// animation never advances there, so an animated panel keeps its start offset.
+func (b *Browser) Activate(selector string) {
+	b.t.Helper()
+	script := fmt.Sprintf(`(() => {
+	  const el = document.evaluate(%q, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+	  if (!el) return 'missing';
+	  el.click();
+	  return 'ok';
+	})()`, selector)
+	if got := b.Eval(script); got != "ok" {
+		b.t.Fatalf("activate %q: %s", selector, got)
+	}
+}
+
+// PressKey sends a key to an element as a bubbling event, for a control that acts
+// on a key rather than on a click. A coordinate click is no use to an element that
+// a time-based animation has left at its start position, which is what every
+// animated surface in this suite is: headless Chrome reports the animations running
+// and never advances them.
+func (b *Browser) PressKey(selector, key string) {
+	b.t.Helper()
+	script := fmt.Sprintf(`(() => {
+	  const el = document.evaluate(%q, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+	  if (!el) return 'missing';
+	  el.dispatchEvent(new KeyboardEvent('keydown', { key: %q, bubbles: true, cancelable: true }));
+	  return 'ok';
+	})()`, selector, key)
+	if got := b.Eval(script); got != "ok" {
+		b.t.Fatalf("press %s on %q: %s", key, selector, got)
+	}
+}
+
 // Text reads a selector's text content.
 func (b *Browser) Text(selector string) string {
 	b.t.Helper()
