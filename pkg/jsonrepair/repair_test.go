@@ -8,6 +8,7 @@ import (
 )
 
 func TestRepair(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		in   string
@@ -22,20 +23,25 @@ func TestRepair(t *testing.T) {
 		{"garbage", `not json at all`, KindNone, false},
 	}
 	for _, c := range cases {
-		got := Repair([]byte(c.in))
-		if got.OK != c.ok {
-			t.Errorf("%s: OK = %v, want %v", c.name, got.OK, c.ok)
-		}
-		if c.ok && !json.Valid(got.Payload) {
-			t.Errorf("%s: repaired payload is not valid JSON: %q", c.name, got.Payload)
-		}
-		if c.ok && got.Kind != c.kind {
-			t.Errorf("%s: Kind = %q, want %q", c.name, got.Kind, c.kind)
-		}
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			got := Repair([]byte(c.in))
+			if got.OK != c.ok {
+				t.Errorf("%s: OK = %v, want %v", c.name, got.OK, c.ok)
+			}
+			if c.ok && !json.Valid(got.Payload) {
+				t.Errorf("%s: repaired payload is not valid JSON: %q", c.name, got.Payload)
+			}
+			if c.ok && got.Kind != c.kind {
+				t.Errorf("%s: Kind = %q, want %q", c.name, got.Kind, c.kind)
+			}
+		})
 	}
 }
 
 func TestRepairValidIsByteIdentical(t *testing.T) {
+	t.Parallel()
 	in := []byte(`{"a":1,"b":[2,3]}`)
 	got := Repair(in)
 	if string(got.Payload) != string(in) {
@@ -44,6 +50,7 @@ func TestRepairValidIsByteIdentical(t *testing.T) {
 }
 
 func TestRepairRefusesOversize(t *testing.T) {
+	t.Parallel()
 	big := []byte(strings.Repeat(" ", 64*1024+1))
 	if got := Repair(big); got.OK {
 		t.Fatal("oversize payload should be refused")
@@ -51,6 +58,7 @@ func TestRepairRefusesOversize(t *testing.T) {
 }
 
 func TestArrayElementsKeepsWhatATruncatedReplyWrote(t *testing.T) {
+	t.Parallel()
 	// A reply cut off mid-entity: the two before the cut are whole.
 	payload := []byte(`{"entities":[{"name":"A","type":"location"},{"name":"B","type":"character"},{"name":"C","ty`)
 	got := ArrayElements(payload)
@@ -66,6 +74,7 @@ func TestArrayElementsKeepsWhatATruncatedReplyWrote(t *testing.T) {
 }
 
 func TestArrayElementsIgnoresBracketsInsideStrings(t *testing.T) {
+	t.Parallel()
 	payload := []byte(`{"entities":[{"name":"A [not an array]","type":"location"},{"name":"B"}]}`)
 	got := ArrayElements(payload)
 	if len(got) != 2 {
@@ -74,6 +83,7 @@ func TestArrayElementsIgnoresBracketsInsideStrings(t *testing.T) {
 }
 
 func TestArrayElementsHandlesNestedArrays(t *testing.T) {
+	t.Parallel()
 	payload := []byte(`{"entities":[{"name":"A","tags":["x","y"]},{"name":"B"}]}`)
 	got := ArrayElements(payload)
 	if len(got) != 2 {
@@ -85,6 +95,7 @@ func TestArrayElementsHandlesNestedArrays(t *testing.T) {
 }
 
 func TestArrayElementsFindsNothingWithoutAnArray(t *testing.T) {
+	t.Parallel()
 	if got := ArrayElements([]byte(`{"name":"A"}`)); got != nil {
 		t.Fatalf("elements = %q, want none", got)
 	}
@@ -94,6 +105,7 @@ func TestArrayElementsFindsNothingWithoutAnArray(t *testing.T) {
 }
 
 func TestArrayElementsStopsAtTheEnclosingArray(t *testing.T) {
+	t.Parallel()
 	payload := []byte(`{"entities":[]}`)
 	if got := ArrayElements(payload); len(got) != 0 {
 		t.Fatalf("elements = %q, want none", got)
@@ -101,6 +113,7 @@ func TestArrayElementsStopsAtTheEnclosingArray(t *testing.T) {
 }
 
 func TestRepairReportsTheFurthestAttemptWhenNothingValidates(t *testing.T) {
+	t.Parallel()
 	// A reply that was fenced and then cut off. The fence is gone, so an error
 	// quotes the cut rather than the backticks, and a caller salvaging elements
 	// starts from the JSON instead of from Markdown.
@@ -119,6 +132,7 @@ func TestRepairReportsTheFurthestAttemptWhenNothingValidates(t *testing.T) {
 }
 
 func TestRepairLeavesAnUnrepairablePayloadAlone(t *testing.T) {
+	t.Parallel()
 	in := []byte("no json here at all")
 	if got := Repair(in); got.OK || string(got.Payload) != string(in) {
 		t.Fatalf("payload = %q, want the input unchanged", got.Payload)
@@ -126,6 +140,7 @@ func TestRepairLeavesAnUnrepairablePayloadAlone(t *testing.T) {
 }
 
 func TestRepairStringFaults(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		in   string
@@ -137,21 +152,26 @@ func TestRepairStringFaults(t *testing.T) {
 		{"smart quotes as delimiters", "{\u201ca\u201d:1}", KindSmartQuote},
 	}
 	for _, c := range cases {
-		got := Repair([]byte(c.in))
-		if !got.OK {
-			t.Errorf("%s: not repaired: %q", c.name, got.Payload)
-			continue
-		}
-		if !json.Valid(got.Payload) {
-			t.Errorf("%s: payload invalid: %q", c.name, got.Payload)
-		}
-		if got.Kind != c.kind {
-			t.Errorf("%s: Kind = %q, want %q", c.name, got.Kind, c.kind)
-		}
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			got := Repair([]byte(c.in))
+			if !got.OK {
+				t.Errorf("%s: not repaired: %q", c.name, got.Payload)
+				return
+			}
+			if !json.Valid(got.Payload) {
+				t.Errorf("%s: payload invalid: %q", c.name, got.Payload)
+			}
+			if got.Kind != c.kind {
+				t.Errorf("%s: Kind = %q, want %q", c.name, got.Kind, c.kind)
+			}
+		})
 	}
 }
 
 func TestRepairPreservesText(t *testing.T) {
+	t.Parallel()
 	got := Repair([]byte("{\"a\":\"one\ntwo\"}"))
 	var decoded map[string]string
 	if err := json.Unmarshal(got.Payload, &decoded); err != nil {
@@ -163,6 +183,7 @@ func TestRepairPreservesText(t *testing.T) {
 }
 
 func TestRepairLeavesASmartQuoteInsideAValue(t *testing.T) {
+	t.Parallel()
 	// A smart quote inside a value is content, not a delimiter, so the payload is
 	// already valid and must come back byte-identical.
 	in := []byte("{\"a\":\"it\u2019s\"}")

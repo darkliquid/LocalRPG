@@ -675,7 +675,8 @@ func TestListGamesOrdersByLatestHistoryModTime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(10 * time.Millisecond)
+	past := time.Now().Add(-1 * time.Hour)
+	_ = os.Chtimes(filepath.Join(svc.GetResolver().GameDir(g1.ID), "game.yaml"), past, past)
 
 	g2, err := svc.CreateGame(context.Background(), CreateGameRequestDTO{
 		Name:       "Newer Campaign",
@@ -964,12 +965,15 @@ func TestAServiceRegeneratesTheSummaryBehindTheTurn(t *testing.T) {
 
 	// The regeneration is detached, so the test waits for it rather than assuming
 	// it finished before Run returned.
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if !svc.SummaryPending("campaign-01") {
-			break
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(5 * time.Second)
+	for svc.SummaryPending("campaign-01") {
+		select {
+		case <-ticker.C:
+		case <-timeout:
+			t.Fatal("timed out waiting for summary generation")
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
 
 	recap, err := svc.GetRecap(context.Background(), "campaign-01")

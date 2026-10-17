@@ -54,6 +54,7 @@ func getTestPlayer(t *testing.T) *Player {
 		t.Fatalf("open player: %v", testPlayerErr)
 	}
 
+	testPlayerInstance.SetOnComplete(nil)
 	testPlayerInstance.Stop()
 	testPlayerInstance.SetVolume(0.5)
 	return testPlayerInstance
@@ -86,15 +87,24 @@ func devicePlays(t *testing.T, player *Player) bool {
 	t.Helper()
 
 	clip := writeToneWAV(t, t.TempDir(), "probe.wav", deviceSampleRate, 20*time.Millisecond)
+	done := make(chan struct{})
+	player.SetOnComplete(func() {
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+	})
 	if err := player.PlayFiles([]string{clip}); err != nil {
 		return false
 	}
 
-	deadline := time.Now().Add(3 * time.Second)
-	for player.Playing() && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
+	select {
+	case <-done:
+		return !player.Playing()
+	case <-time.After(3 * time.Second):
+		return false
 	}
-	return !player.Playing()
 }
 
 func TestPlayerWithoutADeviceReportsUnavailable(t *testing.T) {
@@ -115,6 +125,16 @@ func TestPlayerPlaysAQueue(t *testing.T) {
 	first := writeToneWAV(t, dir, "first.wav", deviceSampleRate, 40*time.Millisecond)
 	second := writeToneWAV(t, dir, "second.wav", 24000, 40*time.Millisecond)
 
+	defer player.SetOnComplete(nil)
+	done := make(chan struct{})
+	player.SetOnComplete(func() {
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+	})
+
 	if err := player.PlayFiles([]string{first, second}); err != nil {
 		t.Fatalf("PlayFiles failed: %v", err)
 	}
@@ -122,9 +142,10 @@ func TestPlayerPlaysAQueue(t *testing.T) {
 		t.Fatalf("expected playback to be reported as running")
 	}
 
-	deadline := time.Now().Add(5 * time.Second)
-	for player.Playing() && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for playback to finish")
 	}
 	if player.Playing() {
 		t.Errorf("expected the queue to finish")
@@ -170,13 +191,24 @@ func TestPlayFilesPlaysTheGoodClipsWhenOneIsBad(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defer player.SetOnComplete(nil)
+	done := make(chan struct{})
+	player.SetOnComplete(func() {
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+	})
+
 	if err := player.PlayFiles([]string{junk, good}); err != nil {
 		t.Fatalf("expected the playable clip to be queued: %v", err)
 	}
 
-	deadline := time.Now().Add(5 * time.Second)
-	for player.Playing() && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for playback to finish")
 	}
 	if player.Playing() {
 		t.Errorf("expected the queue to finish")

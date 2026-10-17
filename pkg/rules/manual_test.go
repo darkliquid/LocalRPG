@@ -19,6 +19,7 @@ func manualResolver() SchemaResolver {
 }
 
 func TestManualDiceAreSummed(t *testing.T) {
+	t.Parallel()
 	res, err := manualResolver().Resolve(context.Background(), harness.CheckRequest{
 		ForcedDice: []int{4, 3}, Difficulty: "easy",
 	}, &entity.Entity{ID: "hero"})
@@ -37,6 +38,7 @@ func TestManualDiceAreSummed(t *testing.T) {
 }
 
 func TestManualTotalPlusBonuses(t *testing.T) {
+	t.Parallel()
 	actor := &entity.Entity{ID: "hero", State: state.NewState(map[string]any{"stealth": 2})}
 	total := 7
 	res, err := manualResolver().Resolve(context.Background(), harness.CheckRequest{
@@ -54,6 +56,7 @@ func TestManualTotalPlusBonuses(t *testing.T) {
 }
 
 func TestManualDiceKeepTheBonuses(t *testing.T) {
+	t.Parallel()
 	actor := &entity.Entity{ID: "hero", State: state.NewState(map[string]any{"stealth": 2})}
 	res, err := manualResolver().Resolve(context.Background(), harness.CheckRequest{
 		Skill: "stealth", ForcedDice: []int{4, 3}, Difficulty: "easy",
@@ -70,6 +73,7 @@ func TestManualDiceKeepTheBonuses(t *testing.T) {
 // resolves the way a rolled pool would, rather than reading a random roll's
 // successes.
 func TestManualPoolCountsSuccesses(t *testing.T) {
+	t.Parallel()
 	r := SchemaResolver{conventions: core.CheckConventions{
 		Notation: "5d10",
 		Profiles: map[string]core.ResolutionProfile{
@@ -95,6 +99,7 @@ func TestManualPoolCountsSuccesses(t *testing.T) {
 // TestManualEntryNeverRejected guards the app's trust: an implausible entry is
 // accepted, because a local-first table may have a house rule.
 func TestManualEntryNeverRejected(t *testing.T) {
+	t.Parallel()
 	res, err := manualResolver().Resolve(context.Background(), harness.CheckRequest{
 		ForcedDice: []int{20}, Difficulty: "easy",
 	}, &entity.Entity{ID: "hero"})
@@ -109,6 +114,7 @@ func TestManualEntryNeverRejected(t *testing.T) {
 // TestManualTotalIsDicePlusBonuses is the property the honesty rests on: whatever
 // dice a player enters, the recorded total is their sum plus the system's bonuses.
 func TestManualTotalIsDicePlusBonuses(t *testing.T) {
+	t.Parallel()
 	actor := &entity.Entity{ID: "hero", State: state.NewState(map[string]any{"stealth": 3, "might": 1})}
 	req := harness.CheckRequest{
 		Skill: "stealth", Stat: "might", Modifiers: []harness.CheckModifier{{Source: "high ground", Value: 2}},
@@ -132,6 +138,7 @@ func TestManualTotalIsDicePlusBonuses(t *testing.T) {
 }
 
 func TestManualRollCountsNoSuccessesWithoutAThreshold(t *testing.T) {
+	t.Parallel()
 	roll := ManualRoll("2d6", []int{6, 6})
 	if roll.Successes != 0 || roll.Total != 12 {
 		t.Fatalf("roll = %+v", roll)

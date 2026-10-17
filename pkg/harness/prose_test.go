@@ -3,6 +3,7 @@ package harness
 import "testing"
 
 func TestProseComplete(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		text string
@@ -29,7 +30,9 @@ func TestProseComplete(t *testing.T) {
 		{"whitespace", "   \n  ", false},
 	}
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if got := ProseComplete(tc.text); got != tc.want {
 				t.Errorf("ProseComplete(%q) = %v, want %v", tc.text, got, tc.want)
 			}
@@ -38,6 +41,7 @@ func TestProseComplete(t *testing.T) {
 }
 
 func TestLastSentenceBoundary(t *testing.T) {
+	t.Parallel()
 	text := "The gate stands open before us all. Its hinges groan, and then"
 	offset, ok := LastSentenceBoundary(text, 24)
 	if !ok {
@@ -56,6 +60,7 @@ func TestLastSentenceBoundary(t *testing.T) {
 }
 
 func TestTrimToLastSentence(t *testing.T) {
+	t.Parallel()
 	trimmed, ok := TrimToLastSentence("The gate stands open before us all. Its hinges groan, and then", 24)
 	if !ok {
 		t.Fatalf("expected a trim")
@@ -70,6 +75,7 @@ func TestTrimToLastSentence(t *testing.T) {
 }
 
 func TestStitchContinuation(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name         string
 		existing     string
@@ -132,7 +138,9 @@ func TestStitchContinuation(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if got := StitchContinuation(tc.existing, tc.continuation); got != tc.want {
 				t.Errorf("StitchContinuation(%q, %q) = %q, want %q", tc.existing, tc.continuation, got, tc.want)
 			}

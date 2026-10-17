@@ -3,6 +3,7 @@ package provider
 import "testing"
 
 func TestTierCaveatIsNonEmptyForEveryTier(t *testing.T) {
+	t.Parallel()
 	for _, tier := range []Tier{TierOfflineBasic, TierOfflineNeural, TierLocalServer, TierCloud} {
 		if !tier.Valid() {
 			t.Errorf("%q is not valid", tier)
@@ -17,6 +18,7 @@ func TestTierCaveatIsNonEmptyForEveryTier(t *testing.T) {
 }
 
 func TestEffectiveCaveatPrefersTheDescriptor(t *testing.T) {
+	t.Parallel()
 	custom := Descriptor{Tier: TierCloud, Caveat: "Only the good stuff."}
 	if got := custom.EffectiveCaveat(); got != "Only the good stuff." {
 		t.Errorf("EffectiveCaveat = %q, want the descriptor's own", got)
@@ -28,6 +30,7 @@ func TestEffectiveCaveatPrefersTheDescriptor(t *testing.T) {
 }
 
 func TestValidateRejectsTierFeatureMismatch(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		d    Descriptor

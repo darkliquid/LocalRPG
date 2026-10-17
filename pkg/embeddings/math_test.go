@@ -6,6 +6,7 @@ import (
 )
 
 func TestVectorEncodeDecodeRoundTrip(t *testing.T) {
+	t.Parallel()
 	orig := []float32{0.0, 1.5, -2.25, 3.14159, -0.0001}
 	encoded := EncodeVector(orig)
 	if len(encoded) != len(orig)*4 {
@@ -26,6 +27,7 @@ func TestVectorEncodeDecodeRoundTrip(t *testing.T) {
 }
 
 func TestDecodeVectorInvalidLength(t *testing.T) {
+	t.Parallel()
 	_, err := DecodeVector([]byte{1, 2, 3}) // not a multiple of 4
 	if err == nil {
 		t.Fatal("expected error on invalid byte length, got nil")
@@ -33,6 +35,7 @@ func TestDecodeVectorInvalidLength(t *testing.T) {
 }
 
 func TestCosineSimilarity(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		a        []float32
@@ -72,7 +75,9 @@ func TestCosineSimilarity(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			sim := CosineSimilarity(tc.a, tc.b)
 			if math.Abs(float64(sim-tc.expected)) > 1e-5 {
 				t.Errorf("expected similarity %f, got %f", tc.expected, sim)

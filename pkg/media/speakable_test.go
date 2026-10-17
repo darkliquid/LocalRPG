@@ -11,6 +11,7 @@ import (
 )
 
 func TestSpeakableText(t *testing.T) {
+	t.Parallel()
 	tests := []struct{ name, in, want string }{
 		{"emphasis", "She *hesitates*, then **commits**.", "She hesitates, then commits."},
 		{"strong emphasis", "***Now*** or never.", "Now or never."},
@@ -30,7 +31,9 @@ func TestSpeakableText(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := SpeakableText(tt.in); got != tt.want {
 				t.Errorf("SpeakableText(%q) = %q, want %q", tt.in, got, tt.want)
 			}

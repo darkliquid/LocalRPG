@@ -8,6 +8,7 @@ import (
 )
 
 func TestClassifyProviderError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		err  error
@@ -21,7 +22,9 @@ func TestClassifyProviderError(t *testing.T) {
 		{"nil", nil, FailureProviderError},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := ClassifyProviderError(tt.err); got != tt.want {
 				t.Fatalf("ClassifyProviderError() = %q, want %q", got, tt.want)
 			}
@@ -30,6 +33,7 @@ func TestClassifyProviderError(t *testing.T) {
 }
 
 func TestFailureFrom(t *testing.T) {
+	t.Parallel()
 	want := &GenerationFailure{Code: FailureEmptyResponse, Message: "empty"}
 	got, ok := FailureFrom(fmt.Errorf("role failed: %w", want))
 	if !ok || got != want {
@@ -41,6 +45,7 @@ func TestFailureFrom(t *testing.T) {
 }
 
 func TestGenerationFailureError(t *testing.T) {
+	t.Parallel()
 	var nilFailure *GenerationFailure
 	if nilFailure.Error() != "" {
 		t.Fatal("nil failure should have an empty message")
@@ -51,6 +56,7 @@ func TestGenerationFailureError(t *testing.T) {
 }
 
 func TestSummarizeAttemptsPrefersLastDetail(t *testing.T) {
+	t.Parallel()
 	attempts := []Attempt{
 		{Role: "gm", Provider: "a", Code: FailureProviderError, Detail: "first"},
 		{Role: "gm", Provider: "b", Code: FailureEmptyResponse, Detail: "second"},
@@ -64,6 +70,7 @@ func TestSummarizeAttemptsPrefersLastDetail(t *testing.T) {
 }
 
 func TestGenerationFailureSummary(t *testing.T) {
+	t.Parallel()
 	if got := (&GenerationFailure{Code: FailureTimeout}).Summary(); got != "timeout" {
 		t.Fatalf("got %q, want %q", got, "timeout")
 	}

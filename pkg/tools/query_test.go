@@ -3,6 +3,7 @@ package tools
 import "testing"
 
 func TestBuildMatch(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name  string
 		query string
@@ -17,7 +18,9 @@ func TestBuildMatch(t *testing.T) {
 		{"empty is empty", "   ", ""},
 	}
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if got := BuildMatch(tc.query); got != tc.want {
 				t.Errorf("BuildMatch(%q) = %q, want %q", tc.query, got, tc.want)
 			}

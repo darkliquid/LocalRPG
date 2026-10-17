@@ -8,15 +8,17 @@ import (
 
 func TestRegistryBlocksAndExpiresOnRead(t *testing.T) {
 	r := NewLimitRegistry()
-	r.Block("gemini", "gm", time.Now().Add(50*time.Millisecond))
+	r.Block("gemini", "gm", time.Now().Add(time.Minute))
 	if _, ok := r.Blocked("gemini", "gm"); !ok {
 		t.Fatal("expected a block")
 	}
 	if _, ok := r.Blocked("gemini", "tts"); ok {
 		t.Fatal("a different role must be unaffected")
 	}
-	time.Sleep(80 * time.Millisecond)
-	if _, ok := r.Blocked("gemini", "gm"); ok {
+
+	r2 := NewLimitRegistry()
+	r2.Block("gemini", "gm", time.Now().Add(-time.Second))
+	if _, ok := r2.Blocked("gemini", "gm"); ok {
 		t.Fatal("block should have expired")
 	}
 }

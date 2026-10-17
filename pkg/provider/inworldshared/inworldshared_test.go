@@ -39,6 +39,7 @@ func TestResolveAPIKey(t *testing.T) {
 }
 
 func TestMapError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		status     int
@@ -84,7 +85,9 @@ func TestMapError(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			err := inworldshared.MapError(tc.status, tc.body)
 			if err == nil || !strings.Contains(err.Error(), tc.wantSubstr) {
 				t.Errorf("MapError(%d, %q) = %v; want substring %q", tc.status, string(tc.body), err, tc.wantSubstr)

@@ -25,6 +25,7 @@ func (m *mockCueClient) SpeechCueCapabilities() SpeechCueCapabilities {
 }
 
 func TestStripAudioTags(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		input    string
 		expected string
