@@ -417,7 +417,20 @@ function useCampaignValue() {
         );
       }
       const turn = event.turn;
-      setChronicle((prev) => [...prev, turn]);
+      if (turn.input_text === '/undo' || turn.prose === 'Undid previous turn.') {
+        if (client) {
+          client
+            .getChronicle()
+            .then(setChronicle)
+            .catch(() => {
+              setChronicle((prev) => prev.filter((t) => t.turn_number <= turn.turn_number));
+            });
+        } else {
+          setChronicle((prev) => prev.filter((t) => t.turn_number <= turn.turn_number));
+        }
+      } else {
+        setChronicle((prev) => [...prev, turn]);
+      }
       setTurnStatus(`Turn ${turn.turn_number} ready`);
       streamProcessorRef.current.reset();
       setStreamedSegments([]);
