@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -79,8 +80,10 @@ func TestFileSinkIsOwnerOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if perm := info.Mode().Perm(); perm != 0600 {
-		t.Errorf("trace mode = %o, want 600; it can contain prompts", perm)
+	if runtime.GOOS != "windows" {
+		if perm := info.Mode().Perm(); perm != 0600 {
+			t.Errorf("trace mode = %o, want 600; it can contain prompts", perm)
+		}
 	}
 }
 

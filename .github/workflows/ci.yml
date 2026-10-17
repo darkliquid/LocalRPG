@@ -172,19 +172,23 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
-    env:
-      GOMODCACHE: ${{ github.workspace }}/.go/mod
-      GOCACHE: ${{ github.workspace }}/.go/build
     steps:
       - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v5
         id: mise
 
+      - name: Get Go cache directories
+        id: go-cache
+        shell: bash
+        run: |
+          echo "gomod=$(mise exec -- go env GOMODCACHE)" >> $GITHUB_OUTPUT
+          echo "gobuild=$(mise exec -- go env GOCACHE)" >> $GITHUB_OUTPUT
+
       - name: Cache the Go module cache
         uses: actions/cache@v5
         with:
-          path: ${{ github.workspace }}/.go/mod
+          path: ${{ steps.go-cache.outputs.gomod }}
           key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
           restore-keys: |
             go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-
@@ -193,7 +197,7 @@ jobs:
       - name: Cache the Go build cache
         uses: actions/cache@v5
         with:
-          path: ${{ github.workspace }}/.go/build
+          path: ${{ steps.go-cache.outputs.gobuild }}
           key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
           restore-keys: |
             go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-
@@ -207,7 +211,7 @@ jobs:
 
       - name: Run Go tests
         shell: bash
-        run: mise run test:backend:fast
+        run: mise run test:backend:cross
 
   e2e:
     name: End-to-end browser tests

@@ -43,8 +43,11 @@ func TestFunctionLengthGate(t *testing.T) {
 			return nil
 		}
 		if d.IsDir() {
+			if strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
 			switch d.Name() {
-			case ".git", ".worktrees", "node_modules", "frontend", "website", "styles", "dist", "bin":
+			case "node_modules", "frontend", "website", "styles", "dist", "bin":
 				return filepath.SkipDir
 			}
 			return nil

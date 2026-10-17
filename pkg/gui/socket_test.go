@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -57,7 +58,12 @@ func TestListenUnix(t *testing.T) {
 
 func TestUnixSocketHTTPCommunication(t *testing.T) {
 	gameID, svc := setupTestGame(t)
-	sockPath := filepath.Join(t.TempDir(), "http_test.sock")
+	sockDir := t.TempDir()
+	if runtime.GOOS == "darwin" {
+		sockDir = "/tmp"
+	}
+	sockPath := filepath.Join(sockDir, fmt.Sprintf("http_%d.sock", time.Now().UnixNano()))
+	defer func() { _ = os.Remove(sockPath) }()
 
 	server := NewServer(svc, AssetHandler())
 
