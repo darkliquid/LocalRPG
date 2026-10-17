@@ -26,6 +26,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/tui"
 )
 
+// handlePlayCommand launches the terminal TUI game session for a specified campaign.
 func handlePlayCommand(args []string) {
 	code := runPlayCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {

@@ -9,6 +9,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/config"
 )
 
+// handleConfigCommand manages configuration settings such as offline presets and offline readiness checks.
 func handleConfigCommand(args []string) {
 	code := runConfigCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {

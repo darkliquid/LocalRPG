@@ -17,6 +17,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/content"
 )
 
+// handlePublisherCommand manages trusted publishers and content signing/verification.
 func handlePublisherCommand(args []string) {
 	code := runPublisherCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {

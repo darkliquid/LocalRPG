@@ -2,9 +2,9 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,12 +13,61 @@ import (
 	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
-func TestCLIExportHelp(t *testing.T) {
-	cmd := exec.Command("go", "run", ".", "export", "--help")
-	out, err := cmd.CombinedOutput()
-	output := string(out)
-	if !strings.Contains(output, "Usage: localrpg export") && !strings.Contains(output, "Usage of export") {
-		t.Errorf("unexpected output: %s, err: %v", output, err)
+func TestRunExportCommandTable(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantCode   int
+		wantStderr string
+	}{
+		{
+			name:     "empty args prints usage",
+			args:     nil,
+			wantCode: 0,
+		},
+		{
+			name:       "unknown flag fails",
+			args:       []string{"--unknown-flag"},
+			wantCode:   1,
+			wantStderr: "flag provided but not defined",
+		},
+		{
+			name:       "inspect missing path",
+			args:       []string{"inspect"},
+			wantCode:   1,
+			wantStderr: "Error: missing bundle path",
+		},
+		{
+			name:       "inspect nonexistent file",
+			args:       []string{"inspect", "nonexistent.zip"},
+			wantCode:   1,
+			wantStderr: "Inspect failed:",
+		},
+		{
+			name:       "missing game id",
+			args:       []string{"web"},
+			wantCode:   1,
+			wantStderr: "Error: missing game ID",
+		},
+		{
+			name:       "compile nonexistent game fails",
+			args:       []string{"web", "nonexistent-game-xyz"},
+			wantCode:   1,
+			wantStderr: "Failed to compile replay script",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runExportCommand(tt.args, &stdout, &stderr)
+			if code != tt.wantCode {
+				t.Errorf("code = %d, want %d (stderr: %q)", code, tt.wantCode, stderr.String())
+			}
+			if tt.wantStderr != "" && !strings.Contains(stderr.String(), tt.wantStderr) {
+				t.Errorf("stderr = %q, want substring %q", stderr.String(), tt.wantStderr)
+			}
+		})
 	}
 }
 

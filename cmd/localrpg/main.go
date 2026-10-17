@@ -72,6 +72,7 @@ func main() {
 	}
 }
 
+// printUsage writes the CLI command index and usage summary to stdout.
 func printUsage() {
 	fmt.Println("Usage: localrpg <command> [arguments]")
 	fmt.Println("\nCommands:")

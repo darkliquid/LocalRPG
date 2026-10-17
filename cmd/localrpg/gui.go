@@ -53,6 +53,7 @@ func parseGUIConfig(args []string, stderr io.Writer) (*guiConfig, error) {
 	return cfg, nil
 }
 
+// handleGUICommand launches the desktop GUI window or web/socket server mode.
 func handleGUICommand(args []string) {
 	code := runGUICommand(args, os.Stdout, os.Stderr)
 	if code != 0 {

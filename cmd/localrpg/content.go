@@ -11,6 +11,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/gui"
 )
 
+// handleContentCommand exports, imports, signs, or verifies content packages (.lrpgpack).
 func handleContentCommand(args []string) {
 	code := runContentCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {

@@ -60,6 +60,7 @@ func parseDebugArgs(args []string) (string, debugConfig, error) {
 	return subcmd, cfg, nil
 }
 
+// handleDebugCommand runs automated scenario tests, system testing, or the debug server.
 func handleDebugCommand(args []string) {
 	code := runDebugCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {

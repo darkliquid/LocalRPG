@@ -223,3 +223,26 @@ func TestRegistryAddRejectsInvalidURL(t *testing.T) {
 		t.Fatalf("an invalid URL must not be stored, got: %s", stdout.String())
 	}
 }
+
+func TestRunRegistryCommandUsage(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	// Empty args
+	if code := runRegistryCommand(nil, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "Usage: localrpg registry") {
+		t.Errorf("empty args: code = %d, stderr = %q", code, stderr.String())
+	}
+
+	// Help arg
+	stdout.Reset()
+	stderr.Reset()
+	if code := runRegistryCommand([]string{"--help"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "Usage: localrpg registry") {
+		t.Errorf("help arg: code = %d, stdout = %q", code, stdout.String())
+	}
+
+	// Unknown subcommand
+	stdout.Reset()
+	stderr.Reset()
+	if code := runRegistryCommand([]string{"bogus"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "Unknown registry subcommand: bogus") {
+		t.Errorf("unknown subcommand: code = %d, stderr = %q", code, stderr.String())
+	}
+}

@@ -17,6 +17,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/registry"
 )
 
+// handleRegistryCommand searches, installs, and updates content packages from registries.
 func handleRegistryCommand(args []string) {
 	code := runRegistryCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {

@@ -60,3 +60,26 @@ func TestOfflineConfigCommands(t *testing.T) {
 		t.Fatalf("expected success message, got: %s", stdout.String())
 	}
 }
+
+func TestRunConfigCommandUsage(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	// Empty args
+	if code := runConfigCommand(nil, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "Usage: localrpg config") {
+		t.Errorf("empty args: code = %d, stderr = %q", code, stderr.String())
+	}
+
+	// Help arg
+	stdout.Reset()
+	stderr.Reset()
+	if code := runConfigCommand([]string{"--help"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "Usage: localrpg config") {
+		t.Errorf("help arg: code = %d, stdout = %q", code, stdout.String())
+	}
+
+	// Unknown subcommand
+	stdout.Reset()
+	stderr.Reset()
+	if code := runConfigCommand([]string{"bogus"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "Unknown config subcommand: bogus") {
+		t.Errorf("unknown subcommand: code = %d, stderr = %q", code, stderr.String())
+	}
+}

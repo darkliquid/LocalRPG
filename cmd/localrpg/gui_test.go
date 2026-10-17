@@ -2,18 +2,43 @@
 package main
 
 import (
+	"bytes"
 	"io"
-	"os/exec"
 	"strings"
 	"testing"
 )
 
-func TestCLIGUICommandHelp(t *testing.T) {
-	cmd := exec.Command("go", "run", ".", "gui", "--help")
-	out, err := cmd.CombinedOutput()
-	output := string(out)
-	if !strings.Contains(output, "Launch desktop GUI or browser app") && !strings.Contains(output, "Usage of gui") {
-		t.Errorf("unexpected output: %s, err: %v", output, err)
+func TestRunGUICommand(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantCode   int
+		wantStderr string
+	}{
+		{
+			name:     "help flag returns zero",
+			args:     []string{"--help"},
+			wantCode: 0,
+		},
+		{
+			name:       "unknown flag fails",
+			args:       []string{"--unknown-flag"},
+			wantCode:   1,
+			wantStderr: "Flag error:",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runGUICommand(tt.args, &stdout, &stderr)
+			if code != tt.wantCode {
+				t.Errorf("code = %d, want %d", code, tt.wantCode)
+			}
+			if tt.wantStderr != "" && !strings.Contains(stderr.String(), tt.wantStderr) {
+				t.Errorf("stderr = %q, want substring %q", stderr.String(), tt.wantStderr)
+			}
+		})
 	}
 }
 

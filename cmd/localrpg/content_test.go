@@ -95,3 +95,26 @@ func TestContentImportCLIRequiresYes(t *testing.T) {
 		t.Fatalf("stdout did not confirm import: %s", stdout.String())
 	}
 }
+
+func TestRunContentCommandUsage(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	// Empty args
+	if code := runContentCommand(nil, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "Usage: localrpg content") {
+		t.Errorf("empty args: code = %d, stderr = %q", code, stderr.String())
+	}
+
+	// Help arg
+	stdout.Reset()
+	stderr.Reset()
+	if code := runContentCommand([]string{"--help"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "Usage: localrpg content") {
+		t.Errorf("help arg: code = %d, stdout = %q", code, stdout.String())
+	}
+
+	// Unknown subcommand
+	stdout.Reset()
+	stderr.Reset()
+	if code := runContentCommand([]string{"bogus"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "Unknown content subcommand: bogus") {
+		t.Errorf("unknown subcommand: code = %d, stderr = %q", code, stderr.String())
+	}
+}
