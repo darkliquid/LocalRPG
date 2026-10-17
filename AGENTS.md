@@ -474,6 +474,14 @@ The floors sit just below what the suite reaches today — 73.3% and 33.36% at t
 **What to argue a behaviour-preserving change with** is `mise run coverage:diff BEFORE.prof AFTER.prof` (`scripts/coverage-diff.sh`), which compares the *functions* that were fully covered before the change and are not after. No comment, blank line or expression layout can make a function lose that, so a name in its output is a block that stopped running. Generate the two profiles from the two revisions with `go test -count=1 -covermode=atomic -coverprofile=….prof ./pkg/…`, and see the script's header for the reasoning in full.
 
 - **Frontend unit and component tests: Vitest + React Testing Library + jsdom.** The runner is configured in `frontend/vitest.config.ts` (not the app's `vite.config.ts`, which sets an output directory and loads Tailwind). Tests live beside the code as `*.test.ts`/`*.test.tsx` and import `describe`/`it`/`expect` from `vitest` explicitly; there are no globals. `frontend/src/test/setup.ts` installs the jest-dom matchers, stubs the browser APIs jsdom lacks, and calls RTL's `cleanup`. The old `frontend/scripts/check*.mjs` files are gone, and the docs lint is no longer a Node script at all: `mise run lint:docs` runs `rumdl` over `pkg/gui/docs`.
+- **A component reads the campaign from the context rather than receiving it.** `ChronicleView` and
+  `StoryTheater` take what defines what they render (`turns`, `genre`, the display state a stream is
+  in) and the flows they call back into, and read the playback, the portraits and the campaign's own
+  values from `useCampaign()`. That is what keeps their prop lists at eleven and five rather than
+  twenty-five and nineteen, and a consumer's test renders it inside a `CampaignProvider` rather than
+  threading a mock through a prop: what the theatre asks the server to play is asserted on the client
+  call the provider makes.
+
 - **A campaign has one owner: `CampaignProvider`.** It is mounted in `App.tsx`, above the component
   that chooses a campaign, and it owns the campaign's data, the turn stream that writes it and the
   playback that reads it, because the three are written by the same code. `App.tsx` is a shell (under

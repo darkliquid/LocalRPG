@@ -72,7 +72,6 @@ export function CampaignScreen({ onOpenDocs: openDocs, docsOpen }: CampaignScree
   const {
     activeGameID,
     activeRateLimitSeconds,
-    addressed,
 
     audioProgress,
     campaignError,
@@ -86,11 +85,9 @@ export function CampaignScreen({ onOpenDocs: openDocs, docsOpen }: CampaignScree
     gameState,
     graph,
     handleActionSubmit,
-    handleAddress,
     handleBeginStory,
     handleBeginWithAction,
     handleMergeEntity,
-    handlePlayTurnAudio,
     handleRenegotiate,
     handleResolveCheck,
     handleSaveEntity,
@@ -103,18 +100,13 @@ export function CampaignScreen({ onOpenDocs: openDocs, docsOpen }: CampaignScree
     pendingAction,
     pendingCheck,
     pendingTurnNumber,
-    playbackLedger,
     recap,
 
     sceneImagePending,
     segmentAudioProgress,
-    segmentAudioStatus,
     selectedEntity,
-    serverAudio,
-    streamedKeys,
     streamedSegments,
     toolActivity,
-    turnAudioStatus,
     turnError,
     turnInFlight,
     turnStatus,
@@ -429,29 +421,11 @@ export function CampaignScreen({ onOpenDocs: openDocs, docsOpen }: CampaignScree
               <ChronicleView
                 turns={chronicle}
                 genre={gameState?.genre}
-                onWikilinkClick={handleOpenWikilink}
-                // With application playback the browser must stay silent, so
-                // it never competes with the narrator or hits autoplay limits.
-                autoPlay={serverAudio ? false : (config?.media.tts.auto_play ?? false)}
-                volume={config?.media.tts.master_volume ?? 1}
-                serverPlayback={serverAudio}
-                onPlayTurnAudio={handlePlayTurnAudio}
-                onStopAudio={handleStopAudio}
-                onCorrect={handleCorrect}
-                addressedTurns={addressed}
-                onAddress={handleAddress}
                 turnInFlight={turnInFlight}
                 pendingAction={pendingAction}
-                streamedSegments={streamedSegments}
-                displayMode={config?.media.tts.speech_cues?.display_mode}
                 sceneImagePending={sceneImagePending}
-                turnAudioStatus={turnAudioStatus}
-                segmentAudioStatus={segmentAudioStatus}
-                characterPortraits={characterPortraits}
-                segmentProgress={segmentAudioProgress}
-                gameId={activeGameID ?? undefined}
-                skipAudioKeys={streamedKeys}
-                playbackLedger={playbackLedger}
+                onWikilinkClick={handleOpenWikilink}
+                onCorrect={handleCorrect}
                 onGenerateImage={handleGenerateImage}
               />
             </>
@@ -632,20 +606,7 @@ export function CampaignScreen({ onOpenDocs: openDocs, docsOpen }: CampaignScree
             handleStopAudio();
             setIsTheaterOpen(false);
           }}
-          volume={config?.media.tts.master_volume ?? 1}
-          gameId={activeGameID ?? undefined}
-          playerId={gameState?.player?.id}
-          playerName={gameState?.player?.name}
-          campaignImage={gameState?.banner_url}
-          serverPlayback={serverAudio}
-          onPlayAudio={handlePlayTurnAudio}
-          onStopAudio={handleStopAudio}
-          segmentAudioStatus={segmentAudioStatus}
           onEntityClick={handleOpenWikilink}
-          displayMode={config?.media.tts.speech_cues?.display_mode}
-          limits={limits}
-          skipAudioKeys={streamedKeys}
-          playbackLedger={playbackLedger}
         />
       </Suspense>
 

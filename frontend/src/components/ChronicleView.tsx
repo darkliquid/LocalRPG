@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Turn, TurnSegment, PlaybackEntry } from '../types';
-import { TurnSegments, TurnAudioState } from './TurnSegments';
+import { Turn } from '../types';
+import { TurnSegments } from './TurnSegments';
 import { RecordNotice } from './RecordNotice';
 import { Sparkles } from 'lucide-react';
 import { genreCopy } from '../lib/genre';
 import { useLightbox } from '../hooks/useLightbox';
+import { useCampaign } from '../context/CampaignContext';
 import { ImageLightbox } from './ImageLightbox';
 
 interface PendingAction {
@@ -20,64 +21,51 @@ const SCENE_PENDING_REASONS: Record<string, string> = {
 };
 
 interface ChronicleViewProps {
+  /** turns is the campaign's chronicle as the caller holds it. */
   turns: Turn[];
   onWikilinkClick: (entityId: string) => void;
-  autoPlay?: boolean;
-  volume?: number;
-  serverPlayback?: boolean;
-  onPlayTurnAudio?: (turnNumber: number, segmentIndex?: number, force?: boolean) => void;
-  onStopAudio?: () => void;
   onCorrect?: (note: string, turnNumber?: number) => void;
   addressedTurns?: Set<number>;
   onAddress?: (turnNumber: number) => void;
-  turnInFlight?: boolean;
   // The campaign's world genre, which flavours the empty and loading lines.
   genre?: string;
+  // What the chronicle is showing rather than what it plays: whether a turn is
+  // being written, what the player just asked, and why an illustration is absent.
+  turnInFlight?: boolean;
   pendingAction?: PendingAction | null;
-  // The segments parsed so far, which render in place of the raw stream while a
-  // turn runs: a control record never appears, because it produces no segment.
-  streamedSegments?: TurnSegment[];
-  displayMode?: 'stage_directions' | 'hidden' | 'raw';
-  turnAudioStatus?: Record<number, { state: TurnAudioState; message?: string }>;
-  // Why the server withheld an illustration for a turn, so the absence can be
-  // explained beside the generate button rather than left silent.
   sceneImagePending?: Record<number, string>;
-  segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
-  characterPortraits?: Record<string, { url: string; hasCustom: boolean }>;
-  segmentProgress?: Record<number, string>;
-  // The campaign whose clips the beat controls regenerate.
-  gameId?: string;
-  // Clips already heard while the turn streamed, which playback must skip.
-  skipAudioKeys?: ReadonlySet<string>;
-  // Playback ledger containing resume offsets and completion states.
-  playbackLedger?: Record<string, PlaybackEntry>;
   // onGenerateImage asks the server to illustrate a turn that has no image.
   onGenerateImage?: (turnNumber: number) => void;
 }
 
 export const ChronicleView: React.FC<ChronicleViewProps> = ({
-  sceneImagePending,
   turns,
   onWikilinkClick,
-  autoPlay = false,
-  volume = 1,
-  serverPlayback = false,
-  onPlayTurnAudio,
-  onStopAudio,
-  turnInFlight,
   genre,
+  turnInFlight,
   pendingAction,
-  streamedSegments,
-  displayMode,
-  turnAudioStatus = {},
-  segmentAudioStatus = {},
-  characterPortraits,
-  segmentProgress,
-  gameId,
-  skipAudioKeys,
-  playbackLedger,
+  sceneImagePending,
   onGenerateImage,
 }) => {
+  // The playback and the campaign's own state come from the provider rather than
+  // through twenty props threaded from the screen that happens to render this.
+  const campaign = useCampaign();
+  const {
+    autoPlay,
+    characterPortraits,
+    displayMode,
+    handlePlayTurnAudio: onPlayTurnAudio,
+    handleStopAudio: onStopAudio,
+    playbackLedger,
+    segmentAudioProgress: segmentProgress,
+    segmentAudioStatus,
+    serverAudio: serverPlayback,
+    activeGameID: gameId,
+    streamedKeys: skipAudioKeys,
+    streamedSegments,
+    turnAudioStatus,
+    volume,
+  } = campaign;
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const { lightbox, isLightboxOpen, openLightbox, closeLightbox } = useLightbox();
 
@@ -183,7 +171,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({
                 characterPortraits={characterPortraits}
                 segmentProgress={index === turns.length - 1 ? segmentProgress : undefined}
                 checks={turn.checks}
-                gameId={gameId}
+                gameId={gameId ?? undefined}
                 skipAudioKeys={skipAudioKeys}
                 playbackLedger={playbackLedger}
               />

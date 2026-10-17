@@ -1,6 +1,7 @@
 import { useDialogFocus } from '../hooks/useDialogFocus';
+import { useCampaign } from '../context/CampaignContext';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Turn, TurnSegment, LimitState, PlaybackEntry } from '../types';
+import { Turn, TurnSegment } from '../types';
 import { TurnAudioState, segmentAudioKey } from './TurnSegments';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { anySegmentHasAudio, groupLastIndex, groupLeaderIndex } from '../lib/audio';
@@ -13,26 +14,11 @@ import { useMountTransition } from '../hooks/useMountTransition';
 import { LimitChip } from './LimitChip';
 
 interface StoryTheaterProps {
+  /** turns is the campaign's chronicle as the caller holds it. */
   turns: Turn[];
   isOpen: boolean;
   onClose: () => void;
-  volume?: number;
-  gameId?: string;
-  playerId?: string;
-  playerName?: string;
-  playerPortrait?: string;
-  campaignImage?: string;
-  serverPlayback?: boolean;
-  onPlayAudio?: (turnNumber: number, segmentIndex?: number, force?: boolean) => void;
-  onStopAudio?: () => void;
-  segmentAudioStatus?: Record<string, { state: TurnAudioState; message?: string }>;
   onEntityClick?: (entityId: string) => void;
-  displayMode?: 'stage_directions' | 'hidden' | 'raw';
-  limits?: LimitState[];
-  // Clips already heard while the turn streamed, which playback must skip.
-  skipAudioKeys?: ReadonlySet<string>;
-  // Playback ledger containing resume offsets and completion states.
-  playbackLedger?: Record<string, PlaybackEntry>;
   // weather is the current location's weather, which draws the stage's overlay.
   weather?: string;
 }
@@ -54,27 +40,29 @@ function segmentsOf(turn: Turn | undefined): TurnSegment[] {
   return [{ kind: 'narration', text: turn?.prose ?? '' }];
 }
 
-export const StoryTheater: React.FC<StoryTheaterProps> = ({
-  turns,
-  isOpen,
-  onClose,
-  volume = 1,
-  gameId,
-  playerId,
-  playerName: propPlayerName,
-  playerPortrait: propPlayerPortrait,
-  campaignImage,
-  serverPlayback = false,
-  onPlayAudio,
-  onStopAudio,
-  segmentAudioStatus = {},
-  onEntityClick,
-  displayMode,
-  limits,
-  skipAudioKeys,
-  playbackLedger,
-  weather,
-}) => {
+export const StoryTheater: React.FC<StoryTheaterProps> = ({ turns, isOpen, onClose, onEntityClick, weather }) => {
+  // The playback and the campaign's own state come from the provider rather than
+  // through the screen that happens to render this.
+  const campaign = useCampaign();
+  const {
+    volume,
+    activeGameID: gameId,
+    serverAudio: serverPlayback,
+    handlePlayTurnAudio: onPlayAudio,
+    handleStopAudio: onStopAudio,
+    segmentAudioStatus,
+    displayMode,
+    limits,
+    streamedKeys: skipAudioKeys,
+    playbackLedger,
+  } = campaign;
+  const playerId = campaign.gameState?.player?.id;
+  const playerName = campaign.gameState?.player?.name;
+  const campaignImage = campaign.gameState?.banner_url;
+  // The player's own portrait is the campaign's, and the theatre falls back to the
+  // character's note when the turn carries one.
+  const propPlayerPortrait: string | undefined = undefined;
+  const propPlayerName = playerName;
   const [currentIdx, setCurrentIdx] = useState(0);
   const [activeSegment, setActiveSegment] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -187,7 +175,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({
   const browser = useSegmentPlayback(segments, {
     autoPlay: isPlaying && !serverPlayback && voiceEnabled,
     volume,
-    gameId,
+    gameId: gameId ?? undefined,
     turnNumber: currentTurn?.turn_number,
     skipKeys: skipAudioKeys,
     ledger: playbackLedger,
