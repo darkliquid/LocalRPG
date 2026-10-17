@@ -41,7 +41,7 @@ func TestResolveRelativeAndAbsolute(t *testing.T) {
 		t.Errorf("relative global Cache = %q", global.Cache)
 	}
 
-	abs := "/opt/localrpg/systems"
+	abs := filepath.Join(t.TempDir(), "opt", "localrpg", "systems")
 	if got := Resolve(bases, config.PathsConfig{Systems: abs}, "").Systems; got != abs {
 		t.Errorf("absolute Systems = %q, want %q", got, abs)
 	}

@@ -118,6 +118,101 @@ jobs:
           mise exec -- go test ./pkg/turnstream/ -run FuzzParser -fuzz FuzzParser -fuzztime 10s
           mise exec -- go test ./pkg/jsonrepair/ -run FuzzRepair -fuzz FuzzRepair -fuzztime 10s
 
+  race:
+    name: Go race detector
+    needs: frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+        id: mise
+
+      - name: Update apt repositories
+        run: sudo apt-get update
+
+      - name: Install native build dependencies
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libgtk-4-dev libwebkitgtk-6.0-dev libasound2-dev libx11-dev
+          version: 1.0
+
+      - name: Cache the Go module cache
+        uses: actions/cache@v5
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-mod-${{ runner.os }}-
+
+      - name: Cache the Go build cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
+          restore-keys: |
+            go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-build-${{ runner.os }}-
+
+      - name: Restore the embedded frontend
+        uses: actions/download-artifact@v8
+        with:
+          name: gui-dist
+          path: pkg/gui/dist
+
+      - name: Run Go tests with race detector
+        run: mise run test:backend:race
+
+  cross-platform:
+    name: Cross-platform Go test (${{ matrix.os }})
+    needs: frontend
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+        id: mise
+
+      - name: Get Go cache directories
+        id: go-cache
+        shell: bash
+        run: |
+          echo "gomod=$(mise exec -- go env GOMODCACHE)" >> $GITHUB_OUTPUT
+          echo "gobuild=$(mise exec -- go env GOCACHE)" >> $GITHUB_OUTPUT
+
+      - name: Cache the Go module cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.go-cache.outputs.gomod }}
+          key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-mod-${{ runner.os }}-
+
+      - name: Cache the Go build cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.go-cache.outputs.gobuild }}
+          key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
+          restore-keys: |
+            go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-
+            go-build-${{ runner.os }}-
+
+      - name: Restore the embedded frontend
+        uses: actions/download-artifact@v8
+        with:
+          name: gui-dist
+          path: pkg/gui/dist
+
+      - name: Run Go tests
+        shell: bash
+        run: mise run test:backend:cross
+
   e2e:
     name: End-to-end browser tests
     needs: frontend

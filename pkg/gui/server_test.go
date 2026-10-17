@@ -1288,7 +1288,7 @@ func TestModelDownloadEndpointOutlivesRequestCancellation(t *testing.T) {
 
 	// Wait for download to finish
 	var finalStatus models.ModelStatus
-	timeout := time.After(2 * time.Second)
+	timeout := time.After(5 * time.Second)
 	for {
 		select {
 		case ev := <-events:

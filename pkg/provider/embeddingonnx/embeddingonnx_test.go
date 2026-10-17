@@ -1,6 +1,7 @@
 package embeddingonnx
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/darkliquid/localrpg/pkg/embeddings"
@@ -37,7 +38,14 @@ func TestBuildFallsBackWhenModelMissing(t *testing.T) {
 	if !ok {
 		t.Fatal("embedding:onnx is not registered")
 	}
-	inst, err := reg.Build(t.Context(), []byte(`{"model_dir":"`+t.TempDir()+`","dimensions":384}`))
+	payload, err := json.Marshal(map[string]any{
+		"model_dir":  t.TempDir(),
+		"dimensions": 384,
+	})
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	inst, err := reg.Build(t.Context(), payload)
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
