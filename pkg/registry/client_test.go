@@ -395,6 +395,7 @@ func TestGitRegistryScheme(t *testing.T) {
 	// Configure author for commit
 	_ = exec.Command("git", "-C", gitDir, "config", "user.name", "Tester").Run()
 	_ = exec.Command("git", "-C", gitDir, "config", "user.email", "test@test.com").Run()
+	_ = exec.Command("git", "-C", gitDir, "config", "commit.gpgsign", "false").Run()
 
 	indexJSON := `{
 		"name": "Git Registry",
@@ -414,7 +415,7 @@ func TestGitRegistryScheme(t *testing.T) {
 	}
 
 	_ = exec.Command("git", "-C", gitDir, "add", "index.json").Run()
-	if out, err := exec.Command("git", "-C", gitDir, "commit", "-m", "init").CombinedOutput(); err != nil {
+	if out, err := exec.Command("git", "-C", gitDir, "commit", "--no-gpg-sign", "-m", "init").CombinedOutput(); err != nil {
 		t.Fatalf("git commit failed: %v (%s)", err, out)
 	}
 

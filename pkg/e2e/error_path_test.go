@@ -44,9 +44,18 @@ func TestAFailedTurnIsVisibleToThePlayer(t *testing.T) {
 	b.WaitFor("The turn failed.")
 	b.Poll(`document.querySelector("[role='alert']") !== null`, "the turn failure banner appears")
 
-	dismiss := b.Eval(`(() => {
+	bannerText := b.Eval(`(() => {
 	  const banner = document.querySelector("[role='alert']");
 	  return banner ? String(banner.innerText).slice(0, 200) : 'none';
+	})()`)
+	if !strings.Contains(bannerText, "insufficient funds/credits") {
+		t.Fatalf("the failure banner does not report insufficient funds: %s", bannerText)
+	}
+
+	dismiss := b.Eval(`(() => {
+	  const banner = document.querySelector("[role='alert']");
+	  const btn = banner ? banner.querySelector("button") : null;
+	  return btn ? (btn.getAttribute("aria-label") || btn.innerText) : 'none';
 	})()`)
 	if !strings.Contains(dismiss, "Dismiss") {
 		t.Fatalf("the failure banner does not offer a way to dismiss it: %s", dismiss)
