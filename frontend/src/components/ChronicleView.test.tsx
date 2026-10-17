@@ -1,24 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { ChronicleView } from './ChronicleView';
+import { CampaignProvider } from '../context/CampaignContext';
+import { SettingsProvider } from '../context/SettingsContext';
 import { genreCopy } from '../lib/genre';
 import type { Turn } from '../types';
 
 // ChronicleView's empty and loading lines come from the genre copy table, so a
 // cyberpunk campaign does not read like a generic one.
+// The playback and the campaign's state come from the provider, so the component
+// renders inside one; with no campaign open the effects make no requests.
+function renderChronicle(element: ReactElement) {
+  return render(
+    <SettingsProvider>
+      <CampaignProvider>{element}</CampaignProvider>
+    </SettingsProvider>,
+  );
+}
+
 describe('ChronicleView genre copy', () => {
   it('shows a genre empty line when there are no turns', () => {
-    render(<ChronicleView turns={[]} onWikilinkClick={() => undefined} genre="cyberpunk" />);
+    renderChronicle(<ChronicleView turns={[]} onWikilinkClick={() => undefined} genre="cyberpunk" />);
     expect(screen.getByText(genreCopy('cyberpunk').empty)).toBeInTheDocument();
   });
 
   it('falls back to the neutral line for an unknown genre', () => {
-    render(<ChronicleView turns={[]} onWikilinkClick={() => undefined} genre="nonsense" />);
+    renderChronicle(<ChronicleView turns={[]} onWikilinkClick={() => undefined} genre="nonsense" />);
     expect(screen.getByText(genreCopy(undefined).empty)).toBeInTheDocument();
   });
 
   it('shows a genre loading line while a turn is in flight', () => {
-    render(
+    renderChronicle(
       <ChronicleView
         turns={[]}
         onWikilinkClick={() => undefined}
@@ -37,7 +50,7 @@ describe('ChronicleView withheld illustrations', () => {
   const turn: Turn = { turn_number: 1, input_text: 'look around', mode: 'Do', prose: 'The hall is dark.' };
 
   it('explains a beat the server withheld an illustration from', () => {
-    render(
+    renderChronicle(
       <ChronicleView
         turns={[turn]}
         onWikilinkClick={() => undefined}
@@ -49,7 +62,9 @@ describe('ChronicleView withheld illustrations', () => {
   });
 
   it('says nothing when the server did not explain the absence', () => {
-    render(<ChronicleView turns={[turn]} onWikilinkClick={() => undefined} onGenerateImage={() => undefined} />);
+    renderChronicle(
+      <ChronicleView turns={[turn]} onWikilinkClick={() => undefined} onGenerateImage={() => undefined} />,
+    );
     expect(screen.queryByText(/No illustration/)).toBeNull();
   });
 });

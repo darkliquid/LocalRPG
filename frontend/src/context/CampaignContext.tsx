@@ -743,6 +743,13 @@ function useCampaignValue() {
   // that explain a setting (for example an unpriced usage row) link a reader to
   // the exact reference instead of leaving them to search.
 
+  // The playback switches the chronicle and the theatre both honour, derived once
+  // here rather than by each of them: with application playback the browser must
+  // stay silent, so it never competes with the narrator or hits autoplay limits.
+  const autoPlay = serverAudio ? false : (config?.media.tts.auto_play ?? false);
+  const volume = config?.media.tts.master_volume ?? 1;
+  const displayMode = config?.media.tts.speech_cues?.display_mode;
+
   // The screen's flows call these rather than reaching into the provider's state:
   // a context that hands out setters is a prop list wearing a context's clothes.
 
@@ -850,6 +857,7 @@ function useCampaignValue() {
     campaignError,
     campaignStatus,
     activeBgImage,
+    autoPlay,
     characterPortraits,
     chronicle,
     client,
@@ -892,6 +900,7 @@ function useCampaignValue() {
     turnError,
     turnInFlight,
     turnStatus,
+    volume,
     // The actions the screen's flows call, so no consumer reaches for a setter.
     addMissingEntity,
     addVoiceProfile,
@@ -899,6 +908,7 @@ function useCampaignValue() {
     dismissFundsError,
     dismissModelPrompt,
     dismissTurnError,
+    displayMode,
     generateTurnImage,
     leaveCampaign,
     openEntity,
