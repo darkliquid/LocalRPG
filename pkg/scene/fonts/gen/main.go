@@ -139,22 +139,28 @@ var source = []struct{ dest, src string }{
 	{"OFL-JetBrainsMono.txt", base + "ofl/jetbrainsmono/OFL.txt"},
 }
 
+func run(dir string, fetcher func(url, dest string) error) error {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("gen: %w", err)
+	}
+	for _, entry := range source {
+		dest := filepath.Join(dir, entry.dest)
+		if err := fetcher(entry.src, dest); err != nil {
+			return fmt.Errorf("gen: %s: %w", entry.dest, err)
+		}
+		fmt.Printf("wrote %s\n", dest)
+	}
+	return nil
+}
+
 func main() {
 	dir := "fonts"
 	if len(os.Args) > 1 {
 		dir = os.Args[1]
 	}
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "gen: %v\n", err)
+	if err := run(dir, fetch); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
-	}
-	for _, entry := range source {
-		dest := filepath.Join(dir, entry.dest)
-		if err := fetch(entry.src, dest); err != nil {
-			fmt.Fprintf(os.Stderr, "gen: %s: %v\n", entry.dest, err)
-			os.Exit(1)
-		}
-		fmt.Printf("wrote %s\n", dest)
 	}
 }
 
