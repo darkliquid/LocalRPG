@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { ChronicleView } from './ChronicleView';
 import { CampaignProvider } from '../context/CampaignContext';
@@ -66,5 +66,52 @@ describe('ChronicleView withheld illustrations', () => {
       <ChronicleView turns={[turn]} onWikilinkClick={() => undefined} onGenerateImage={() => undefined} />,
     );
     expect(screen.queryByText(/No illustration/)).toBeNull();
+  });
+});
+
+describe('ChronicleView continuity findings', () => {
+  const turnWithFinding = (): Turn => ({
+    turn_number: 3,
+    input_text: '',
+    mode: 'do',
+    prose: 'The guard steps aside.',
+    continuity_notes: ['Mira was introduced without a note.'],
+  });
+
+  it('offers to correct or dismiss each finding', () => {
+    const onCorrect = vi.fn();
+    const onAddress = vi.fn();
+
+    renderChronicle(
+      <ChronicleView
+        turns={[turnWithFinding()]}
+        onWikilinkClick={() => undefined}
+        onCorrect={onCorrect}
+        onAddress={onAddress}
+      />,
+    );
+
+    expect(screen.getByText('Mira was introduced without a note.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Correct' }));
+    expect(onCorrect).toHaveBeenCalledWith('Mira was introduced without a note.', 3);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(onAddress).toHaveBeenCalledWith(3);
+  });
+
+  it('marks a finding that has been dealt with, with nothing left to press', () => {
+    renderChronicle(
+      <ChronicleView
+        turns={[turnWithFinding()]}
+        onWikilinkClick={() => undefined}
+        addressedTurns={new Set([3])}
+        onAddress={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText('Addressed')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Correct' })).not.toBeInTheDocument();
   });
 });
