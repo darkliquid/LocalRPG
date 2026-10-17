@@ -12,6 +12,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/provider/openaichat"
 )
 
+// handlePromptCommand runs model inference via a CLI command harness or HTTP endpoint.
 func handlePromptCommand(args []string) {
 	code := runPromptCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {

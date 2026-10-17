@@ -14,6 +14,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/paths"
 )
 
+// handleTTSCommand synthesizes an utterance to speech and outputs the resulting audio file path.
 func handleTTSCommand(args []string) {
 	code := runTTSCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {
@@ -21,6 +22,7 @@ func handleTTSCommand(args []string) {
 	}
 }
 
+// runTTSCommand executes the tts command or delegates to tts batch.
 func runTTSCommand(args []string, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "batch" {
 		return runTTSBatchCommand(args[1:], stdout, stderr)
@@ -83,6 +85,7 @@ func runTTSCommand(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// handleImageCommand generates a scene or character image from a text prompt.
 func handleImageCommand(args []string) {
 	code := runImageCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {

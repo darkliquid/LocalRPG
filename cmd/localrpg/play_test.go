@@ -1,19 +1,42 @@
 package main
 
 import (
-	"os/exec"
+	"bytes"
 	"strings"
 	"testing"
 )
 
-func TestCLIPlayMissingArg(t *testing.T) {
-	cmd := exec.Command("go", "run", ".", "play")
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected error on missing game-id argument")
+func TestRunPlayCommand(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantCode   int
+		wantStderr string
+	}{
+		{
+			name:       "empty args shows usage",
+			args:       nil,
+			wantCode:   1,
+			wantStderr: "Usage: localrpg play <game-id>",
+		},
+		{
+			name:       "nonexistent game returns error",
+			args:       []string{"nonexistent-game-xyz"},
+			wantCode:   1,
+			wantStderr: "Error loading game manifest",
+		},
 	}
 
-	if !strings.Contains(string(out), "Usage: localrpg play <game-id>") {
-		t.Errorf("unexpected output: %s", string(out))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runPlayCommand(tt.args, &stdout, &stderr)
+			if code != tt.wantCode {
+				t.Errorf("code = %d, want %d", code, tt.wantCode)
+			}
+			if tt.wantStderr != "" && !strings.Contains(stderr.String(), tt.wantStderr) {
+				t.Errorf("stderr = %q, want %q", stderr.String(), tt.wantStderr)
+			}
+		})
 	}
 }

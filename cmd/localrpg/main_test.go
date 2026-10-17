@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -19,5 +22,31 @@ func TestCLIVersionAndHelp(t *testing.T) {
 	want := "LocalRPG v" + Version
 	if !strings.Contains(string(out), want) {
 		t.Errorf("expected output to contain %q, got: %s", want, string(out))
+	}
+}
+
+func TestPrintUsage(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe failed: %v", err)
+	}
+	os.Stdout = w
+
+	printUsage()
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	_ = r.Close()
+
+	output := buf.String()
+	commands := []string{"roll", "prompt", "play", "tts", "image", "gui", "export", "content", "publisher", "registry", "debug", "config", "styles", "version"}
+	for _, cmd := range commands {
+		if !strings.Contains(output, cmd) {
+			t.Errorf("printUsage missing command %q", cmd)
+		}
 	}
 }

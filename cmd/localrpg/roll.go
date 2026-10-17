@@ -8,6 +8,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/rules"
 )
 
+// handleRollCommand evaluates a dice expression and prints the result.
 func handleRollCommand(args []string) {
 	code := runRollCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {

@@ -202,3 +202,26 @@ func TestContentVerifyCLIReportsState(t *testing.T) {
 		t.Fatalf("expected 'invalid' in output/stderr, got stdout: %s, stderr: %s", stdout.String(), stderr.String())
 	}
 }
+
+func TestRunPublisherCommandUsage(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	// Empty args
+	if code := runPublisherCommand(nil, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "Usage: localrpg publisher") {
+		t.Errorf("empty args: code = %d, stderr = %q", code, stderr.String())
+	}
+
+	// Help arg
+	stdout.Reset()
+	stderr.Reset()
+	if code := runPublisherCommand([]string{"--help"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "Usage: localrpg publisher") {
+		t.Errorf("help arg: code = %d, stdout = %q", code, stdout.String())
+	}
+
+	// Unknown subcommand
+	stdout.Reset()
+	stderr.Reset()
+	if code := runPublisherCommand([]string{"bogus"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "Unknown publisher subcommand: bogus") {
+		t.Errorf("unknown subcommand: code = %d, stderr = %q", code, stderr.String())
+	}
+}

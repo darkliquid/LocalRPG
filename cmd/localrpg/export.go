@@ -17,6 +17,7 @@ import (
 	"github.com/darkliquid/localrpg/pkg/scene"
 )
 
+// handleExportCommand exports a story replay as a web bundle or video file.
 func handleExportCommand(args []string) {
 	code := runExportCommand(args, os.Stdout, os.Stderr)
 	if code != 0 {
