@@ -10,6 +10,7 @@ import (
 
 	"github.com/darkliquid/localrpg/pkg/engine"
 	"github.com/darkliquid/localrpg/pkg/gui"
+	_ "github.com/darkliquid/localrpg/pkg/provider/all"
 )
 
 // Fixture is the application under test: a real gui.Service on a temp root,
