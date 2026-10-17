@@ -71,6 +71,7 @@ export function CampaignScreen({ onOpenDocs: openDocs, docsOpen }: CampaignScree
 
   const {
     activeGameID,
+    addressed,
     activeRateLimitSeconds,
 
     audioProgress,
@@ -85,6 +86,7 @@ export function CampaignScreen({ onOpenDocs: openDocs, docsOpen }: CampaignScree
     gameState,
     graph,
     handleActionSubmit,
+    handleAddress,
     handleBeginStory,
     handleBeginWithAction,
     handleMergeEntity,
@@ -426,6 +428,8 @@ export function CampaignScreen({ onOpenDocs: openDocs, docsOpen }: CampaignScree
                 sceneImagePending={sceneImagePending}
                 onWikilinkClick={handleOpenWikilink}
                 onCorrect={handleCorrect}
+                addressedTurns={addressed}
+                onAddress={handleAddress}
                 onGenerateImage={handleGenerateImage}
               />
             </>
