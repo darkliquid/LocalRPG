@@ -167,6 +167,27 @@ func (b *Browser) SetInputValue(selector, value string) {
 	}
 }
 
+// SetFileInput gives a file input the files a chooser would hand it, which is the
+// only way to drive a picker: the native dialog is out of reach. It does not wait
+// for the input to be visible, because the input a button opens is hidden by
+// design and a visible wait would time out on it.
+func (b *Browser) SetFileInput(selector, path string) {
+	b.t.Helper()
+	b.run(chromedp.SetUploadFiles(selector, []string{path}, chromedp.BySearch))
+
+	// Setting the files does not tell React, which listens for a change event on
+	// the input rather than watching the files list.
+	script := fmt.Sprintf(`(() => {
+	  const el = document.evaluate(%q, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+	  if (!el) return 'missing';
+	  el.dispatchEvent(new Event('change', { bubbles: true }));
+	  return 'ok';
+	})()`, selector)
+	if got := b.Eval(script); got != "ok" {
+		b.t.Fatalf("dispatch change on %q: %s", selector, got)
+	}
+}
+
 // Text reads a selector's text content.
 func (b *Browser) Text(selector string) string {
 	b.t.Helper()
