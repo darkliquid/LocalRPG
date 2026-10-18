@@ -13,7 +13,7 @@ require (
 	github.com/chromedp/chromedp v0.16.0
 	github.com/darkliquid/roll v0.0.0-20261006063131-e515e24fa1af
 	github.com/dop251/goja v0.0.0-20260917113740-793a2a65c13b
-	github.com/ebitengine/oto/v3 v3.1.0
+	github.com/ebitengine/oto/v3 v3.5.1
 	github.com/gen2brain/vpx v0.2.1
 	github.com/google/uuid v1.6.0
 	github.com/gopxl/beep v1.4.1
@@ -64,7 +64,7 @@ require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/ebitengine/purego v0.10.0 // indirect
+	github.com/ebitengine/purego v0.11.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260820222146-c27c302e5fc3 // indirect
@@ -84,6 +84,7 @@ require (
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
+	github.com/jfreymuth/pulse v0.1.3 // indirect
 	github.com/k2-fsa/sherpa-onnx-go-linux v1.13.8 // indirect
 	github.com/k2-fsa/sherpa-onnx-go-macos v1.13.8 // indirect
 	github.com/k2-fsa/sherpa-onnx-go-windows v1.13.8 // indirect
