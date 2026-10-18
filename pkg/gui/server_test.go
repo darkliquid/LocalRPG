@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1233,13 +1234,13 @@ func TestModelDownloadEndpointOutlivesRequestCancellation(t *testing.T) {
 	sum := sha256.Sum256(tarData)
 	checksum := hex.EncodeToString(sum[:])
 
+	var downloadStartedOnce sync.Once
 	downloadStarted := make(chan struct{})
 	releaseDownload := make(chan struct{})
 	mockHTTP := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		select {
-		case downloadStarted <- struct{}{}:
-		default:
-		}
+		downloadStartedOnce.Do(func() {
+			close(downloadStarted)
+		})
 		<-releaseDownload
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(tarData)))
 		_, _ = w.Write(tarData)

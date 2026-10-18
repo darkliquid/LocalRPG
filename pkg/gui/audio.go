@@ -503,9 +503,15 @@ func (s *Service) synthesizeTurnGroups(ctx context.Context, gameID string, turn 
 // suppressed here, because the device cannot seek, and resumed by the client from
 // its recorded offset.
 func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.Turn, force bool, emit func(string), plan *turnAudioPlan) {
+	if ctx.Err() != nil {
+		return
+	}
 	cfg := s.configMgr.Get()
 	// emitClip applies the ledger to one clip before sending it.
 	emitClip := func(clip string, indexes []int) {
+		if ctx.Err() != nil {
+			return
+		}
 		if plan != nil && s.ledgerHolds(plan, media.ClipKeyForPath(clip), indexes) {
 			return
 		}
@@ -513,6 +519,9 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 	}
 	if groups, grouped, _ := s.synthesizeTurnGroups(ctx, gameID, turn, cfg, force); grouped {
 		for _, group := range groups {
+			if ctx.Err() != nil {
+				return
+			}
 			if plan != nil {
 				all, some := plan.heardState(group.SegmentIndexes)
 				if all {
@@ -535,9 +544,14 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 				continue
 			}
 			for _, index := range group.SegmentIndexes {
+				if ctx.Err() != nil {
+					return
+				}
 				clips, err := s.synthesizeSegment(ctx, gameID, turn, index, false)
 				if err != nil {
-					s.broadcastAudioFailure(turn.Number, index, err, "synthesize")
+					if ctx.Err() == nil {
+						s.broadcastAudioFailure(turn.Number, index, err, "synthesize")
+					}
 					continue
 				}
 				for _, clip := range clips {
@@ -549,12 +563,17 @@ func (s *Service) emitTurnClips(ctx context.Context, gameID string, turn engine.
 		return
 	}
 	for i := range turn.Segments {
+		if ctx.Err() != nil {
+			return
+		}
 		if plan != nil && plan.heardAll([]int{i}) {
 			continue
 		}
 		clips, err := s.synthesizeSegment(ctx, gameID, turn, i, force)
 		if err != nil {
-			s.broadcastAudioFailure(turn.Number, i, err, "synthesize")
+			if ctx.Err() == nil {
+				s.broadcastAudioFailure(turn.Number, i, err, "synthesize")
+			}
 			continue
 		}
 		for _, clip := range clips {
@@ -747,6 +766,15 @@ func (s *Service) AudioPlaying() bool {
 
 // StopAudio cancels the current narration queue.
 func (s *Service) StopAudio() {
+	s.audioSubMu.Lock()
+	if s.audioCancel != nil {
+		s.audioCancel()
+		s.audioCancel = nil
+	}
+	s.audioSubMu.Unlock()
+
+	s.audioWG.Wait()
+
 	if player := s.audioPlayer(); player != nil {
 		player.Stop()
 	}
@@ -1298,11 +1326,29 @@ func (s *Service) turnClipStream(gameID string, turnNumber int, force bool) <-ch
 		return clips
 	}
 
+	s.audioSubMu.Lock()
+	if s.audioCancel != nil {
+		s.audioCancel()
+	}
+	bgCtx := s.bgCtx
+	if bgCtx == nil {
+		bgCtx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(bgCtx)
+	s.audioCancel = cancel
+	s.audioWG.Add(1)
+	s.audioSubMu.Unlock()
+
 	go func() {
-		defer close(clips)
-		ctx := context.Background()
+		defer func() {
+			close(clips)
+			s.audioWG.Done()
+		}()
 		s.emitTurnClips(ctx, gameID, *turn, force, func(path string) {
-			clips <- path
+			select {
+			case <-ctx.Done():
+			case clips <- path:
+			}
 		}, nil)
 	}()
 
