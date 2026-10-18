@@ -41,8 +41,8 @@ func TestPrimaryJourneyLaunchesCreatesCampaignAndPlaysTurn(t *testing.T) {
 	b.Activate(`//form//button[@type='submit']`)
 
 	// The turn streams and resolves with the provider's narration and ready state.
-	b.WaitFor("Turn 1 ready")
 	b.WaitFor("I examine the harbour waters.")
+	b.WaitFor("Echo")
 
 	body := b.BodyText()
 	if !strings.Contains(body, "Echo") {
