@@ -157,9 +157,13 @@ func (b *Browser) SetInputValue(selector, value string) {
 	script := fmt.Sprintf(`(() => {
 	  const el = document.evaluate(%q, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
 	  if (!el) return 'missing';
+	  if (el._valueTracker) {
+	    el._valueTracker.setValue('');
+	  }
 	  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
 	  Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, %q);
 	  el.dispatchEvent(new Event('input', { bubbles: true }));
+	  el.dispatchEvent(new Event('change', { bubbles: true }));
 	  return 'ok';
 	})()`, selector, value)
 	if got := b.Eval(script); got != "ok" {
@@ -188,21 +192,19 @@ func (b *Browser) SetFileInput(selector, path string) {
 	}
 }
 
-// Activate clicks an element through its own click handler. A coordinate click is
-// no use to a control the layout has left outside the viewport: headless Chrome
-// starts at 780x437, which is narrower than the campaign header, and a time-based
-// animation never advances there, so an animated panel keeps its start offset.
+// Activate clicks an element through its own click handler once it is present
+// and not disabled. A coordinate click is no use to a control the layout has
+// left outside the viewport: headless Chrome starts at 780x437, which is narrower
+// than the campaign header, and a time-based animation never advances there, so
+// an animated panel keeps its start offset.
 func (b *Browser) Activate(selector string) {
 	b.t.Helper()
-	script := fmt.Sprintf(`(() => {
+	b.Poll(fmt.Sprintf(`(() => {
 	  const el = document.evaluate(%q, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-	  if (!el) return 'missing';
+	  if (!el || el.disabled) return false;
 	  el.click();
-	  return 'ok';
-	})()`, selector)
-	if got := b.Eval(script); got != "ok" {
-		b.t.Fatalf("activate %q: %s", selector, got)
-	}
+	  return true;
+	})()`, selector), fmt.Sprintf("activate %s", selector))
 }
 
 // PressKey sends a key to an element as a bubbling event, for a control that acts
