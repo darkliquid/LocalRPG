@@ -35,7 +35,7 @@ jobs:
       - uses: jdx/mise-action@v5
 
       - name: Cache the npm cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.npm
           key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
@@ -115,7 +115,7 @@ jobs:
       # The caches are keyed on the lockfile (and, for the build cache, the
       # commit) so a module change or a new revision restores the right one.
       - name: Cache the Go module cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/.go/mod
           key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
@@ -124,7 +124,7 @@ jobs:
             go-mod-${{ runner.os }}-
 
       - name: Cache the Go build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/.go/build
           key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
