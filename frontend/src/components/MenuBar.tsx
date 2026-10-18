@@ -3,7 +3,6 @@ import {
   BookOpen,
   Bug,
   FolderTree,
-  Github,
   Info,
   Maximize,
   Minimize,
@@ -12,6 +11,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import { Github } from './icons/Github';
 import { useMountTransition } from '../hooks/useMountTransition';
 import { PROJECT_ISSUES_URL, PROJECT_REPO_URL, openExternal } from '../lib/project';
 
