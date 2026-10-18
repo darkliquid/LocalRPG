@@ -34,13 +34,13 @@ jobs:
 
       - uses: jdx/mise-action@v5
 
-      - name: Cache the npm cache
-        uses: actions/cache@v6
+      - name: Setup aube and cache dependencies
+        uses: jdx/aube-action@v1
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
+          version: "2.7.2"
+          working-directory: frontend
+          run-install: true
+          cache: true
 
       # The GUI embeds pkg/gui/dist, so the bundle has to exist in the tree
       # goreleaser compiles. It is platform independent, so build it once and

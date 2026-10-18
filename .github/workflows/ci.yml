@@ -16,21 +16,60 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - 'package.json'
+              - 'mise.toml'
+              - '.github/workflows/ci.yml'
+            backend:
+              - 'cmd/**'
+              - 'pkg/**'
+              - 'tools/**'
+              - 'scripts/**'
+              - 'go.mod'
+              - 'go.sum'
+              - 'mise.toml'
+              - '.github/workflows/ci.yml'
+            docs:
+              - 'pkg/gui/docs/**'
+              - 'docs/**'
+              - 'README.md'
+              - '.vale.ini'
+              - '.rumdl.toml'
+              - 'styles/**'
+              - 'website/**'
+
   frontend:
     name: Build the embedded frontend
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v5
 
-      - name: Cache the npm cache
-        uses: actions/cache@v6
+      - name: Setup aube and cache dependencies
+        uses: jdx/aube-action@v1
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
+          version: "2.7.2"
+          working-directory: frontend
+          run-install: true
+          cache: true
 
       # The GUI embeds pkg/gui/dist, and the SPA the browser tests drive is the
       # same bundle, so build it once here and hand it to every job that needs
@@ -47,7 +86,8 @@ jobs:
 
   go:
     name: Go vet and test
-    needs: frontend
+    needs: [changes, frontend]
+    if: github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -120,7 +160,8 @@ jobs:
 
   race:
     name: Go race detector
-    needs: frontend
+    needs: [changes, frontend]
+    if: github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -166,7 +207,8 @@ jobs:
 
   cross-platform:
     name: Cross-platform Go test (${{ matrix.os }})
-    needs: frontend
+    needs: [changes, frontend]
+    if: github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -215,7 +257,8 @@ jobs:
 
   e2e:
     name: End-to-end browser tests
-    needs: frontend
+    needs: [changes, frontend]
+    if: github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -283,22 +326,25 @@ jobs:
 
   web:
     name: Frontend type check and docs lint
-    needs: frontend
+    needs: [changes, frontend]
+    if: (github.event_name != 'pull_request' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.docs == 'true') && (needs.frontend.result == 'success' || needs.frontend.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v5
 
-      - name: Cache the npm cache
-        uses: actions/cache@v6
+      - name: Setup aube and cache dependencies
+        if: github.event_name != 'pull_request' || needs.changes.outputs.frontend == 'true'
+        uses: jdx/aube-action@v1
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
+          version: "2.7.2"
+          working-directory: frontend
+          run-install: true
+          cache: true
 
       - name: Restore the embedded frontend
+        if: needs.frontend.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: gui-dist
@@ -308,28 +354,35 @@ jobs:
       # treats the build:frontend dependency of test:frontend as up to date and
       # skips it, leaving only the type check and the unit tests to run here.
       - name: Mark the shared bundle as current
+        if: needs.frontend.result == 'success'
         run: find pkg/gui/dist -type f -exec touch {} +
 
       - name: Type check and unit tests
+        if: github.event_name != 'pull_request' || needs.changes.outputs.frontend == 'true'
         run: mise run test:frontend
 
       # Prettier's check gates, and Oxlint's error level does. Its warnings are the
       # tracked accessibility and React Compiler work (FE-6, FE-3) and print here
       # without failing the build, the same way the prose lint treats its warnings.
       - name: Lint the frontend
+        if: github.event_name != 'pull_request' || needs.changes.outputs.frontend == 'true'
         run: mise run lint:frontend
 
       - name: Lint embedded documentation
+        if: github.event_name != 'pull_request' || needs.changes.outputs.docs == 'true'
         run: mise run lint:docs
 
       # Gates on error-level alerts only. Warnings and suggestions are reported in
       # the summary but do not fail the build, because they are style preferences
       # rather than mistakes.
       - name: Lint prose and code comments
+        if: github.event_name != 'pull_request' || needs.changes.outputs.docs == 'true'
         run: STRICT=1 SUMMARY=1 mise run lint:prose
 
   packaging:
     name: Release config and site build
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
