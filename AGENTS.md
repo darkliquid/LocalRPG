@@ -4,17 +4,18 @@ LocalRPG is a local-first, turn-based tabletop RPG client: a single Go binary th
 
 ## Commands
 
-Toolchain is pinned by `mise.toml` (Go 1.27.1, Node 26.9.0, GoReleaser 2.18.2). Prefer `mise run`, but plain `go`/`npm` work if the toolchain is already active.
+Toolchain is pinned by `mise.toml` (Go 1.27.2, Node 26.9.0, Aube 2.7.2, GoReleaser 2.18.2). Prefer `mise run`, but plain `go`/`aube`/`npm` work if the toolchain is already active.
 
 ```bash
-mise run setup          # go mod download + cd frontend && npm install
+mise run setup          # go mod download + cd frontend && aube install
 mise run install:vale-styles # vale sync: download the style packages when .vale.ini changes
 mise run build          # frontend bundle -> pkg/gui/dist, then bin/localrpg
 mise run build:frontend # npm run build in frontend/ (tsc + vite)
 mise run build:backend  # depends on build:frontend
 mise run test           # coverage-checked Go tests  AND  mise run test:frontend  AND  mise run test:e2e
-mise run test:backend   # go test with a coverage floor (scripts/check-coverage.sh)
+mise run test:backend   # go test with a coverage floor and test cache reuse (scripts/check-coverage.sh)
 mise run test:backend:fast # go test without the coverage check
+mise run test:backend:clean # go test bypassing the test cache (-count=1)
 mise run test:backend:race # go test with the race detector enabled
 mise run test:backend:cross # go test across cross-platform packages (scripts/test-cross-platform.sh)
 mise run coverage:diff  # compare two profiles by function, not by their statement totals
@@ -140,7 +141,7 @@ auto-commit; a dirty working set complains until `bd dolt commit -m "..."` clear
 
 ## CI, releases and the showcase site
 
-Three workflows live in `.github/workflows/`. `ci.yml` runs on every push to `main` and every pull request: a Go job (native headers, frontend build, `go vet`, `go test`), a web job (`tsc --noEmit`, vitest, rumdl), and a packaging job (`goreleaser check`, `mise run site:build`, plus the built site as an artifact). It also declares `workflow_call`, so `release.yml` reuses it as a `verify` job and a tag can only ship what passed.
+Three workflows live in `.github/workflows/`. `ci.yml` uses `dorny/paths-filter` to inspect changes at the start of a pull request, skipping unchanged test suites while running the complete matrix unconditionally on `main` and release tags. Frontend setup uses `jdx/aube-action` with content-addressable `node_modules` caching, and Go test caching is preserved across runs. Jobs include Go (native headers, frontend build, `go vet`, `go test`), race detector, cross-platform tests (macOS and Windows), browser e2e tests, a web job (`tsc --noEmit`, vitest, oxlint, rumdl, Vale), and a packaging job (`goreleaser check`, `mise run site:build`, plus the built site as an artifact). It also declares `workflow_call`, so `release.yml` reuses it as a `verify` job and a tag can only ship what passed.
 
 `release.yml` runs on `v*` tags and published releases. Every platform needs CGO, so no runner can cross-compile the matrix: `.goreleaser.yaml` defines one build per target (OS plus architecture), each with a `skip` template that disables it unless `RELEASE_TARGET` names its target. The matrix runs one native runner per target — `ubuntu-latest` and `ubuntu-24.04-arm` for the two Linux architectures (a CGO build for arm64 cannot come from an amd64 host), `macos-latest` twice for both macOS slices, and `windows-latest` — uploads archives, and a final job combines the checksums and publishes or enriches the release with `gh`. GoReleaser's own split/merge is a Pro feature, which is why publishing is done with `gh`. The arm64 Linux runner is a hosted runner, free only for public repositories; on a private repo, drop that matrix entry. `Version` in `cmd/localrpg/main.go` is a `var` so `-X main.Version` can stamp the tag.
 
