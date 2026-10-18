@@ -24,13 +24,13 @@ jobs:
 
       - uses: jdx/mise-action@v5
 
-      - name: Cache the npm cache
-        uses: actions/cache@v5
+      - name: Setup aube and cache dependencies
+        uses: jdx/aube-action@v1
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
+          version: "2.7.2"
+          working-directory: frontend
+          run-install: true
+          cache: true
 
       # The GUI embeds pkg/gui/dist, and the SPA the browser tests drive is the
       # same bundle, so build it once here and hand it to every job that needs
@@ -290,13 +290,13 @@ jobs:
 
       - uses: jdx/mise-action@v5
 
-      - name: Cache the npm cache
-        uses: actions/cache@v5
+      - name: Setup aube and cache dependencies
+        uses: jdx/aube-action@v1
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
+          version: "2.7.2"
+          working-directory: frontend
+          run-install: true
+          cache: true
 
       - name: Restore the embedded frontend
         uses: actions/download-artifact@v8
