@@ -23,8 +23,7 @@ func failingRoleConfig(message string) string {
 // credit fails, and the two places the app reports it are asserted: the failure
 // region above the chrome, and the alert banner the player can dismiss.
 func TestAFailedTurnIsVisibleToThePlayer(t *testing.T) {
-	f := NewFixture(t, "agents:\n  roles:\n    gm:\n      type: cli\n      command: /bin/sh\n"+
-		"      args: [\"-c\", \"echo insufficient_quota >&2; exit 1\"]\n")
+	f := NewFixture(t, failingRoleConfig("insufficient_quota"))
 	f.WriteSystem(t, "freeform", "Freeform")
 	f.WriteWorld(t, "harbour-realm", "Harbour Realm", nil)
 	f.InitGame(t, engine.InitOptions{

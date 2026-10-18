@@ -90,7 +90,7 @@ func Available(ctx context.Context) error {
 		taskCtx, cancelTask := chromedp.NewContext(allocCtx)
 		defer cancelTask()
 
-		if err := chromedp.Run(taskCtx); err != nil {
+		if err := chromedp.Do(taskCtx); err != nil {
 			availableErr = fmt.Errorf("start browser: %w", err)
 		}
 	})
@@ -106,24 +106,9 @@ func (d *Driver) Run(ctx context.Context, s *Scenario, cb StepCallback) ([]debug
 	defer cancelTask()
 
 	var records []debugger.ActionRecord
-	var currentActionID string
-	var mu sync.Mutex
-
-	// Intercept outbound network requests to inject X-LocalRPG-Action-ID
-	chromedp.ListenTarget(taskCtx, func(ev any) {
-		switch ev.(type) {
-		case *network.EventRequestWillBeSent:
-			mu.Lock()
-			_ = currentActionID
-			mu.Unlock()
-		}
-	})
 
 	for i, step := range s.Steps {
 		actionID := uuid.NewString()
-		mu.Lock()
-		currentActionID = actionID
-		mu.Unlock()
 
 		start := time.Now()
 		rec := debugger.ActionRecord{
@@ -140,7 +125,7 @@ func (d *Driver) Run(ctx context.Context, s *Scenario, cb StepCallback) ([]debug
 		headers := network.Headers{
 			"X-LocalRPG-Action-ID": actionID,
 		}
-		if err := chromedp.Run(taskCtx, network.SetExtraHTTPHeaders(headers)); err != nil {
+		if _, err := chromedp.Call(taskCtx, network.SetExtraHTTPHeaders, network.SetExtraHTTPHeadersParams{Headers: headers}); err != nil {
 			rec.Status = "failed"
 			rec.FailureReason = fmt.Sprintf("set headers: %v", err)
 		} else {
@@ -150,8 +135,7 @@ func (d *Driver) Run(ctx context.Context, s *Scenario, cb StepCallback) ([]debug
 				rec.FailureReason = err.Error()
 
 				// Capture failure screenshot
-				var buf []byte
-				if captureErr := chromedp.Run(taskCtx, chromedp.CaptureScreenshot(&buf)); captureErr == nil {
+				if buf, captureErr := chromedp.Run(taskCtx, chromedp.CaptureScreenshot()); captureErr == nil {
 					rec.ScreenshotB64 = base64.StdEncoding.EncodeToString(buf)
 				}
 			}
@@ -182,22 +166,22 @@ func (d *Driver) executeStep(ctx context.Context, step Step, rec *debugger.Actio
 
 	switch step.Action {
 	case ActionNavigate:
-		return chromedp.Run(stepCtx, chromedp.Navigate(d.resolveURL(step.URL)))
+		return chromedp.Do(stepCtx, chromedp.Navigate(d.resolveURL(step.URL)))
 
 	case ActionClick:
-		return chromedp.Run(stepCtx,
+		return chromedp.Do(stepCtx,
 			chromedp.WaitVisible(step.Selector),
 			chromedp.Click(step.Selector),
 		)
 
 	case ActionTypeInput:
-		return chromedp.Run(stepCtx,
+		return chromedp.Do(stepCtx,
 			chromedp.WaitVisible(step.Selector),
 			chromedp.SendKeys(step.Selector, step.Text),
 		)
 
 	case ActionWaitVisible:
-		return chromedp.Run(stepCtx, chromedp.WaitVisible(step.Selector))
+		return chromedp.Do(stepCtx, chromedp.WaitVisible(step.Selector))
 
 	case ActionAssertVisible:
 		return assertVisible(stepCtx, step)
@@ -222,11 +206,11 @@ func (d *Driver) resolveURL(targetURL string) string {
 }
 
 func assertVisible(stepCtx context.Context, step Step) error {
-	var text string
-	if err := chromedp.Run(stepCtx,
-		chromedp.WaitVisible(step.Selector),
-		chromedp.Text(step.Selector, &text),
-	); err != nil {
+	if err := chromedp.Do(stepCtx, chromedp.WaitVisible(step.Selector)); err != nil {
+		return err
+	}
+	text, err := chromedp.Run(stepCtx, chromedp.Text(step.Selector))
+	if err != nil {
 		return err
 	}
 	if step.TextContains != "" && !strings.Contains(text, step.TextContains) {
@@ -243,13 +227,13 @@ func executeScreenshot(stepCtx context.Context, step Step, rec *debugger.ActionR
 	// CaptureScreenshot writes a PNG of the viewport; the full-page variant
 	// only emits JPEG. A desktop app is captured at a fixed window size, so
 	// an optional width and height emulate the window it was designed for.
-	actions := make([]chromedp.Action, 0, 2)
 	if step.Width > 0 && step.Height > 0 {
-		actions = append(actions, chromedp.EmulateViewport(int64(step.Width), int64(step.Height)))
+		if err := chromedp.Do(stepCtx, chromedp.EmulateViewport(int64(step.Width), int64(step.Height))); err != nil {
+			return err
+		}
 	}
-	var pngData []byte
-	actions = append(actions, chromedp.CaptureScreenshot(&pngData))
-	if err := chromedp.Run(stepCtx, actions...); err != nil {
+	pngData, err := chromedp.Run(stepCtx, chromedp.CaptureScreenshot())
+	if err != nil {
 		return err
 	}
 
