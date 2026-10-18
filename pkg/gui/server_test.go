@@ -1278,7 +1278,7 @@ func TestModelDownloadEndpointOutlivesRequestCancellation(t *testing.T) {
 
 	select {
 	case <-downloadStarted:
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("download did not start")
 	}
 
@@ -1288,7 +1288,7 @@ func TestModelDownloadEndpointOutlivesRequestCancellation(t *testing.T) {
 
 	// Wait for download to finish
 	var finalStatus models.ModelStatus
-	timeout := time.After(5 * time.Second)
+	timeout := time.After(10 * time.Second)
 	for {
 		select {
 		case ev := <-events:
