@@ -201,6 +201,14 @@ One advisory does remain in the tree, held down by an `overrides` block in
 No CI job runs `npm audit`, so a new advisory would not gate a build. If one is
 added, it should start from a clean tree.
 
+## Automated dependency updates (Dependabot)
+
+`.github/dependabot.yml` configures Dependabot to check weekly on Mondays at 06:00 UTC across three ecosystems:
+
+- **Go modules (`gomod`)**: checks root `go.mod` dependencies. The OpenTelemetry suite (`go.opentelemetry.io/*` and `github.com/XSAM/otelsql`) is grouped into a single update (`opentelemetry`) so coordinated instrumentation and SDK releases arrive in one combined pull request.
+- **Frontend packages (`npm`)**: checks `frontend/package.json` for npm package updates.
+- **GitHub Actions (`github-actions`)**: checks workflow action references in `.github/workflows/`.
+
 ## Prose linting with Vale
 
 Vale checks prose style in the user-facing documentation only. It is pinned in
