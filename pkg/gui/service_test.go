@@ -934,6 +934,7 @@ func TestAServiceRegeneratesTheSummaryBehindTheTurn(t *testing.T) {
 	}
 
 	svc := NewService(root)
+	defer svc.Close()
 	paths := svc.GetResolver()
 	sysDir := paths.SystemDir("freeform")
 	if err := os.MkdirAll(sysDir, 0755); err != nil {
@@ -1004,6 +1005,7 @@ func TestRecapIsDisabledWhenSummariesAreOff(t *testing.T) {
 	}
 
 	svc := NewService(root)
+	defer svc.Close()
 	paths := svc.GetResolver()
 	sysDir := paths.SystemDir("freeform")
 	if err := os.MkdirAll(sysDir, 0755); err != nil {
