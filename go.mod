@@ -12,7 +12,7 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20260922220944-a19bff23514f
 	github.com/chromedp/chromedp v0.16.0
 	github.com/darkliquid/roll v0.0.0-20261006063131-e515e24fa1af
-	github.com/dop251/goja v0.0.0-20260917113740-793a2a65c13b
+	github.com/dop251/goja v0.0.0-20261017142635-e6862644b38f
 	github.com/ebitengine/oto/v3 v3.5.1
 	github.com/gen2brain/vpx v0.2.1
 	github.com/google/uuid v1.6.0
@@ -22,7 +22,7 @@ require (
 	github.com/pion/opus v0.1.1-0.20260923000601-86ced7318333
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef
-	github.com/wailsapp/wails/v3 v3.0.0-beta.29
+	github.com/wailsapp/wails/v3 v3.0.0-beta.31
 	github.com/yalue/onnxruntime_go v1.36.0
 	github.com/yuin/goldmark v1.8.6
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
@@ -62,7 +62,7 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
-	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
+	github.com/dlclark/regexp2/v2 v2.8.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.11.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
