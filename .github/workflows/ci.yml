@@ -116,7 +116,7 @@ jobs:
       # carries the SHA: each run saves a fresh cache and restores the newest
       # matching one, which is what keeps it current instead of frozen.
       - name: Cache the Go module cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/go/pkg/mod
           key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
@@ -125,7 +125,7 @@ jobs:
             go-mod-${{ runner.os }}-
 
       - name: Cache the Go build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/go-build
           key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
@@ -179,7 +179,7 @@ jobs:
           version: 1.0
 
       - name: Cache the Go module cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/go/pkg/mod
           key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
@@ -188,7 +188,7 @@ jobs:
             go-mod-${{ runner.os }}-
 
       - name: Cache the Go build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/go-build
           key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
@@ -228,7 +228,7 @@ jobs:
           echo "gobuild=$(mise exec -- go env GOCACHE)" >> $GITHUB_OUTPUT
 
       - name: Cache the Go module cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.go-cache.outputs.gomod }}
           key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
@@ -237,7 +237,7 @@ jobs:
             go-mod-${{ runner.os }}-
 
       - name: Cache the Go build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.go-cache.outputs.gobuild }}
           key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
@@ -280,7 +280,7 @@ jobs:
           version: 1.0
 
       - name: Cache the Go module cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/go/pkg/mod
           key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
@@ -289,7 +289,7 @@ jobs:
             go-mod-${{ runner.os }}-
 
       - name: Cache the Go build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/go-build
           key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
@@ -393,7 +393,7 @@ jobs:
       # site:build runs tools/sitegen through `go run`, so the Go caches stop
       # the generator recompiling from scratch on every run.
       - name: Cache the Go module cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/go/pkg/mod
           key: go-mod-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ hashFiles('go.sum') }}
@@ -402,7 +402,7 @@ jobs:
             go-mod-${{ runner.os }}-
 
       - name: Cache the Go build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/go-build
           key: go-build-${{ runner.os }}-${{ steps.mise.outputs.go }}-${{ github.sha }}
