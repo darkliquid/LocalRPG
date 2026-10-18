@@ -356,6 +356,10 @@ func (s *Service) Close() {
 	if ledger != nil {
 		_ = ledger.Close()
 	}
+
+	if s.player != nil {
+		_ = s.player.Close()
+	}
 }
 
 // GetResolver returns the path resolver the service was built with, so a caller

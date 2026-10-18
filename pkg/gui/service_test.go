@@ -96,6 +96,9 @@ The town watch captain. Speaks with [[player-elena]].`
 	}
 
 	service := NewService(tempDir)
+	t.Cleanup(func() {
+		service.Close()
+	})
 	return "test-campaign", service
 }
 
