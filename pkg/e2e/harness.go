@@ -157,9 +157,13 @@ func (b *Browser) SetInputValue(selector, value string) {
 	script := fmt.Sprintf(`(() => {
 	  const el = document.evaluate(%q, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
 	  if (!el) return 'missing';
+	  if (el._valueTracker) {
+	    el._valueTracker.setValue('');
+	  }
 	  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
 	  Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, %q);
 	  el.dispatchEvent(new Event('input', { bubbles: true }));
+	  el.dispatchEvent(new Event('change', { bubbles: true }));
 	  return 'ok';
 	})()`, selector, value)
 	if got := b.Eval(script); got != "ok" {
