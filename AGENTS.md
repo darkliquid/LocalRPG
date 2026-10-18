@@ -15,6 +15,8 @@ mise run build:backend  # depends on build:frontend
 mise run test           # coverage-checked Go tests  AND  mise run test:frontend  AND  mise run test:e2e
 mise run test:backend   # go test with a coverage floor (scripts/check-coverage.sh)
 mise run test:backend:fast # go test without the coverage check
+mise run test:backend:race # go test with the race detector enabled
+mise run test:backend:cross # go test across cross-platform packages (scripts/test-cross-platform.sh)
 mise run coverage:diff  # compare two profiles by function, not by their statement totals
 mise run test:frontend  # npx tsc --noEmit and npx vitest run --coverage (in frontend/)
 mise run test:e2e       # go test -tags e2e ./pkg/e2e/... (skips without a browser)

@@ -69,7 +69,7 @@ func SanitizeID(id string) string {
 // ResolveSafeChild resolves relativePath under baseDir and verifies that the
 // resulting path remains strictly contained within baseDir.
 func ResolveSafeChild(baseDir, relativePath string) (string, error) {
-	if filepath.IsAbs(relativePath) {
+	if filepath.IsAbs(relativePath) || strings.HasPrefix(relativePath, "/") || strings.HasPrefix(relativePath, "\\") {
 		return "", fmt.Errorf("path %q is absolute", relativePath)
 	}
 	cleanBase := filepath.Clean(baseDir)

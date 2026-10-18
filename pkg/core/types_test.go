@@ -29,64 +29,76 @@ version: "1.0.0"
 }
 
 func TestResolvePaths(t *testing.T) {
-	baseDir := "/test/rpg"
+	baseDir := filepath.Join(string(filepath.Separator), "test", "rpg")
 	paths := NewPathResolver(baseDir)
 
-	if paths.SystemDir("d20-classic") != "/test/rpg/systems/d20-classic" {
+	if paths.SystemDir("d20-classic") != filepath.Join(baseDir, "systems", "d20-classic") {
 		t.Errorf("unexpected system dir: %s", paths.SystemDir("d20-classic"))
 	}
-	if paths.WorldDir("forgotten-reach") != "/test/rpg/worlds/forgotten-reach" {
+	if paths.WorldDir("forgotten-reach") != filepath.Join(baseDir, "worlds", "forgotten-reach") {
 		t.Errorf("unexpected world dir: %s", paths.WorldDir("forgotten-reach"))
 	}
-	if paths.GameDir("campaign-01") != "/test/rpg/games/campaign-01" {
+	if paths.GameDir("campaign-01") != filepath.Join(baseDir, "games", "campaign-01") {
 		t.Errorf("unexpected game dir: %s", paths.GameDir("campaign-01"))
 	}
 }
 
 func TestPathResolver_CustomPaths(t *testing.T) {
-	resolver := NewCustomPathResolver("/custom/sys", "/custom/worlds", "/custom/games", "/custom/cache")
-	if resolver.SystemsDir() != "/custom/sys" {
-		t.Errorf("expected /custom/sys, got %q", resolver.SystemsDir())
+	sysDir := filepath.Join(string(filepath.Separator), "custom", "sys")
+	worldsDir := filepath.Join(string(filepath.Separator), "custom", "worlds")
+	gamesDir := filepath.Join(string(filepath.Separator), "custom", "games")
+	cacheDir := filepath.Join(string(filepath.Separator), "custom", "cache")
+	resolver := NewCustomPathResolver(sysDir, worldsDir, gamesDir, cacheDir)
+	if resolver.SystemsDir() != sysDir {
+		t.Errorf("expected %q, got %q", sysDir, resolver.SystemsDir())
 	}
-	if resolver.WorldsDir() != "/custom/worlds" {
-		t.Errorf("expected /custom/worlds, got %q", resolver.WorldsDir())
+	if resolver.WorldsDir() != worldsDir {
+		t.Errorf("expected %q, got %q", worldsDir, resolver.WorldsDir())
 	}
-	if resolver.GamesDir() != "/custom/games" {
-		t.Errorf("expected /custom/games, got %q", resolver.GamesDir())
+	if resolver.GamesDir() != gamesDir {
+		t.Errorf("expected %q, got %q", gamesDir, resolver.GamesDir())
 	}
-	if resolver.CacheDir() != "/custom/cache" {
-		t.Errorf("expected /custom/cache, got %q", resolver.CacheDir())
+	if resolver.CacheDir() != cacheDir {
+		t.Errorf("expected %q, got %q", cacheDir, resolver.CacheDir())
 	}
-	if resolver.SystemDir("d20") != "/custom/sys/d20" {
-		t.Errorf("expected /custom/sys/d20, got %q", resolver.SystemDir("d20"))
+	if resolver.SystemDir("d20") != filepath.Join(sysDir, "d20") {
+		t.Errorf("expected %q, got %q", filepath.Join(sysDir, "d20"), resolver.SystemDir("d20"))
 	}
 
-	resolver.SetPaths("/new/sys", "/new/worlds", "/new/games", "/new/cache")
-	if resolver.SystemsDir() != "/new/sys" {
-		t.Errorf("expected /new/sys, got %q", resolver.SystemsDir())
+	newSys := filepath.Join(string(filepath.Separator), "new", "sys")
+	newWorlds := filepath.Join(string(filepath.Separator), "new", "worlds")
+	newGames := filepath.Join(string(filepath.Separator), "new", "games")
+	newCache := filepath.Join(string(filepath.Separator), "new", "cache")
+	resolver.SetPaths(newSys, newWorlds, newGames, newCache)
+	if resolver.SystemsDir() != newSys {
+		t.Errorf("expected %q, got %q", newSys, resolver.SystemsDir())
 	}
-	if resolver.CacheDir() != "/new/cache" {
-		t.Errorf("expected /new/cache, got %q", resolver.CacheDir())
+	if resolver.CacheDir() != newCache {
+		t.Errorf("expected %q, got %q", newCache, resolver.CacheDir())
 	}
 }
 
 func TestPathResolverSanitizesIDs(t *testing.T) {
-	resolver := NewPathResolver("/app/base")
+	base := filepath.Join(string(filepath.Separator), "app", "base")
+	resolver := NewPathResolver(base)
 
 	malicious := "../../etc/passwd"
 	gameDir := resolver.GameDir(malicious)
-	if filepath.Clean(gameDir) != filepath.Clean("/app/base/games/etc-passwd") {
-		t.Errorf("GameDir(%q) = %q, expected /app/base/games/etc-passwd", malicious, gameDir)
+	expected := filepath.Clean(filepath.Join(base, "games", "etc-passwd"))
+	if filepath.Clean(gameDir) != expected {
+		t.Errorf("GameDir(%q) = %q, expected %q", malicious, gameDir, expected)
 	}
 
 	worldDir := resolver.WorldDir(malicious)
-	if filepath.Clean(worldDir) != filepath.Clean("/app/base/worlds/etc-passwd") {
-		t.Errorf("WorldDir(%q) = %q, expected /app/base/worlds/etc-passwd", malicious, worldDir)
+	expectedWorld := filepath.Clean(filepath.Join(base, "worlds", "etc-passwd"))
+	if filepath.Clean(worldDir) != expectedWorld {
+		t.Errorf("WorldDir(%q) = %q, expected %q", malicious, worldDir, expectedWorld)
 	}
 
 	sysDir := resolver.SystemDir(malicious)
-	if filepath.Clean(sysDir) != filepath.Clean("/app/base/systems/etc-passwd") {
-		t.Errorf("SystemDir(%q) = %q, expected /app/base/systems/etc-passwd", malicious, sysDir)
+	expectedSys := filepath.Clean(filepath.Join(base, "systems", "etc-passwd"))
+	if filepath.Clean(sysDir) != expectedSys {
+		t.Errorf("SystemDir(%q) = %q, expected %q", malicious, sysDir, expectedSys)
 	}
 }
 

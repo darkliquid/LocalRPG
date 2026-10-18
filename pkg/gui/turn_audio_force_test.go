@@ -39,6 +39,7 @@ func TestSegmentAudioRouteIsNotAGet(t *testing.T) {
 
 func TestPlayTurnAudioRouteWithForce(t *testing.T) {
 	gameID, svc := setupTestGame(t)
+	defer svc.StopAudio()
 	writeSegmentTurn(t, svc, gameID)
 	server := NewServer(svc, http.NotFoundHandler())
 
@@ -55,6 +56,7 @@ func TestPlayTurnAudioRouteWithForce(t *testing.T) {
 
 func TestPlaySegmentAudioRouteWithForce(t *testing.T) {
 	gameID, svc := setupTestGame(t)
+	defer svc.StopAudio()
 	writeSegmentTurn(t, svc, gameID)
 	server := NewServer(svc, http.NotFoundHandler())
 

@@ -3,7 +3,10 @@ package harness_test
 import (
 	"testing"
 
-	_ "github.com/darkliquid/localrpg/pkg/provider/all"
+	_ "github.com/darkliquid/localrpg/pkg/provider/clillm"
+	_ "github.com/darkliquid/localrpg/pkg/provider/geminillm"
+	_ "github.com/darkliquid/localrpg/pkg/provider/openaichat"
+	_ "github.com/darkliquid/localrpg/pkg/provider/oracle"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
 )

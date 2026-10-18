@@ -128,6 +128,26 @@ func validateOne(d Descriptor) error {
 	return nil
 }
 
+// Snapshot copies the current registry and returns a restore function. It exists
+// for tests only so an isolated test can mutate or reset the registry and
+// restore previous registrations afterwards.
+func Snapshot() func() {
+	mu.Lock()
+	defer mu.Unlock()
+	saved := make(map[string]Registration, len(byID))
+	for k, v := range byID {
+		saved[k] = v
+	}
+	return func() {
+		mu.Lock()
+		defer mu.Unlock()
+		byID = make(map[string]Registration, len(saved))
+		for k, v := range saved {
+			byID[k] = v
+		}
+	}
+}
+
 // Reset clears the registry. It exists for tests only.
 func Reset() {
 	mu.Lock()

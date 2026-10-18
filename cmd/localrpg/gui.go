@@ -304,7 +304,9 @@ func installSaveFilePicker(app *application.App, svc *gui.Service, window *appli
 // reports the application name and description, so it already describes LocalRPG.
 func localRPGApplicationMenu() *application.Menu {
 	menu := application.NewMenu()
-	menu.AddRole(application.AppMenu)
+	if application.Get() != nil {
+		menu.AddRole(application.AppMenu)
+	}
 	menu.AddRole(application.FileMenu)
 	menu.AddRole(application.EditMenu)
 	menu.AddRole(application.ViewMenu)

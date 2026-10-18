@@ -2,11 +2,13 @@ package gui
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -37,9 +39,11 @@ func TestListenUnix(t *testing.T) {
 		t.Fatalf("stat socket file failed: %v", err)
 	}
 
-	// Verify file mode is 0600
-	if perm := info.Mode().Perm(); perm != 0600 {
-		t.Errorf("expected socket permissions 0600, got %o", perm)
+	// Verify file mode is 0600 on platforms supporting POSIX file modes
+	if runtime.GOOS != "windows" {
+		if perm := info.Mode().Perm(); perm != 0600 {
+			t.Errorf("expected socket permissions 0600, got %o", perm)
+		}
 	}
 
 	// Test stale socket cleanup: close listener without removing file
@@ -54,7 +58,12 @@ func TestListenUnix(t *testing.T) {
 
 func TestUnixSocketHTTPCommunication(t *testing.T) {
 	gameID, svc := setupTestGame(t)
-	sockPath := filepath.Join(t.TempDir(), "http_test.sock")
+	sockDir := t.TempDir()
+	if runtime.GOOS == "darwin" {
+		sockDir = "/tmp"
+	}
+	sockPath := filepath.Join(sockDir, fmt.Sprintf("http_%d.sock", time.Now().UnixNano()))
+	defer func() { _ = os.Remove(sockPath) }()
 
 	server := NewServer(svc, AssetHandler())
 
