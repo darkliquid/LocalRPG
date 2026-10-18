@@ -67,6 +67,8 @@ type Service struct {
 	audioSubs    map[chan AudioStatusDTO]struct{}
 	audioTurn    int
 	audioSegment int
+	audioCancel  context.CancelFunc
+	audioWG      sync.WaitGroup
 	// playback is the session's playback ledger and owner: which clips the
 	// player has heard, and how far, and whether the device or the browser plays
 	// them. It is in memory only; a fresh session has heard nothing.
@@ -328,6 +330,8 @@ func (s *Service) goBackground(fn func()) {
 // Close stops background work and waits for it, so no goroutine writes after a
 // caller considers the service done. It is safe to call more than once.
 func (s *Service) Close() {
+	s.StopAudio()
+
 	s.bgMu.Lock()
 	s.closed = true
 	s.bgMu.Unlock()
