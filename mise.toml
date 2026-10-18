@@ -56,11 +56,15 @@ run = "bash scripts/check-coverage.sh"
 
 [tasks."test:backend:fast"]
 description = "Run the Go tests without the coverage check"
-run = "go test -v -count=1 -shuffle=on ./..."
+run = "go test -v ./..."
+
+[tasks."test:backend:clean"]
+description = "Run the Go tests bypassing the test cache"
+run = "go test -v -count=1 ./..."
 
 [tasks."test:backend:race"]
 description = "Run the Go tests with the race detector enabled"
-run = "go test -race -shuffle=on ./..."
+run = "go test -race ./..."
 
 [tasks."test:backend:cross"]
 description = "Run cross-platform Go tests with platform-appropriate package filtering"

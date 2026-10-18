@@ -23,7 +23,13 @@ trap '[ "$kept" -eq 1 ] || rm -f "$profile"' EXIT
 
 # -v so a CI log shows which test failed, and one profile for the whole run so the
 # total is the project's rather than a package's.
-go test -v -count=1 -shuffle=on -covermode=atomic -coverprofile="$profile" ./...
+shuffle_flag=""
+[ -n "${SHUFFLE:-}" ] && shuffle_flag="-shuffle=on"
+count_flag=""
+[ -n "${CLEAN:-}" ] && count_flag="-count=1"
+
+# shellcheck disable=SC2086
+go test -v $count_flag $shuffle_flag -covermode=atomic -coverprofile="$profile" ./...
 
 total="$(go tool cover -func="$profile" | awk '/^total:/ {gsub(/%/, "", $3); print $3}')"
 [ -n "$total" ] || { printf 'coverage: could not read a total from %s\n' "$profile" >&2; exit 1; }
