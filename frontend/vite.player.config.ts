@@ -9,14 +9,14 @@ import path from 'path';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
-    outDir: path.resolve(__dirname, '../pkg/gui/dist/player'),
+    outDir: path.resolve(import.meta.dirname, '../pkg/gui/dist/player'),
     emptyOutDir: true,
     // A bundle inlines this build into a page opened from file://, where a module
     // script is refused by CORS and dynamic imports cannot resolve. One classic
     // script and one stylesheet is what can be inlined.
     cssCodeSplit: false,
     rollupOptions: {
-      input: { player: path.resolve(__dirname, 'player.html') },
+      input: { player: path.resolve(import.meta.dirname, 'player.html') },
       output: { format: 'iife', inlineDynamicImports: true },
     },
   },

@@ -20,10 +20,10 @@ mise run test:backend:cross # go test across cross-platform packages (scripts/te
 mise run coverage:diff  # compare two profiles by function, not by their statement totals
 mise run test:frontend  # npx tsc --noEmit and npx vitest run --coverage (in frontend/)
 mise run test:e2e       # go test -tags e2e ./pkg/e2e/... (skips without a browser)
-mise run lint           # gofmt, staticcheck, go vet, Prettier, ESLint, rumdl, goreleaser, actionlint
+mise run lint           # gofmt, staticcheck, go vet, Prettier, Oxlint, rumdl, goreleaser, actionlint
 mise run lint:gofmt     # fail if any Go file is not gofmt-formatted
 mise run lint:staticcheck # staticcheck over every Go package, tests included
-mise run lint:frontend  # prettier --check and eslint over frontend/
+mise run lint:frontend  # prettier --check and oxlint over frontend/
 mise run lint:docs      # rumdl over the embedded help articles (pkg/gui/docs, .rumdl.toml)
 mise run lint:prose     # Vale over tracked prose and source comments (report only; STRICT=1 to gate)
 mise run lint:revive    # revive over the Go packages: undocumented exported symbols (report only)
@@ -529,7 +529,7 @@ The floors sit just below what the suite reaches today — 73.3% and 33.36% at t
 - Tests that need hardware a CI runner does not have — a browser, a sound card — skip rather than fail, and detect the capability instead of assuming it. `driver.Available` probes for a browser, because having Chrome installed is not the same as being able to start it. The audio device tests play a short clip and watch it finish, because a context opens on a host that cannot play anything and no cheaper signal distinguishes the two.
 - Identifiers: `entity.Slugify` (display name -> kebab-case ID) and `entity.WikilinkTarget` (unwraps `[[target|label]]`) are the shared helpers — reuse them instead of writing local slug/link parsing.
 - TypeScript: React 19 + Tailwind v4 (config lives in CSS via `@import "tailwindcss"` in `frontend/src/index.css`, there is no `tailwind.config.js`). `tsconfig.json` has `strict`, `noUnusedLocals`, `noUnusedParameters`, so `npm run build`/`tsc --noEmit` fails on unused imports. Components live in `frontend/src/components/`, icons come from `lucide-react`.
-- **The frontend's lint is ESLint plus Prettier, run by `mise run lint:frontend`.** `frontend/eslint.config.mjs` is the flat config and `frontend/prettier.config.mjs` the formatter's; both carry the reasoning for every non-default choice. Prettier's `format:check` and ESLint's **error** level gate a build; ESLint's **warnings** print without failing it. That split is the same shape as the prose lint, and each warning group names the proposal that fixes it and promotes it: accessibility to FE-6, React Compiler readiness (refs during render, setState in an effect) to FE-3 and FE-2, and `no-explicit-any` to FE-8. One a11y rule is off rather than warned: `control-has-associated-label` reports the same unlabelled inputs as `label-has-associated-control`, from the control's side, so the two together gave 258 findings for one class of defect.
+- **The frontend's lint is Oxlint plus Prettier, run by `mise run lint:frontend`.** `frontend/.oxlintrc.json` is the configuration and `frontend/prettier.config.mjs` the formatter's; both carry the reasoning for every non-default choice. Prettier's `format:check` and Oxlint's **error** level gate a build; Oxlint's **warnings** print without failing it. That split is the same shape as the prose lint, and each warning group names the proposal that fixes it and promotes it: accessibility to FE-6, React Compiler readiness (refs during render, setState in an effect) to FE-3 and FE-2, and `no-explicit-any` to FE-8. One a11y rule is off rather than warned: `control-has-associated-label` reports the same unlabelled inputs as `label-has-associated-control`, from the control's side, so the two together gave 258 findings for one class of defect.
 - **The Go and TypeScript DTO contract is checked, not trusted.** `pkg/gui/types.go` and
   `frontend/src/types.ts` are two hand-maintained mirrors of one wire contract, so
   `pkg/gui/testdata/dto.json` is generated from the Go structs by
@@ -550,7 +550,7 @@ The floors sit just below what the suite reaches today — 73.3% and 33.36% at t
   carries an `aria-label`: `frontend/src/test/iconButtons.test.ts` parses every `.tsx` with the
   TypeScript compiler and fails on a button whose subtree renders no text and no expression and which
   has no name, and it deliberately does not accept `title`, which is a tooltip that needs a pointer.
-- TypeScript 5.9 is pinned by `typescript-eslint`'s peer range (`>=4.8.4 <6.1.0`), so the TypeScript bump in TQ-9 has to move that plugin in the same commit.
+- TypeScript 7 decouples from the legacy JS compiler API; frontend linting is handled natively by Oxlint in Rust without a peer version bottleneck.
 - Commits: Conventional Commits with a scope, e.g. `feat(harness): …`, `fix(frontend): …`, `docs: …`. Keep the subject under 72 chars. Commit after every turn of work is preferred, but only on a feature branch: never commit directly on `main` — branch first, then commit there.
 - Design work is spec-first: `docs/superpowers/specs/` holds approved design docs and `docs/superpowers/plans/` holds task-by-task implementation plans with `- [ ]` checkboxes, including a "File Map" listing files to create/modify per feature. Read the relevant spec before changing a subsystem; the plans reference the superpowers skills workflow. Note `.superpowers/` is gitignored while `docs/superpowers/` is tracked.
 

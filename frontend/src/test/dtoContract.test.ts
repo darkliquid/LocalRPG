@@ -1,6 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+import { API } from 'typescript/unstable/sync';
+import {
+  SyntaxKind,
+  isIdentifier,
+  isInterfaceDeclaration,
+  isNumericLiteral,
+  isPropertySignatureDeclaration,
+  isStringLiteral,
+} from 'typescript/unstable/ast';
 import { describe, expect, it } from 'vitest';
 
 // The Go side owns this manifest: `go test ./pkg/gui -update-dto` rewrites it from
@@ -61,30 +69,37 @@ function readManifest(): Manifest {
 // is a hand-written mirror rather than a generated one: its unions, its view models
 // and its comments are the reason this test exists instead of a generator.
 function readDeclarations(): Map<string, Declaration> {
-  const source = ts.createSourceFile(
-    declarationsPath,
-    fs.readFileSync(declarationsPath, 'utf8'),
-    ts.ScriptTarget.ESNext,
-    true,
-    ts.ScriptKind.TS,
-  );
-
-  const declarations = new Map<string, Declaration>();
-  for (const statement of source.statements) {
-    if (!ts.isInterfaceDeclaration(statement)) continue;
-    if (!statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) continue;
-
-    const members = new Map<string, boolean>();
-    for (const member of statement.members) {
-      const name = member.name;
-      if (!name) continue;
-      if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
-        members.set(name.text, !!member.questionToken);
-      }
+  const api = new API();
+  try {
+    const tsconfig = path.resolve(__dirname, '../../tsconfig.json');
+    const snapshot = api.updateSnapshot({ openProjects: [tsconfig] });
+    const proj = snapshot.getProject(tsconfig);
+    const source = proj?.program.getSourceFile(declarationsPath);
+    if (!source) {
+      throw new Error(`Could not load source file: ${declarationsPath}`);
     }
-    declarations.set(statement.name.text, { name: statement.name.text, members });
+
+    const declarations = new Map<string, Declaration>();
+    for (const statement of source.statements) {
+      if (!isInterfaceDeclaration(statement)) continue;
+      if (!statement.modifiers?.some((m) => m.kind === SyntaxKind.ExportKeyword)) continue;
+
+      const members = new Map<string, boolean>();
+      for (const member of statement.members) {
+        if (!isPropertySignatureDeclaration(member)) continue;
+        const name = member.name;
+        if (!name) continue;
+        if (isIdentifier(name) || isStringLiteral(name) || isNumericLiteral(name)) {
+          const isOptional = member.postfixToken?.kind === SyntaxKind.QuestionToken;
+          members.set(name.text, isOptional);
+        }
+      }
+      declarations.set(statement.name.text, { name: statement.name.text, members });
+    }
+    return declarations;
+  } finally {
+    api.close();
   }
-  return declarations;
 }
 
 function setEquals(a: Set<string>, b: Set<string>): boolean {

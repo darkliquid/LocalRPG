@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: path.resolve(__dirname, '../pkg/gui/dist'),
+    outDir: path.resolve(import.meta.dirname, '../pkg/gui/dist'),
     emptyOutDir: true,
     rollupOptions: {
       output: {

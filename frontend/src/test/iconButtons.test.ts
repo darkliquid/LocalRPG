@@ -1,6 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+import { API } from 'typescript/unstable/sync';
+import {
+  type JsxElement,
+  type Node,
+  type SourceFile,
+  isJsxAttribute,
+  isJsxElement,
+  isJsxExpression,
+  isJsxFragment,
+  isJsxText,
+  visitEachChild,
+} from 'typescript/unstable/ast';
 import { describe, expect, it } from 'vitest';
 
 // This is a source scan rather than a render, because the defect it looks for is
@@ -20,21 +31,22 @@ function walk(dir: string, out: string[] = []): string[] {
 // rendersText reports whether an element subtree can render any text: a text node
 // with content, or an expression, whose value is not knowable here. An icon is a
 // self-closing element and renders none.
-function rendersText(node: ts.JsxElement, source: ts.SourceFile): boolean {
+function rendersText(node: JsxElement, source: SourceFile): boolean {
   let found = false;
-  const visit = (child: ts.Node) => {
-    if (found) return;
-    if (ts.isJsxText(child)) {
+  const visit = (child: Node): Node => {
+    if (found) return child;
+    if (isJsxText(child)) {
       if (child.getText(source).trim() !== '') found = true;
-      return;
+      return child;
     }
-    if (ts.isJsxExpression(child)) {
+    if (isJsxExpression(child)) {
       found = true;
-      return;
+      return child;
     }
-    if (ts.isJsxElement(child) || ts.isJsxFragment(child)) {
-      child.children.forEach(visit);
+    if (isJsxElement(child) || isJsxFragment(child)) {
+      visitEachChild(child, visit);
     }
+    return child;
   };
   node.children.forEach(visit);
   return found;
@@ -43,27 +55,33 @@ function rendersText(node: ts.JsxElement, source: ts.SourceFile): boolean {
 function unnamedIconButtons(): string[] {
   const root = path.resolve(__dirname, '..');
   const found: string[] = [];
+  const api = new API();
 
-  for (const file of walk(root)) {
-    const source = ts.createSourceFile(
-      file,
-      fs.readFileSync(file, 'utf8'),
-      ts.ScriptTarget.ESNext,
-      true,
-      ts.ScriptKind.TSX,
-    );
-    const visit = (node: ts.Node) => {
-      if (ts.isJsxElement(node) && node.openingElement.tagName.getText(source) === 'button') {
-        const attributes = node.openingElement.attributes.properties;
-        const has = (name: string) => attributes.some((a) => a.name?.getText(source) === name);
-        if (!rendersText(node, source) && !has('aria-label') && !has('aria-labelledby')) {
-          const line = source.getLineAndCharacterOfPosition(node.openingElement.getStart(source)).line + 1;
-          found.push(`${path.relative(root, file)}:${line}`);
+  try {
+    const tsconfig = path.resolve(__dirname, '../../tsconfig.json');
+    const snapshot = api.updateSnapshot({ openProjects: [tsconfig] });
+    const proj = snapshot.getProject(tsconfig);
+
+    for (const file of walk(root)) {
+      const source = proj?.program.getSourceFile(file);
+      if (!source) continue;
+
+      const visit = (node: Node): Node => {
+        if (isJsxElement(node) && node.openingElement.tagName.getText(source) === 'button') {
+          const attributes = node.openingElement.attributes.properties;
+          const has = (name: string) => attributes.some((a) => isJsxAttribute(a) && a.name.getText(source) === name);
+          if (!rendersText(node, source) && !has('aria-label') && !has('aria-labelledby')) {
+            const line = source.getLineAndCharacterOfPosition(node.openingElement.getStart(source)).line + 1;
+            found.push(`${path.relative(root, file)}:${line}`);
+          }
         }
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(source);
+        visitEachChild(node, visit);
+        return node;
+      };
+      visit(source);
+    }
+  } finally {
+    api.close();
   }
 
   return found;

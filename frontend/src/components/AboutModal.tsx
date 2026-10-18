@@ -1,5 +1,6 @@
 import React from 'react';
-import { BookOpen, Bug, Github, Sparkles, X } from 'lucide-react';
+import { BookOpen, Bug, Sparkles, X } from 'lucide-react';
+import { Github } from './icons/Github';
 import { useMountTransition } from '../hooks/useMountTransition';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { PROJECT_ISSUES_URL, PROJECT_NAME, PROJECT_REPO_URL, PROJECT_TAGLINE, openExternal } from '../lib/project';

@@ -122,11 +122,11 @@ description = "Run staticcheck over the Go packages"
 run = "staticcheck ./..."
 
 [tasks."lint:frontend"]
-description = "Check the frontend's formatting and run ESLint over it"
+description = "Check the frontend's formatting and run Oxlint over it"
 dir = "frontend"
 depends = ["install:frontend"]
 # Prettier first: it is fast, and a formatting failure makes the lint findings
-# harder to read. ESLint's error level is what gates; its warnings are the
+# harder to read. Oxlint's error level is what gates; its warnings are the
 # tracked accessibility and React Compiler work, and they print here.
 run = """
 npm run format:check
