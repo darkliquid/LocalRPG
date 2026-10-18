@@ -229,7 +229,7 @@ func (p *Player) playStreamer(queue beep.Streamer, closers []io.Closer, clipCoun
 func (p *Player) playStreamerLocked(queue beep.Streamer, closers []io.Closer, clipCount int) error {
 	previousClosers := p.closers
 	if p.otoPlayer != nil {
-		_ = p.otoPlayer.Close()
+		p.otoPlayer.Pause()
 		p.otoPlayer = nil
 	}
 
@@ -274,7 +274,6 @@ func (p *Player) playStreamerLocked(queue beep.Streamer, closers []io.Closer, cl
 				p.otoPlayer = nil
 				onComplete := p.onComplete
 				p.mu.Unlock()
-				_ = player.Close()
 				closeAll(closers)
 				if onComplete != nil {
 					onComplete()
@@ -301,7 +300,7 @@ func (p *Player) Stop() {
 	p.streamer = nil
 	p.playing = false
 	if p.otoPlayer != nil {
-		_ = p.otoPlayer.Close()
+		p.otoPlayer.Pause()
 		p.otoPlayer = nil
 	}
 	onComplete := p.onComplete
