@@ -27,7 +27,7 @@
     "@headless-tree/core": "^1.7.0",
     "@headless-tree/react": "^1.7.0",
     "codemirror": "^6.0.2",
-    "lucide-react": "^0.475.0",
+    "lucide-react": "^1.57.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
