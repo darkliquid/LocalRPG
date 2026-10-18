@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"go.opentelemetry.io/otel"
-	logglobal "go.opentelemetry.io/otel/log/global"
 	noopmetric "go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
@@ -83,7 +82,7 @@ func NewInMemory() (*Recorder, *Provider, error) {
 
 	otel.SetTracerProvider(tp)
 	otel.SetMeterProvider(mp)
-	logglobal.SetLoggerProvider(lp)
+	otel.SetLoggerProvider(lp)
 
 	p := &Provider{
 		tracer: tp,
@@ -98,5 +97,5 @@ func NewInMemory() (*Recorder, *Provider, error) {
 func ResetGlobalForTest() {
 	otel.SetTracerProvider(nooptrace.NewTracerProvider())
 	otel.SetMeterProvider(noopmetric.NewMeterProvider())
-	logglobal.SetLoggerProvider(log.NewLoggerProvider())
+	otel.SetLoggerProvider(log.NewLoggerProvider())
 }

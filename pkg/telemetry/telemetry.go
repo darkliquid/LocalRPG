@@ -15,7 +15,6 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	logglobal "go.opentelemetry.io/otel/log/global"
 	otelmetric "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/log"
@@ -112,7 +111,7 @@ func New(ctx context.Context, cfg config.TelemetryConfig, build BuildInfo) (*Pro
 		)
 		p.logger = lp
 		p.shut = append(p.shut, lp.Shutdown)
-		logglobal.SetLoggerProvider(lp)
+		otel.SetLoggerProvider(lp)
 	}
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(

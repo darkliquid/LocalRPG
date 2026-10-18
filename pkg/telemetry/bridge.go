@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	otellog "go.opentelemetry.io/otel/log"
-	logglobal "go.opentelemetry.io/otel/log/global"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/darkliquid/localrpg/pkg/trace"
@@ -49,7 +49,7 @@ func (b *bridgeLogger) EventCtx(ctx context.Context, name string, fields map[str
 }
 
 func (b *bridgeLogger) emit(ctx context.Context, name string, fields map[string]any) {
-	logger := logglobal.GetLoggerProvider().Logger(MeterName)
+	logger := otel.GetLoggerProvider().Logger(MeterName)
 	var record otellog.Record
 	record.SetEventName(name)
 	record.SetBody(attribute.StringValue(name))

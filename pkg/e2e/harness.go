@@ -15,9 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chromedp/cdproto/log"
 	"github.com/chromedp/cdproto/page"
-	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 
 	"github.com/darkliquid/localrpg/pkg/driver"
@@ -75,20 +73,15 @@ func NewBrowser(t *testing.T, baseURL string) *Browser {
 	b := &Browser{t: t, ctx: ctx, baseURL: baseURL, dir: artifactDir(t)}
 	b.cancel = func() { cancelTimeout(); cancelTask(); cancelAlloc() }
 
-	chromedp.ListenTarget(taskCtx, func(ev any) {
-		switch event := ev.(type) {
-		case *runtime.EventConsoleAPICalled:
-			parts := make([]string, 0, len(event.Args))
-			for _, arg := range event.Args {
-				parts = append(parts, string(arg.Value))
+	messages := chromedp.Console(taskCtx)
+	go func() {
+		for m, err := range messages {
+			if err != nil {
+				return
 			}
-			b.record(event.Type.String() + ": " + strings.Join(parts, " "))
-		case *runtime.EventExceptionThrown:
-			b.record("exception: " + event.ExceptionDetails.Error())
-		case *log.EventEntryAdded:
-			b.record("log: " + event.Entry.Text)
+			b.record(m.String())
 		}
-	})
+	}()
 
 	t.Cleanup(b.cancel)
 	return b
@@ -109,9 +102,9 @@ func (b *Browser) Console() []string {
 
 // run executes actions under the session deadline. A failure captures artifacts
 // and the console, because a CDP error alone rarely says what the page did.
-func (b *Browser) run(actions ...chromedp.Action) {
+func (b *Browser) run(actions ...chromedp.Action[chromedp.Void]) {
 	b.t.Helper()
-	if err := chromedp.Run(b.ctx, actions...); err != nil {
+	if err := chromedp.Do(b.ctx, actions...); err != nil {
 		b.dumpArtifacts()
 		b.t.Fatalf("%v\npage console:\n%s", err, strings.Join(b.Console(), "\n"))
 	}
@@ -133,19 +126,19 @@ func (b *Browser) Navigate(path string) {
 // WaitVisible waits for the selector to be visible.
 func (b *Browser) WaitVisible(selector string) {
 	b.t.Helper()
-	b.run(chromedp.WaitVisible(selector, chromedp.BySearch))
+	b.run(chromedp.WaitVisible(selector))
 }
 
 // Click waits for the selector, then clicks it.
 func (b *Browser) Click(selector string) {
 	b.t.Helper()
-	b.run(chromedp.WaitVisible(selector, chromedp.BySearch), chromedp.Click(selector, chromedp.BySearch))
+	b.run(chromedp.WaitVisible(selector), chromedp.Click(selector))
 }
 
 // Type waits for the selector, then sends the text.
 func (b *Browser) Type(selector, text string) {
 	b.t.Helper()
-	b.run(chromedp.WaitVisible(selector, chromedp.BySearch), chromedp.SendKeys(selector, text, chromedp.BySearch))
+	b.run(chromedp.WaitVisible(selector), chromedp.SendKeys(selector, text))
 }
 
 // SetInputValue sets a controlled input's value the way React observes it: it
@@ -177,7 +170,7 @@ func (b *Browser) SetInputValue(selector, value string) {
 // design and a visible wait would time out on it.
 func (b *Browser) SetFileInput(selector, path string) {
 	b.t.Helper()
-	b.run(chromedp.SetUploadFiles(selector, []string{path}, chromedp.BySearch))
+	b.run(chromedp.SetUploadFiles(selector, []string{path}))
 
 	// Setting the files does not tell React, which listens for a change event on
 	// the input rather than watching the files list.
@@ -228,16 +221,24 @@ func (b *Browser) PressKey(selector, key string) {
 // Text reads a selector's text content.
 func (b *Browser) Text(selector string) string {
 	b.t.Helper()
-	var out string
-	b.run(chromedp.WaitVisible(selector, chromedp.BySearch), chromedp.Text(selector, &out, chromedp.BySearch))
+	b.run(chromedp.WaitVisible(selector))
+	out, err := chromedp.Run(b.ctx, chromedp.Text(selector))
+	if err != nil {
+		b.dumpArtifacts()
+		b.t.Fatalf("%v\npage console:\n%s", err, strings.Join(b.Console(), "\n"))
+	}
 	return out
 }
 
 // InputValue reads an input's value.
 func (b *Browser) InputValue(selector string) string {
 	b.t.Helper()
-	var out string
-	b.run(chromedp.WaitVisible(selector, chromedp.BySearch), chromedp.Value(selector, &out, chromedp.BySearch))
+	b.run(chromedp.WaitVisible(selector))
+	out, err := chromedp.Run(b.ctx, chromedp.Value(selector))
+	if err != nil {
+		b.dumpArtifacts()
+		b.t.Fatalf("%v\npage console:\n%s", err, strings.Join(b.Console(), "\n"))
+	}
 	return out
 }
 
@@ -250,8 +251,11 @@ func (b *Browser) BodyText() string {
 // Eval runs a script and returns its string result.
 func (b *Browser) Eval(script string) string {
 	b.t.Helper()
-	var out string
-	b.run(chromedp.Evaluate(script, &out))
+	out, err := chromedp.Run(b.ctx, chromedp.Evaluate[string](script))
+	if err != nil {
+		b.dumpArtifacts()
+		b.t.Fatalf("%v\npage console:\n%s", err, strings.Join(b.Console(), "\n"))
+	}
 	return out
 }
 
@@ -299,7 +303,7 @@ func (b *Browser) Poll(expression, describe string) {
 	b.t.Helper()
 	pollCtx, cancel := context.WithTimeout(b.ctx, 15*time.Second)
 	defer cancel()
-	if err := chromedp.Run(pollCtx, chromedp.Poll(expression, nil)); err != nil {
+	if _, err := chromedp.Run(pollCtx, chromedp.Poll[chromedp.Void](expression)); err != nil {
 		b.dumpArtifacts()
 		b.t.Fatalf("the page never became ready (%s): %v", describe, err)
 	}
@@ -310,10 +314,13 @@ func (b *Browser) Poll(expression, describe string) {
 // played the clip" from "the page created a clip it never played".
 func (b *Browser) InstrumentAudio() {
 	b.t.Helper()
-	b.run(chromedp.ActionFunc(func(ctx context.Context) error {
-		_, err := page.AddScriptToEvaluateOnNewDocument(instrumentAudioScript).Do(ctx)
-		return err
-	}))
+	_, err := chromedp.Call(b.ctx, page.AddScriptToEvaluateOnNewDocument, page.AddScriptToEvaluateOnNewDocumentParams{
+		Source: instrumentAudioScript,
+	})
+	if err != nil {
+		b.dumpArtifacts()
+		b.t.Fatalf("instrument audio: %v", err)
+	}
 }
 
 // Clips returns the recorded audio probe as JSON.
@@ -340,8 +347,11 @@ func (b *Browser) WaitForClips() string {
 // Screenshot writes a PNG of the viewport to path.
 func (b *Browser) Screenshot(path string) {
 	b.t.Helper()
-	var buf []byte
-	b.run(chromedp.CaptureScreenshot(&buf))
+	buf, err := chromedp.Run(b.ctx, chromedp.CaptureScreenshot())
+	if err != nil {
+		b.dumpArtifacts()
+		b.t.Fatalf("capture screenshot: %v", err)
+	}
 	if err := os.WriteFile(path, buf, 0o644); err != nil {
 		b.t.Fatalf("write screenshot: %v", err)
 	}
@@ -350,8 +360,11 @@ func (b *Browser) Screenshot(path string) {
 // FullScreenshot captures the whole page as a JPEG at the given quality.
 func (b *Browser) FullScreenshot(quality int) []byte {
 	b.t.Helper()
-	var buf []byte
-	b.run(chromedp.FullScreenshot(&buf, quality))
+	buf, err := chromedp.Run(b.ctx, chromedp.FullScreenshot(quality))
+	if err != nil {
+		b.dumpArtifacts()
+		b.t.Fatalf("full screenshot: %v", err)
+	}
 	return buf
 }
 
@@ -400,16 +413,13 @@ func (b *Browser) dumpArtifacts() {
 	// reason a page went blank.
 	_ = os.WriteFile(filepath.Join(b.dir, "console.txt"),
 		[]byte(strings.Join(b.Console(), "\n")+"\n"), 0o644)
-	var text string
-	if err := chromedp.Run(b.ctx, chromedp.Evaluate(`document.body.innerText`, &text)); err == nil {
+	if text, err := chromedp.Run(b.ctx, chromedp.Evaluate[string](`document.body.innerText`)); err == nil {
 		_ = os.WriteFile(filepath.Join(b.dir, "body.txt"), []byte(text), 0o644)
 	}
-	var probe string
-	if err := chromedp.Run(b.ctx, chromedp.Evaluate(domProbeScript, &probe)); err == nil {
+	if probe, err := chromedp.Run(b.ctx, chromedp.Evaluate[string](domProbeScript)); err == nil {
 		_ = os.WriteFile(filepath.Join(b.dir, "dom.json"), []byte(probe), 0o644)
 	}
-	var buf []byte
-	if err := chromedp.Run(b.ctx, chromedp.CaptureScreenshot(&buf)); err == nil {
+	if buf, err := chromedp.Run(b.ctx, chromedp.CaptureScreenshot()); err == nil {
 		_ = os.WriteFile(filepath.Join(b.dir, "failure.png"), buf, 0o644)
 	}
 }
