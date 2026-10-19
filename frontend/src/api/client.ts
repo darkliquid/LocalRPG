@@ -427,16 +427,42 @@ export class APIClient {
     return res.json();
   }
 
+  // characterPortraitURL formats the endpoint URL for an entity portrait image.
+  static characterPortraitURL(gameID: string, characterID: string, timestamp?: string | number): string {
+    const base = `/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(characterID)}/portrait`;
+    return timestamp ? `${base}?t=${encodeURIComponent(String(timestamp))}` : base;
+  }
+
+  // worldAssetURL formats the endpoint URL for a world banner or icon image.
+  static worldAssetURL(worldID: string, kind: 'banner' | 'icon', timestamp?: string | number): string {
+    const base = `/api/world/${encodeURIComponent(worldID)}/${kind}`;
+    return timestamp ? `${base}?t=${encodeURIComponent(String(timestamp))}` : base;
+  }
+
+  static worldBannerURL(worldID: string, timestamp?: string | number): string {
+    return APIClient.worldAssetURL(worldID, 'banner', timestamp);
+  }
+
+  static worldIconURL(worldID: string, timestamp?: string | number): string {
+    return APIClient.worldAssetURL(worldID, 'icon', timestamp);
+  }
+
+  // audioEventsURL returns the Server-Sent Events endpoint URL for audio playback.
+  static audioEventsURL(): string {
+    return '/api/audio/events';
+  }
+
   // regenerateCharacterPortrait asks the backend for a fresh portrait and
   // returns its cache-busted URL.
   static async regenerateCharacterPortrait(gameID: string, characterID: string): Promise<CharacterPortraitDTO> {
     const res = await fetch(
-      `/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(characterID)}/portrait`,
+      APIClient.characterPortraitURL(gameID, characterID),
       { method: 'POST' },
     );
     if (!res.ok) return throwGenerationError(res);
     return res.json();
   }
+
 
   static async deleteGame(gameID: string): Promise<void> {
     const res = await fetch(`/api/game/${gameID}`, { method: 'DELETE' });
