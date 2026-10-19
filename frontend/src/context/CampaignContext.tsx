@@ -636,7 +636,7 @@ function useCampaignValue() {
         setStatus({ state: 'playing' });
         // The server reports the completion over SSE, so the beat advances on a
         // real event rather than a status poll.
-        const source = new EventSource('/api/audio/events');
+        const source = new EventSource(APIClient.audioEventsURL());
         let settled = false;
         const settle = (entry: { state: TurnAudioState; message?: string }) => {
           if (settled) return;

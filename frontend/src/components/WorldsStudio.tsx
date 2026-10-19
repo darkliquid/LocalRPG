@@ -250,8 +250,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
       setBannerFile(null);
       setIconFile(null);
-      setBannerPreview(`/api/world/${encodeURIComponent(id)}/banner?t=${Date.now()}`);
-      setIconPreview(`/api/world/${encodeURIComponent(id)}/icon?t=${Date.now()}`);
+      setBannerPreview(APIClient.worldBannerURL(id, Date.now()));
+      setIconPreview(APIClient.worldIconURL(id, Date.now()));
 
       if (detail.entities && detail.entities.length > 0) {
         const first = detail.entities[0];
@@ -382,9 +382,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       if (savedID) {
         await APIClient.generateWorldAsset(savedID, kind);
         if (kind === 'banner') {
-          setBannerPreview(`/api/world/${encodeURIComponent(savedID)}/banner?t=${Date.now()}`);
+          setBannerPreview(APIClient.worldBannerURL(savedID, Date.now()));
         } else {
-          setIconPreview(`/api/world/${encodeURIComponent(savedID)}/icon?t=${Date.now()}`);
+          setIconPreview(APIClient.worldIconURL(savedID, Date.now()));
         }
         setToast({ type: 'success', message: `Generated world ${kind}!` });
       } else {

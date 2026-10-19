@@ -255,9 +255,7 @@ export const CodexDrawer: React.FC<CodexDrawerProps> = ({
 
   const portraitURL =
     gameID && entity
-      ? `/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(entity.id)}/portrait${
-          portraitVersion ? `?v=${portraitVersion}` : ''
-        }`
+      ? APIClient.characterPortraitURL(gameID, entity.id, { version: portraitVersion || undefined })
       : '';
 
   return (

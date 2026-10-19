@@ -189,6 +189,12 @@ describe('APIClient URL builders', () => {
     expect(APIClient.characterPortraitURL('game-1', 'char-2', 98765)).toBe(
       '/api/game/game-1/character/char-2/portrait?t=98765',
     );
+    expect(APIClient.characterPortraitURL('game-1', 'char-2', { version: 3 })).toBe(
+      '/api/game/game-1/character/char-2/portrait?v=3',
+    );
+    expect(APIClient.characterPortraitURL('game-1', 'char-2', { version: 3, timestamp: 999 })).toBe(
+      '/api/game/game-1/character/char-2/portrait?v=3&t=999',
+    );
   });
 
   it('formats world asset URLs', () => {

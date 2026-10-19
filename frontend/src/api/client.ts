@@ -428,9 +428,25 @@ export class APIClient {
   }
 
   // characterPortraitURL formats the endpoint URL for an entity portrait image.
-  static characterPortraitURL(gameID: string, characterID: string, timestamp?: string | number): string {
+  static characterPortraitURL(
+    gameID: string,
+    characterID: string,
+    options?: string | number | { timestamp?: string | number; version?: string | number },
+  ): string {
     const base = `/api/game/${encodeURIComponent(gameID)}/character/${encodeURIComponent(characterID)}/portrait`;
-    return timestamp ? `${base}?t=${encodeURIComponent(String(timestamp))}` : base;
+    if (!options) return base;
+    if (typeof options === 'object') {
+      const q = new URLSearchParams();
+      if (options.version !== undefined && options.version !== null && options.version !== '') {
+        q.set('v', String(options.version));
+      }
+      if (options.timestamp !== undefined && options.timestamp !== null && options.timestamp !== '') {
+        q.set('t', String(options.timestamp));
+      }
+      const qs = q.toString();
+      return qs ? `${base}?${qs}` : base;
+    }
+    return `${base}?t=${encodeURIComponent(String(options))}`;
   }
 
   // worldAssetURL formats the endpoint URL for a world banner or icon image.
