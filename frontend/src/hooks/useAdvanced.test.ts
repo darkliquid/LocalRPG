@@ -1,5 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { STORAGE_KEYS } from '../lib/constants';
 import { useAdvanced } from './useAdvanced';
 
 describe('useAdvanced', () => {
@@ -14,7 +15,7 @@ describe('useAdvanced', () => {
   });
 
   it('reads a stored preference', () => {
-    localStorage.setItem('localrpg.settings.advanced', 'true');
+    localStorage.setItem(STORAGE_KEYS.SETTINGS_ADVANCED, 'true');
 
     const { result } = renderHook(() => useAdvanced());
 
@@ -26,15 +27,15 @@ describe('useAdvanced', () => {
 
     act(() => result.current[1](true));
     expect(result.current[0]).toBe(true);
-    expect(localStorage.getItem('localrpg.settings.advanced')).toBe('true');
+    expect(localStorage.getItem(STORAGE_KEYS.SETTINGS_ADVANCED)).toBe('true');
 
     act(() => result.current[1](false));
     expect(result.current[0]).toBe(false);
-    expect(localStorage.getItem('localrpg.settings.advanced')).toBe('false');
+    expect(localStorage.getItem(STORAGE_KEYS.SETTINGS_ADVANCED)).toBe('false');
   });
 
   it('ignores a stored value that is not a stored preference', () => {
-    localStorage.setItem('localrpg.settings.advanced', 'nonsense');
+    localStorage.setItem(STORAGE_KEYS.SETTINGS_ADVANCED, 'nonsense');
 
     const { result } = renderHook(() => useAdvanced());
 

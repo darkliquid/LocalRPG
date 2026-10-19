@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
+import { STORAGE_KEYS } from '../lib/constants';
 
 // A UI preference rather than machine configuration, so it lives in
 // localStorage instead of the config file: it never needs to sync, and the
 // config schema stays untouched.
-const STORAGE_KEY = 'localrpg.settings.advanced';
+const STORAGE_KEY = STORAGE_KEYS.SETTINGS_ADVANCED;
 
 function readStored(): boolean {
   try {
