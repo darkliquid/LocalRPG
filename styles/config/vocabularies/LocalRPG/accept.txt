@@ -105,3 +105,11 @@ VTT
 ffmpeg
 sidecar
 sidecars
+
+# Tracing and observability. The trace is exported over OTLP, and these are the
+# collectors and dashboards a reader may already run.
+OTLP
+Grafana
+Jaeger
+Tempo
+JSONL

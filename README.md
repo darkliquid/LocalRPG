@@ -131,6 +131,11 @@ suggests an order to read them in. The guides then group as follows:
 
 - **Core concepts** - [`01-overview.md`](pkg/gui/docs/01-overview.md) on the architecture,
   then worlds, systems and campaigns.
+- **Using the app** - the desktop window, Story Theatre, the spoken lines, and character
+  portraits.
+- **Command line and terminal** - [`25-cli-reference.md`](pkg/gui/docs/25-cli-reference.md)
+  for every command and flag, and [`26-terminal-client.md`](pkg/gui/docs/26-terminal-client.md)
+  for playing in a terminal.
 - **Studio guides** - building a world and a system in the app, and generating one from a prompt.
 - **Configuration and providers** - wiring up LLMs and media, and what they cost.
 - **Local AI and self-hosting** - running Ollama, Kokoro, Faster-Whisper and ComfyUI, or all
@@ -146,6 +151,21 @@ LocalRPG includes an embedded debugging suite for diagnosing turn failures and i
 - **Automated Test Runner**: Run `localrpg debug test-run --scenario scenarios/smoke-test.yaml` to execute declarative browser scenarios headlessly and generate standalone HTML reports.
 
 See [docs/debugging.md](docs/debugging.md) for full instructions and scenario syntax.
+For the local JSONL trace and the OpenTelemetry export, see
+[Trace & Telemetry](pkg/gui/docs/29-trace-and-telemetry.md).
+
+---
+
+## Contributing
+
+Issues are tracked in [Beads](https://github.com/gastownhall/beads), a local tracker whose
+database is in `.beads/`. GitHub hosts this repository and reviews pull requests, and is
+not used as an issue tracker.
+
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers the toolchain, the test and lint gates, the
+branch and commit conventions, and how to add a guide or an endpoint.
+[`docs/architecture/overview.md`](docs/architecture/overview.md) is the living architecture,
+and [`AGENTS.md`](AGENTS.md) describes the same ground in the detail an assistant needs.
 
 ---
 

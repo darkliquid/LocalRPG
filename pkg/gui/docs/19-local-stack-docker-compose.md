@@ -67,6 +67,8 @@ ComfyUI CUDA image is by far the largest single pull.
 The base file is the CPU stack. Save it as `docker/compose.local.yml` (it's
 already there in a checkout of this repository):
 
+### The base stack
+
 ```yaml
 name: localrpg-local-ai
 
@@ -124,6 +126,8 @@ volumes:
 
 Named volumes keep every downloaded weight outside the containers, so
 `docker compose down` never costs you a re-download.
+
+### The GPU override
 
 The GPU override is a second file rather than a second stack, so the two never
 drift. It swaps the image tags and reserves the GPU:
@@ -361,8 +365,8 @@ Kokoro voices, `/health` returns the transcription server's status, and
 Each of these covers the native installation path, the full preset list, and
 provider-specific tuning:
 
-- [Setting Up Ollama for Local LLMs](14-local-llm-ollama)
-- [Setting Up Kokoro-FastAPI for Neural TTS](15-local-tts-kokoro)
-- [Setting Up Fish Audio S2 with vLLM-Omni](16-local-tts-fish-audio)
-- [Setting Up Faster-Whisper for Speech Recognition](17-local-stt-whisper)
-- [Setting Up ComfyUI for Local Image Generation](18-local-image-comfyui)
+- [Setting Up Ollama for Local LLMs](14-local-llm-ollama.md)
+- [Setting Up Kokoro-FastAPI for Neural TTS](15-local-tts-kokoro.md)
+- [Setting Up Fish Audio S2 with vLLM-Omni](16-local-tts-fish-audio.md)
+- [Setting Up Faster-Whisper for Speech Recognition](17-local-stt-whisper.md)
+- [Setting Up ComfyUI for Local Image Generation](18-local-image-comfyui.md)

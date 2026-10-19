@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -149,6 +150,48 @@ func TestDocsService_UsagePricingArticle(t *testing.T) {
 	}
 	if !strings.Contains(article.Content, "providers.prices") {
 		t.Errorf("expected article to document the providers.prices config key")
+	}
+}
+
+// Every article must parse, and the parsed set must be the whole embedded set.
+// A malformed article is skipped in silence by listEmbeddedDocs, so it vanishes
+// from the viewer and every link to it stops resolving: an unclosed frontmatter
+// block or a description containing a colon is easier to catch here than in the
+// app, where the article is simply absent.
+func TestDocsService_EveryArticleParses(t *testing.T) {
+	entries, err := fs.ReadDir(embeddedDocsFS, "docs")
+	if err != nil {
+		t.Fatalf("read embedded docs: %v", err)
+	}
+
+	files := 0
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		files++
+
+		data, err := embeddedDocsFS.ReadFile("docs/" + entry.Name())
+		if err != nil {
+			t.Errorf("read %s: %v", entry.Name(), err)
+			continue
+		}
+		fm, _, err := parseDocFile(data)
+		if err != nil {
+			t.Errorf("%s does not parse and would be skipped: %v", entry.Name(), err)
+			continue
+		}
+		if fm.Title == "" || fm.Category == "" || fm.Description == "" {
+			t.Errorf("%s is missing a title, category, or description", entry.Name())
+		}
+	}
+
+	list, err := listEmbeddedDocs()
+	if err != nil {
+		t.Fatalf("list embedded docs: %v", err)
+	}
+	if len(list) != files {
+		t.Errorf("%d articles embedded, %d parsed; a malformed one is being skipped", files, len(list))
 	}
 }
 

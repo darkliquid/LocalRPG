@@ -24,7 +24,7 @@ LocalRPG keeps content in three tiers, each one a directory of directories named
 
 An ID is a directory name, and `pathutil.SanitizeID` normalises it before every lookup, so a trailing space or a capital letter does not create a second copy of the same content.
 
-By default the three tiers default to the platform data directory (`$XDG_DATA_HOME/localrpg/` on Linux and BSD, `~/Library/Application Support/localrpg/` on macOS, `%LOCALAPPDATA%\localrpg\` on Windows), and the campaign cache defaults to the cache directory. The `paths.systems`, `paths.worlds`, `paths.games`, and `paths.cache` configuration keys override each one: an absolute value applies verbatim, and a relative value resolves against the platform data directory. Launch LocalRPG inside a directory containing `./localrpg.yaml`, or pass `--dir <path>`, and relative values resolve against that project root instead, which is what makes a content tree portable in Git. See [Storage & Directories](07-storage-paths) for the full resolution order.
+By default the three tiers default to the platform data directory (`$XDG_DATA_HOME/localrpg/` on Linux and BSD, `~/Library/Application Support/localrpg/` on macOS, `%LOCALAPPDATA%\localrpg\` on Windows), and the campaign cache defaults to the cache directory. The `paths.systems`, `paths.worlds`, `paths.games`, and `paths.cache` configuration keys override each one: an absolute value applies verbatim, and a relative value resolves against the platform data directory. Launch LocalRPG inside a directory containing `./localrpg.yaml`, or pass `--dir <path>`, and relative values resolve against that project root instead, which is what makes a content tree portable in Git. See [Storage & Directories](07-storage-paths.md) for the full resolution order.
 
 ## 2. A System
 
@@ -99,13 +99,13 @@ The `mechanics` block maps onto `core.MechanicsSpec`:
 | `engagement` | Default mechanics policy: `off`, `auto`, or `ask`. |
 | `advancement` | Progression: a currency stat, how a character gains it, and what it buys. |
 
-The `checks.profiles` map declares named resolution profiles. A profile can be a threshold `ladder`, a difficulty class in `dc`, a success-count pool with `success_on` and `outcomes`, or a `position` and `effect` vocabulary. A profile that sets `opposed` (and optionally `ties`) resolves as a contest against the opponent's own roll. See [Systems & Mechanics](03-systems) for worked examples of each kind.
+The `checks.profiles` map declares named resolution profiles. A profile can be a threshold `ladder`, a difficulty class in `dc`, a success-count pool with `success_on` and `outcomes`, or a `position` and `effect` vocabulary. A profile that sets `opposed` (and optionally `ties`) resolves as a contest against the opponent's own roll. See [Systems & Mechanics](03-systems.md) for worked examples of each kind.
 
 ### `mechanics.js`
 
 LocalRPG loads the file into a sandboxed Goja runtime, and the host bridge receives the `mechanics` block, so a script can read the stats and conventions the schema declares. A world can extend the system with `worlds/<world>/system_overrides/<system-id>/hooks.js`, which loads after the base script, so it can replace a handler.
 
-The hooks are `onAction`, `onTurnBegin`, `onTurnEnd`, `onWorldTick`, `onCheck`, and `onHealthZero`, alongside helpers such as `roll`, `getStat`, `setStat`, and `injectGMDirection`. [Systems & Mechanics](03-systems) documents them in full.
+The hooks are `onAction`, `onTurnBegin`, `onTurnEnd`, `onWorldTick`, `onCheck`, and `onHealthZero`, alongside helpers such as `roll`, `getStat`, `setStat`, and `injectGMDirection`. [Systems & Mechanics](03-systems.md) documents them in full.
 
 ### `tests/`
 
@@ -168,7 +168,7 @@ LocalRPG enforces a `requires` entry when a campaign is created and again on eve
 
 ### `entities/`
 
-Each note is a template. Creating a campaign copies the files directly inside `entities/` into `games/<id>/entities/`, renames each to `<frontmatter-id>.md`, and indexes them. A subdirectory is left untouched, so a world can keep notes it does not want in every campaign. See [Worlds & Lore](02-worlds) for the opening-location resolution that runs after the copy.
+Each note is a template. Creating a campaign copies the files directly inside `entities/` into `games/<id>/entities/`, renames each to `<frontmatter-id>.md`, and indexes them. A subdirectory is left untouched, so a world can keep notes it does not want in every campaign. See [Worlds & Lore](02-worlds.md) for the opening-location resolution that runs after the copy.
 
 ## 4. Entities
 
@@ -224,7 +224,7 @@ Evelyn is the second daughter of the Vance merchant dynasty.
 
 Notes may sit in subdirectories, and the walk is recursive: `entities/characters/lord-aldous.md` is the same note as `entities/lord-aldous.md`, with the folder recorded as its location rather than as a field. The walk skips hidden directories and `assets/`.
 
-Links written as `[[wikilinks]]` in `location`, `faction`, and the prose become graph edges, which is how the context assembler loads the characters in the player's current scene. [Codex YAML Frontmatter & Graph Reference](10-codex-yaml) documents the field list and the link forms.
+Links written as `[[wikilinks]]` in `location`, `faction`, and the prose become graph edges, which is how the context assembler loads the characters in the player's current scene. [Codex YAML Frontmatter & Graph Reference](10-codex-yaml.md) documents the field list and the link forms.
 
 ## 5. The Package Format
 
@@ -301,6 +301,8 @@ localrpg publisher remove <fingerprint>
 
 `content sign` accepts either a `.lrpgpack` or an unpacked content directory, which is how a content author signs a tree in place. The `publishers` configuration key maps a key fingerprint to a display name, so `publisher add` is the whole trust decision. Signed content that arrives from a registry without a trusted key reports `unknown_key` rather than `verified`.
 
+### Registries
+
 Packages can also come from a registry index:
 
 ```bash
@@ -337,6 +339,6 @@ A hand edit that appears to do nothing is almost always one of three failure mod
 
 **A malformed note disappears rather than fails.** The indexer skips a file whose frontmatter has no closing `---`, or whose YAML does not parse, so that one bad file cannot stop the rest of the campaign from indexing. The symptom is an entity missing from the codex while the file is plainly on disk, and the delimiters are the first thing to check.
 
-**A behavioural digest change surfaces a warning.** The campaign's lock file hashes `system.yaml` and `mechanics.js` for a system, and `world.yaml` plus every `system_overrides/*/hooks.js` for a world. Editing those files surfaces a digest change on the next open, because the rules may have moved since the campaign started. Editing prose, entities, or a rules prompt does not, so a documentation pass is silent.
+**A behavioural digest change surfaces a warning.** The digest hashes the files that describe a dependency's behaviour, so the rules may have moved since the campaign started. The campaign's lock file hashes `system.yaml` and `mechanics.js` for a system, and `world.yaml` plus every `system_overrides/*/hooks.js` for a world. Editing those files surfaces a digest change on the next open. Editing prose, entities, or a rules prompt does not, so a documentation pass is silent.
 
 **Editing a signed package invalidates it.** Sign again with `localrpg content sign` after any change to a packed tree, or the next `content verify` reports `invalid`.

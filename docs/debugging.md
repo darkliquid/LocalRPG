@@ -48,7 +48,7 @@ Click the turn to view:
   - **Raw Completion**: Exactly what the model returned. If it's empty, you immediately see `""`. If the model returned thoughts, unexpected JSON, or partial text, you can inspect it verbatim.
   - **Failure Code**: Shows classified error codes like `empty_response`, `provider_timeout`, `rate_limit`, or `auth_failure`.
 - **Spans Waterfall Tab**:
-  - Shows the complete span tree: `turn` &rarr; `context.assemble` &rarr; `provider.generate` &rarr; `tool.call` &rarr; `timeline.record_turn`.
+  - Shows the complete span tree, where a *span* is one timed step of the turn: `turn` &rarr; `context.assemble` &rarr; `provider.generate` &rarr; `tool.call` &rarr; `timeline.record_turn`.
   - Highlights latency bottlenecks and marks which specific span encountered an error.
 - **Raw JSON Tab**:
   - Full OpenTelemetry attributes, duration in milliseconds, token counts, and parent/child span IDs.

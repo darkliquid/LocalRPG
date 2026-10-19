@@ -10,6 +10,32 @@ import (
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
 
+// traceFlag accepts the trace level as an optional value so that a command with
+// its own flag set can declare it without rejecting the documented forms: a bare
+// --trace means full, and --trace=summary names a level. It is declared only to
+// keep the parser from refusing the flag; buildTraceLogger reads the level from
+// the argument list, because a plain flag with a value would make a bare --trace
+// swallow the next argument.
+type traceFlag struct{}
+
+// String is the flag package's default-value interface.
+func (traceFlag) String() string { return "" }
+
+// IsBoolFlag lets --trace stand alone without a value.
+func (traceFlag) IsBoolFlag() bool { return true }
+
+// Set validates the level and discards it, reporting an unknown level the way
+// the parser reports any bad flag value.
+func (traceFlag) Set(value string) error {
+	if value == "" {
+		return nil
+	}
+	if _, err := trace.ParseLevel(value); err != nil {
+		return err
+	}
+	return nil
+}
+
 // traceFlagLevel reads --trace from the argument list without registering it with
 // flag, so a bare --trace can mean "full" rather than swallowing the next
 // argument. The returned bool reports whether the flag was present at all.

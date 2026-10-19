@@ -91,3 +91,24 @@ func TestParseGUIConfig(t *testing.T) {
 		})
 	}
 }
+
+// TestParseGUIConfigAcceptsTrace pins the documented form: the trace flag is
+// read from the argument list by buildTraceLogger rather than bound here, so the
+// parser only has to tolerate it. A bare --trace means full, which is why the
+// flag cannot be declared as a bool.
+func TestParseGUIConfigAcceptsTrace(t *testing.T) {
+	for _, args := range [][]string{
+		{"--trace"},
+		{"--trace", "summary"},
+		{"--trace=full"},
+	} {
+		cfg, err := parseGUIConfig(args, io.Discard)
+		if err != nil {
+			t.Errorf("parseGUIConfig(%v) failed: %v", args, err)
+			continue
+		}
+		if cfg == nil {
+			t.Errorf("parseGUIConfig(%v) returned no config", args)
+		}
+	}
+}

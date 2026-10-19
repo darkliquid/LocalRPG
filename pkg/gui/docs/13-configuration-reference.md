@@ -16,7 +16,7 @@ directory, merged with an optional `./localrpg.yaml` in the project root.
 
 A `[]` suffix marks a list of tables. `<key>` and `<role>` are names you
 choose; the ledger and provider identifiers are listed in the
-[Provider & Model Catalogue](12-provider-catalogue).
+[Provider & Model Catalogue](12-provider-catalogue.md).
 
 ### `version`
 

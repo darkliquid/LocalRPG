@@ -44,7 +44,7 @@ command also has an instance form:
 | Embedding | `embedding:openai`, `embedding:gemini`, `embedding:builtin` |
 
 An unpriced row in the Usage tab shows exactly the key to use, and the
-[Provider & Model Catalogue](12-provider-catalogue) lists them all.
+[Provider & Model Catalogue](12-provider-catalogue.md) lists them all.
 
 ### The fallback ladder
 
@@ -61,7 +61,7 @@ which rate-limit block applies: a block on one endpoint doesn't stop another,
 while a block on the adapter stops them all.
 
 The field names below are also listed, with every other config key, in the
-[Configuration Reference](13-configuration-reference).
+[Configuration Reference](13-configuration-reference.md).
 
 ## Setting a Price
 
@@ -143,5 +143,5 @@ historical totals don't drift.
   the ledger can express. Gemini speech has no published character rate, and
   transcription is billed per minute while the ledger records requests. Add a
   `providers.prices` entry if you know your own rate.
-- The [Provider & Model Catalogue](12-provider-catalogue) lists the built-in
+- The [Provider & Model Catalogue](12-provider-catalogue.md) lists the built-in
   rates with their models, so you can see what's priced before adding anything.

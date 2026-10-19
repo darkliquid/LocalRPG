@@ -14,6 +14,8 @@ import {
   Wrench,
   FileCode,
   Cpu,
+  Terminal,
+  AppWindow,
 } from 'lucide-react';
 import { APIClient } from '../api/client';
 import { DocArticleSummary, DocArticle } from '../types';
@@ -26,11 +28,14 @@ interface DocsModalProps {
 }
 
 const CATEGORY_ICONS: Record<string, React.FC<{ className?: string }>> = {
+  'Start Here': BookOpen,
   'Core Concepts': Compass,
   'Configuration & Providers': Sliders,
   'Studio Guides': Wrench,
   'Codex & Content Reference': FileCode,
   'Local AI & Self-Hosting': Cpu,
+  'Command Line & Terminal': Terminal,
+  'Using the App': AppWindow,
 };
 
 export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose, initialArticleID }) => {
