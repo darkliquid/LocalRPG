@@ -32,7 +32,7 @@ func renderConfigurationReference() string {
 	b.WriteString("## Keys\n\n")
 	b.WriteString("A `[]` suffix marks a list of tables. `<key>` and `<role>` are names you\n")
 	b.WriteString("choose; the ledger and provider identifiers are listed in the\n")
-	b.WriteString("[Provider & Model Catalogue](12-provider-catalogue).\n\n")
+	b.WriteString("[Provider & Model Catalogue](12-provider-catalogue.md).\n\n")
 
 	root := reflect.TypeOf(config.Config{})
 	for i := 0; i < root.NumField(); i++ {

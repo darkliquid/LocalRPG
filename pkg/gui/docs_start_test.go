@@ -64,7 +64,7 @@ func renderStartHere(t *testing.T) string {
 		if !ok {
 			t.Fatalf("start here offers %q, which is not an article any more; update startHerePathOrder", id)
 		}
-		fmt.Fprintf(&b, "- **[%s](%s)** - %s\n", a.Title, a.ID, a.Description)
+		fmt.Fprintf(&b, "- **[%s](%s.md)** - %s\n", a.Title, a.ID, a.Description)
 	}
 
 	b.WriteString("\n## Every guide\n\n")
@@ -90,7 +90,7 @@ func renderStartHere(t *testing.T) string {
 	for _, category := range categories {
 		fmt.Fprintf(&b, "\n### %s\n\n", category)
 		for _, a := range grouped[category] {
-			fmt.Fprintf(&b, "- **[%s](%s)** - %s\n", a.Title, a.ID, a.Description)
+			fmt.Fprintf(&b, "- **[%s](%s.md)** - %s\n", a.Title, a.ID, a.Description)
 		}
 	}
 

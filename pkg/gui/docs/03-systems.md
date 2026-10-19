@@ -114,7 +114,7 @@ settled roll.
 
 ## Sandboxed JavaScript Mechanics Engine (`mechanics.js`)
 
-Custom systems export JavaScript functions that execute inside an isolated Goja runtime. The engine passes a small context and receives a structured resolution:
+Custom systems export JavaScript functions that execute inside an isolated Goja runtime, a JavaScript engine embedded in the binary itself. The engine passes a small context and receives a structured resolution:
 
 ```javascript
 // Example mechanics.js

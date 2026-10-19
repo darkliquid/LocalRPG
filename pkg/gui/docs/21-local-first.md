@@ -16,11 +16,11 @@ The table below outlines what runs across each capability family, comparing full
 
 | Capability | No GPU, No Model | No GPU, Small Model | GPU / Local Server | Cloud |
 | --- | --- | --- | --- | --- |
-| **LLM (Storyteller)** | [Narrative Oracle](12-provider-catalogue) · Fast deterministic templates | — | [Ollama](14-local-llm-ollama), llama.cpp, [LM Studio](14-local-llm-ollama) · Rich interactive prose | Gemini, OpenAI · Frontier intelligence |
-| **TTS (Speech)** | [`native-os`](12-provider-catalogue) · System speech synthesizer | [Kokoro via Sherpa ONNX](15-local-tts-kokoro) · Natural speech on CPU | [Kokoro-FastAPI](15-local-tts-kokoro), [Piper](12-provider-catalogue), [Fish Audio](16-local-tts-fish-audio) · Fast expressive audio | ElevenLabs, Gemini · Studio quality |
-| **STT (Voice Input)** | Web Speech API · In browser mode only | — | [Faster-Whisper](17-local-stt-whisper) · Accurate transcription | Cartesia, Inworld · Low-latency streaming |
-| **Image Generation** | [Procedural Art](12-provider-catalogue) · Instant procedural SVG portraits | — | [ComfyUI](18-local-image-comfyui), [Automatic1111](18-local-image-comfyui) · Detailed diffusion art | Gemini Imagen · High-fidelity scenes |
-| **Embeddings** | Built-in Projection · Fast hash vectors | [ONNX Encoder](20-local-embeddings) · Small neural embedding model | — | OpenAI, Gemini · Cloud vectors |
+| **LLM (Storyteller)** | [Narrative Oracle](12-provider-catalogue.md) · Fast deterministic templates | — | [Ollama](14-local-llm-ollama.md), llama.cpp, [LM Studio](14-local-llm-ollama.md) · Rich interactive prose | Gemini, OpenAI · Frontier intelligence |
+| **TTS (Speech)** | [`native-os`](12-provider-catalogue.md) · System speech synthesizer | [Kokoro via Sherpa ONNX](15-local-tts-kokoro.md) · Natural speech on CPU | [Kokoro-FastAPI](15-local-tts-kokoro.md), [Piper](12-provider-catalogue.md), [Fish Audio](16-local-tts-fish-audio.md) · Fast expressive audio | ElevenLabs, Gemini · Studio quality |
+| **STT (Voice Input)** | Web Speech API · In browser mode only | — | [Faster-Whisper](17-local-stt-whisper.md) · Accurate transcription | Cartesia, Inworld · Low-latency streaming |
+| **Image Generation** | [Procedural Art](12-provider-catalogue.md) · Instant procedural SVG portraits | — | [ComfyUI](18-local-image-comfyui.md), [Automatic1111](18-local-image-comfyui.md) · Detailed diffusion art | Gemini Imagen · High-fidelity scenes |
+| **Embeddings** | Built-in Projection · Fast hash vectors | [ONNX Encoder](20-local-embeddings.md) · Small neural embedding model | — | OpenAI, Gemini · Cloud vectors |
 
 ### Notes on Speed and Quality
 
@@ -63,10 +63,10 @@ localrpg config check-offline
 
 To set up local servers for generative models, refer to the dedicated guides:
 
-- [Local LLMs with Ollama and LM Studio](14-local-llm-ollama)
-- [Local Voice Synthesis with Kokoro](15-local-tts-kokoro)
-- [Voice Synthesis with Fish Audio](16-local-tts-fish-audio)
-- [Speech Recognition with Faster-Whisper](17-local-stt-whisper)
-- [Image Generation with ComfyUI and Automatic1111](18-local-image-comfyui)
-- [Unified Local Stack with Docker Compose](19-local-stack-docker-compose)
-- [Local Semantic Search with a Built-in Encoder](20-local-embeddings)
+- [Local LLMs with Ollama and LM Studio](14-local-llm-ollama.md)
+- [Local Voice Synthesis with Kokoro](15-local-tts-kokoro.md)
+- [Voice Synthesis with Fish Audio](16-local-tts-fish-audio.md)
+- [Speech Recognition with Faster-Whisper](17-local-stt-whisper.md)
+- [Image Generation with ComfyUI and Automatic1111](18-local-image-comfyui.md)
+- [Unified Local Stack with Docker Compose](19-local-stack-docker-compose.md)
+- [Local Semantic Search with a Built-in Encoder](20-local-embeddings.md)

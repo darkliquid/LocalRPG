@@ -44,7 +44,7 @@ requires:
     version: ">=1.0.0 <2.0.0"
 ```
 
-The pinned opening location is a campaign setting rather than a world setting: the engine resolves it once at creation and records it in `game.yaml`. See [Editing Content Outside the App](22-editing-content) for the field list of each manifest.
+The pinned opening location is a campaign setting rather than a world setting: the engine resolves it once at creation and records it in `game.yaml`. See [Editing Content Outside the App](22-editing-content.md) for the field list of each manifest.
 
 ## Starting Location Resolution
 

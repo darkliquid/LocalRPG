@@ -35,8 +35,9 @@ providers:
 ### How providers run
 
 LocalRPG labels providers with one of four capability tiers, so an offline
-template is not mistaken for a frontier model. The tier and its caveat appear
-beside each provider in the catalogue and the preset picker.
+template is not mistaken for a frontier model. A **capability tier** describes how
+a provider runs and how good its output can be, not how it is configured. The tier
+and its caveat appear beside each provider in the catalogue and the preset picker.
 
 | Tier | Label | What it means |
 | --- | --- | --- |
@@ -47,7 +48,7 @@ beside each provider in the catalogue and the preset picker.
 
 The tier describes the architecture. A `cli` provider is `local-server` because
 the binary it runs may reach the network. The
-[Provider & Model Catalogue](12-provider-catalogue) lists the tier of every
+[Provider & Model Catalogue](12-provider-catalogue.md) lists the tier of every
 provider.
 
 ### Offline Preset and Verification
@@ -70,7 +71,7 @@ providers:
     model: "llama3.1:8b"
 ```
 
-For hardware requirements, container deployment, and configuration walkthroughs, see [Setting Up Ollama for Local LLMs](14-local-llm-ollama).
+For hardware requirements, container deployment, and configuration walkthroughs, see [Setting Up Ollama for Local LLMs](14-local-llm-ollama.md).
 
 ### Gemini API (GCP)
 
@@ -93,21 +94,21 @@ Zero-setup built-in offline storyteller. It reads character stats, outcome tiers
 
 - **ElevenLabs**: High-fidelity AI speech (`type: http`, `base_url: https://api.elevenlabs.io`).
 - **Gemini Voice**: Multimodal speech synthesis.
-- **Fish Audio S2 (Local vLLM-Omni)**: 4-billion-parameter Dual-AR multilingual voice synthesis at 44.1 kHz with fine-grained emotional tags and zero-shot voice cloning. See [Setting Up Fish Audio S2](16-local-tts-fish-audio).
-- **Kokoro-FastAPI**: High-speed local neural voice synthesis on CPU/GPU. See [Setting Up Kokoro-FastAPI](15-local-tts-kokoro).
+- **Fish Audio S2 (Local vLLM-Omni)**: 4-billion-parameter Dual-AR multilingual voice synthesis at 44.1 kHz with fine-grained emotional tags and zero-shot voice cloning. See [Setting Up Fish Audio S2](16-local-tts-fish-audio.md).
+- **Kokoro-FastAPI**: High-speed local neural voice synthesis on CPU/GPU. See [Setting Up Kokoro-FastAPI](15-local-tts-kokoro.md).
 - **Native OS (`builtin_name: native-os`)**: Built-in speech using your operating system's native synthesizer (`say` on macOS, `spd-say` on Linux, PowerShell SAPI on Windows).
 - **Sherpa / Piper**: High quality local neural speech synthesis.
 
 ### Speech Recognition (STT)
 
-- **Faster-Whisper**: High-speed local transcription server via CTranslate2. See [Setting Up Faster-Whisper](17-local-stt-whisper).
+- **Faster-Whisper**: High-speed local transcription server via CTranslate2. See [Setting Up Faster-Whisper](17-local-stt-whisper.md).
 - **Whisper CLI**: Standalone local transcription via `whisper.cpp`.
 - **Web Speech API**: In-browser speech recognition supported on Chromium-based browsers.
 
 ### Image Generation
 
 - **Procedural Art (`builtin_name: procedural-art`)**: Pure-Go SVG generator creating heraldic banners, landscape silhouettes, and item icons without a GPU.
-- **ComfyUI / Automatic1111**: Local Stable Diffusion web APIs. See [Setting Up ComfyUI](18-local-image-comfyui).
+- **ComfyUI / Automatic1111**: Local Stable Diffusion web APIs. See [Setting Up ComfyUI](18-local-image-comfyui.md).
 - **Google Imagen**: GCP image synthesis.
 
 ### Purpose Chains
@@ -140,14 +141,14 @@ LocalRPG protects you from runaway API costs and service interruptions:
 
 For step-by-step local service installation guides, see:
 
-- [Fully Local AI Stack with Docker Compose](19-local-stack-docker-compose) (all four services in one Compose project)
-- [Setting Up Ollama for Local LLMs](14-local-llm-ollama)
-- [Setting Up Kokoro-FastAPI for Neural TTS](15-local-tts-kokoro)
-- [Setting Up Fish Audio S2 with vLLM-Omni](16-local-tts-fish-audio)
-- [Setting Up Faster-Whisper for Speech Recognition](17-local-stt-whisper)
-- [Setting Up ComfyUI for Local Image Generation](18-local-image-comfyui)
+- [Fully Local AI Stack with Docker Compose](19-local-stack-docker-compose.md) (all four services in one Compose project)
+- [Setting Up Ollama for Local LLMs](14-local-llm-ollama.md)
+- [Setting Up Kokoro-FastAPI for Neural TTS](15-local-tts-kokoro.md)
+- [Setting Up Fish Audio S2 with vLLM-Omni](16-local-tts-fish-audio.md)
+- [Setting Up Faster-Whisper for Speech Recognition](17-local-stt-whisper.md)
+- [Setting Up ComfyUI for Local Image Generation](18-local-image-comfyui.md)
 
-See [Usage, Cost & Pricing](11-usage-and-pricing) for the ledger keys and price
-fields, the [Provider & Model Catalogue](12-provider-catalogue) for the full
+See [Usage, Cost & Pricing](11-usage-and-pricing.md) for the ledger keys and price
+fields, the [Provider & Model Catalogue](12-provider-catalogue.md) for the full
 list of provider IDs, presets, and models, and the
-[Configuration Reference](13-configuration-reference) for every config key.
+[Configuration Reference](13-configuration-reference.md) for every config key.

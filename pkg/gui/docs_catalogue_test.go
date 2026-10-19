@@ -43,6 +43,10 @@ func renderProviderCatalogue() string {
 	b.WriteString("Provider column of the Usage tab. A price with no `model` matches every model of\n")
 	b.WriteString("that key.\n\n")
 
+	b.WriteString("A **ledger key** is the identifier the usage ledger files a call under: the\n")
+	b.WriteString("adapter that served it, and the endpoint it used. The config key you chose for a\n")
+	b.WriteString("provider is your own name for it.\n\n")
+
 	b.WriteString("> [!NOTE]\n")
 	b.WriteString("> A provider ID such as `llm:openaichat` is the built-in adapter name, not the key\n")
 	b.WriteString("> you choose for `providers.<your-id>`. The ledger key is fixed by the adapter;\n")

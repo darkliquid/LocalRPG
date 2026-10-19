@@ -58,11 +58,17 @@ The **Source** row in the dialog has three modes:
 | **Folder** | Reads `.md`, `.markdown`, and `.txt` files under a directory. Entirely local, with no network call. |
 | **URLs** | Fetches the pages you list, one per line, and reduces each to readable text. |
 
+### Reading a folder
+
 For a folder, the **Browse** button opens the desktop window's folder picker. The picker is a modal system dialog, so LocalRPG opens it and keeps working while it is up; choosing a folder fills the path field, and dismissing it leaves the field alone. A browser or headless build has no native dialog, so the button reports that and the field is typed instead.
 
 Folder ingestion splits each file into chunks at headings and paragraph boundaries, and skips binary files and dot-directories. It removes a page's frontmatter and link lists first, because those are metadata and navigation rather than lore. An empty folder is an error rather than an empty world.
 
+### Reading a page
+
 URL ingestion is a network action you opt into. It sends a descriptive user agent, fetches `robots.txt` once per host and honours it, caps each page at 2 MB, and fetches at most 20 URLs. It does **not** crawl: LocalRPG fetches only the URLs you name. A page that fails is reported, and the rest of the batch still ingests. A JavaScript-only page yields little or no text, and LocalRPG reports that as a likely render issue.
+
+### Provenance and licensing
 
 Each entity built from a source records the chunk it came from in its `source` frontmatter field, so you can trace it. You are responsible for the licensing of anything you ingest.
 
@@ -151,6 +157,6 @@ generation:
 
 ## Related
 
-- [Building Worlds Studio Guide](08-worlds-studio) for authoring a world by hand.
-- [Editing Content Outside the App](22-editing-content) for the on-disk layout a commit produces.
-- [Usage, Cost & Provider Limits](11-usage-and-pricing) for the ledger the `generator` role records into.
+- [Building Worlds Studio Guide](08-worlds-studio.md) for authoring a world by hand.
+- [Editing Content Outside the App](22-editing-content.md) for the on-disk layout a commit produces.
+- [Usage, Cost & Provider Limits](11-usage-and-pricing.md) for the ledger the `generator` role records into.
