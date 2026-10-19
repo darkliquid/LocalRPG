@@ -207,8 +207,8 @@ added, it should start from a clean tree.
 `.github/dependabot.yml` configures Dependabot to check weekly on Mondays at 06:00 UTC across three ecosystems:
 
 - **Go modules (`gomod`)**: checks root `go.mod` dependencies. The OpenTelemetry suite (`go.opentelemetry.io/*` and `github.com/XSAM/otelsql`) is grouped into a single update (`opentelemetry`) so coordinated instrumentation and SDK releases arrive in one combined pull request.
-- **Frontend packages (`npm`)**: checks `frontend/package.json` for npm package updates.
-- **GitHub Actions (`github-actions`)**: checks workflow action references in `.github/workflows/`.
+- **Frontend packages (`npm`)**: checks `frontend/package.json` for npm package updates. Minor and patch updates arrive as one pull request (`npm-minor-and-patch`) so a week of lockfile churn is reviewed in one place, and a major version stays on its own because a breaking change deserves its own diff.
+- **GitHub Actions (`github-actions`)**: checks workflow action references in `.github/workflows/`, grouped into one pull request (`github-actions`). An action's version tag is a major by convention, so a minor-and-patch-only group would leave every action update ungrouped; `actionlint` and the CI matrix check the result instead.
 
 ## Prose linting with Vale
 
