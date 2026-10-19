@@ -38,6 +38,9 @@ func parseGUIConfig(args []string, stderr io.Writer) (*guiConfig, error) {
 	socket := fs.String("socket", "", "Unix domain socket path (defaults to user runtime socket)")
 	dir := fs.String("dir", ".", "Project root directory")
 	headless := fs.Bool("headless", false, "Run in headless mode (listen on Unix domain socket)")
+	// The trace level is read from the argument list by buildTraceLogger, so the
+	// flag is declared here only to keep the parser from rejecting it.
+	fs.Var(traceFlag{}, "trace", "Trace level: off, summary, or full (a bare --trace means full)")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
