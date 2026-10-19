@@ -4,25 +4,7 @@ import { AlertCircle, CheckCircle, Zap } from 'lucide-react';
 import type { AgentRoleConfig, AppConfig, TestProviderResponse } from '../../types';
 import { AdvancedSection } from '../ui/AdvancedSection';
 import { ROLE_LABELS } from '../../lib/roleLabels';
-
-// The suggested Gemini models, used before the live catalogue is fetched, so
-// the editor is never empty and works offline.
-const GEMINI_AGENT_MODELS = [
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
-  'gemini-3.1-pro-preview',
-  'gemini-3-flash-preview',
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-  'gemini-2.5-flash-lite',
-  'gemma-4-31b-it',
-  'gemma-4-26b-it',
-  'gemma-4-12b-it',
-  'gemma-3-27b-it',
-];
+import { DEFAULT_GEMINI_AGENT_MODELS } from '../../lib/constants';
 
 interface LLMRoleEditorProps {
   config: AppConfig;
@@ -281,7 +263,7 @@ export const LLMRoleEditor: React.FC<LLMRoleEditorProps> = ({
               className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
             />
             <div className="flex flex-wrap gap-1.5 pt-1">
-              {(geminiModels ?? GEMINI_AGENT_MODELS).map((m) => (
+              {(geminiModels ?? DEFAULT_GEMINI_AGENT_MODELS).map((m) => (
                 <button
                   key={m}
                   type="button"

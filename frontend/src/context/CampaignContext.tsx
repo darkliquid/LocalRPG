@@ -21,7 +21,7 @@ import { TurnAudioState, segmentAudioKey } from '../components/TurnSegments';
 import { DiceEntry } from '../lib/diceRange';
 import type { Adjudication, CounterProposal } from '../types';
 import { formatGenerationError } from '../lib/generationError';
-import { STORAGE_KEYS } from '../lib/constants';
+import { DEFAULT_KOKORO_MODEL_ID, DEFAULT_KOKORO_SIZE_BYTES, STORAGE_KEYS } from '../lib/constants';
 import { useStreamedSpeech } from '../hooks/useStreamedSpeech';
 import { TurnStreamProcessor } from '../lib/turnStreamProcessor';
 import { slugify } from '../lib/slug';
@@ -447,9 +447,9 @@ function useCampaignValue() {
     } else if (event.type === 'model_missing') {
       if (!dismissedModelPrompt) {
         setMissingModel({
-          id: event.model_id || 'kokoro-tts',
+          id: event.model_id || DEFAULT_KOKORO_MODEL_ID,
           name: event.name || 'Kokoro Voice Pack',
-          sizeBytes: event.size_bytes || 90177536,
+          sizeBytes: event.size_bytes || DEFAULT_KOKORO_SIZE_BYTES,
         });
       }
     } else if (event.type === 'error') {
