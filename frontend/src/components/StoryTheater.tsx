@@ -1,5 +1,6 @@
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { useCampaign } from '../context/CampaignContext';
+import { APIClient } from '../api/client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Turn, TurnSegment } from '../types';
 import { TurnAudioState, segmentAudioKey } from './TurnSegments';
@@ -101,7 +102,7 @@ export const StoryTheater: React.FC<StoryTheaterProps> = ({ turns, isOpen, onClo
       if (pSeg?.portrait_url) return pSeg.portrait_url;
     }
     if (gameId && playerId) {
-      return `/api/game/${gameId}/character/${playerId}/portrait`;
+      return APIClient.characterPortraitURL(gameId, playerId);
     }
     return undefined;
   }, [propPlayerPortrait, turns, gameId, playerId]);

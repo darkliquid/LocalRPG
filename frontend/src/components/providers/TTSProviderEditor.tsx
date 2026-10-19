@@ -13,6 +13,7 @@ import { VoiceCombobox } from '../VoiceCombobox';
 import { VoiceOptionsControl } from '../VoiceOptionsControl';
 import { tierLabel } from './TierBadge';
 import { DEFAULT_VOICE_PROFILES, KOKORO_VOICE_PROFILES } from '../../lib/voiceProfiles';
+import { DEFAULT_KOKORO_MODEL_ID } from '../../lib/constants';
 import { DEFAULT_TTS_PREVIEW_TEXT } from '../../lib/mediaProviders';
 
 interface TTSProviderEditorProps {
@@ -355,7 +356,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
             disabled={kokoroStatus?.downloading}
             onClick={() =>
               onMissingModel({
-                id: 'kokoro-tts',
+                id: DEFAULT_KOKORO_MODEL_ID,
                 name: 'Kokoro Voice Pack',
                 sizeBytes: 319625534,
               })

@@ -1,4 +1,5 @@
 import { errorMessage } from '../lib/errors';
+import { PACKAGE_EXTENSIONS } from '../lib/constants';
 import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient, WorldExistsError } from '../api/client';
@@ -250,8 +251,8 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
       setBannerFile(null);
       setIconFile(null);
-      setBannerPreview(`/api/world/${encodeURIComponent(id)}/banner?t=${Date.now()}`);
-      setIconPreview(`/api/world/${encodeURIComponent(id)}/icon?t=${Date.now()}`);
+      setBannerPreview(APIClient.worldBannerURL(id, Date.now()));
+      setIconPreview(APIClient.worldIconURL(id, Date.now()));
 
       if (detail.entities && detail.entities.length > 0) {
         const first = detail.entities[0];
@@ -382,9 +383,9 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
       if (savedID) {
         await APIClient.generateWorldAsset(savedID, kind);
         if (kind === 'banner') {
-          setBannerPreview(`/api/world/${encodeURIComponent(savedID)}/banner?t=${Date.now()}`);
+          setBannerPreview(APIClient.worldBannerURL(savedID, Date.now()));
         } else {
-          setIconPreview(`/api/world/${encodeURIComponent(savedID)}/icon?t=${Date.now()}`);
+          setIconPreview(APIClient.worldIconURL(savedID, Date.now()));
         }
         setToast({ type: 'success', message: `Generated world ${kind}!` });
       } else {
@@ -623,14 +624,14 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
   const handleExport = async () => {
     if (!savedID) return;
-    const defaultFilename = `${savedID}-1.0.0.lrpgworld`;
+    const defaultFilename = `${savedID}-1.0.0${PACKAGE_EXTENSIONS.WORLD}`;
     try {
       if (savePicker.nativeDialog) {
         const path = await savePicker.pick({
           title: 'Export World Package',
           default_filename: defaultFilename,
           filters: [
-            { display_name: 'LocalRPG World (*.lrpgworld)', pattern: '*.lrpgworld' },
+            { display_name: `LocalRPG World (*${PACKAGE_EXTENSIONS.WORLD})`, pattern: `*${PACKAGE_EXTENSIONS.WORLD}` },
             { display_name: 'All Files (*.*)', pattern: '*.*' },
           ],
         });

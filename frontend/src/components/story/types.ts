@@ -1,3 +1,5 @@
+import type { StageDirectionsDisplayMode } from '../../types';
+
 // The exported bundle's payload. It is what an export inlines as
 // window.__LOCALRPG_STORY__, and it is deliberately independent of the app's API
 // types: a bundle is read from a file with no server behind it.
@@ -37,7 +39,7 @@ export interface StoryChapter {
 
 export interface Story {
   game_name: string;
-  display_mode?: 'stage_directions' | 'hidden' | 'raw';
+  display_mode?: StageDirectionsDisplayMode;
   // banner is the campaign's own image, which the theatre shows behind a scene that
   // has no art of its own.
   banner?: string;

@@ -1,5 +1,6 @@
 import React from 'react';
-import { TurnSegment, TurnCheck, PlaybackEntry } from '../types';
+import { TurnSegment, TurnCheck, PlaybackEntry, StageDirectionsDisplayMode } from '../types';
+import { DEFAULT_STAGE_DIRECTIONS_DISPLAY_MODE } from '../lib/constants';
 import { useSegmentPlayback } from '../hooks/useSegmentPlayback';
 import { anySegmentHasAudio, segmentIsGroupLeader } from '../lib/audio';
 import { MarkdownProse } from './MarkdownProse';
@@ -37,7 +38,7 @@ interface TurnSegmentsProps {
   segmentProgress?: Record<number, string>;
   // Checks resolved this turn, rendered inline at the segment that narrates them.
   checks?: TurnCheck[];
-  displayMode?: 'stage_directions' | 'hidden' | 'raw';
+  displayMode?: StageDirectionsDisplayMode;
   // Clips already heard while the turn streamed, which playback must skip.
   skipAudioKeys?: ReadonlySet<string>;
   // Playback ledger containing resume offsets and completion states.
@@ -61,7 +62,7 @@ export const TurnSegments: React.FC<TurnSegmentsProps> = ({
   characterPortraits,
   segmentProgress,
   checks,
-  displayMode = 'stage_directions',
+  displayMode = DEFAULT_STAGE_DIRECTIONS_DISPLAY_MODE,
   skipAudioKeys,
   playbackLedger,
 }) => {

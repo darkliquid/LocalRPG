@@ -21,6 +21,7 @@ import { ModelDownloadModal } from './ModelDownloadModal';
 import { AlertCircle, Bug, CheckCircle, Cloud, Coins, Cpu, Folder, Layers, Save, Sliders, Volume2 } from 'lucide-react';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAdvanced } from '../hooks/useAdvanced';
+import { DEFAULT_KOKORO_MODEL_ID, DEFAULT_KOKORO_SIZE_BYTES } from '../lib/constants';
 import { UsagePanel } from './UsagePanel';
 import { TTSBatchPanel } from './TTSBatchPanel';
 import { PathsPanel } from './settings/PathsPanel';
@@ -205,12 +206,12 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       const isTargetKokoro =
         provider?.type === 'builtin' &&
         (provider?.builtin_name === 'sherpa-onnx' || provider?.builtin_name === 'kokoro');
-      const kokoroInstalled = models.find((m) => m.id === 'kokoro-tts')?.installed;
+      const kokoroInstalled = models.find((m) => m.id === DEFAULT_KOKORO_MODEL_ID)?.installed;
       if (isTargetKokoro && !kokoroInstalled) {
         setMissingModelPrompt({
-          id: 'kokoro-tts',
+          id: DEFAULT_KOKORO_MODEL_ID,
           name: 'Kokoro Voice Pack',
-          sizeBytes: 90177536,
+          sizeBytes: DEFAULT_KOKORO_SIZE_BYTES,
         });
         return;
       }
@@ -227,9 +228,9 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ isCompact, onSav
       setTestResult({ category, res });
       if (res.model_missing) {
         setMissingModelPrompt({
-          id: res.model_id || 'kokoro-tts',
+          id: res.model_id || DEFAULT_KOKORO_MODEL_ID,
           name: 'Kokoro Voice Pack',
-          sizeBytes: 90177536,
+          sizeBytes: DEFAULT_KOKORO_SIZE_BYTES,
         });
       }
       if (category === 'tts' && res.success && res.audio_data_uri) {

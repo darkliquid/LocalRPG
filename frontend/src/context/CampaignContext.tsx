@@ -21,6 +21,7 @@ import { TurnAudioState, segmentAudioKey } from '../components/TurnSegments';
 import { DiceEntry } from '../lib/diceRange';
 import type { Adjudication, CounterProposal } from '../types';
 import { formatGenerationError } from '../lib/generationError';
+import { DEFAULT_KOKORO_MODEL_ID, DEFAULT_KOKORO_SIZE_BYTES, STORAGE_KEYS } from '../lib/constants';
 import { useStreamedSpeech } from '../hooks/useStreamedSpeech';
 import { TurnStreamProcessor } from '../lib/turnStreamProcessor';
 import { slugify } from '../lib/slug';
@@ -177,8 +178,8 @@ function useCampaignValue() {
   const handleGameStateFailure = useCallback((err: unknown) => {
     if (err instanceof HTTPError && err.status === 404) {
       // The campaign is definitively gone: forget it and return to the launcher.
-      localStorage.removeItem('localrpg_active_game');
-      localStorage.removeItem('localrpg_last_played_game');
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
+      localStorage.removeItem(STORAGE_KEYS.LAST_PLAYED_GAME);
       setActiveGameID(null);
       setCampaignStatus('idle');
       setCampaignError(null);
@@ -240,8 +241,8 @@ function useCampaignValue() {
         if (games.some((game) => game.id === activeGameID)) {
           return;
         }
-        localStorage.removeItem('localrpg_active_game');
-        localStorage.removeItem('localrpg_last_played_game');
+        localStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
+        localStorage.removeItem(STORAGE_KEYS.LAST_PLAYED_GAME);
         setActiveGameID(null);
         setCampaignStatus('idle');
       })
@@ -329,8 +330,8 @@ function useCampaignValue() {
   }, [client, activeGameID, chronicle, characterPortraits]);
 
   const handleSelectGame = (gameId: string) => {
-    localStorage.setItem('localrpg_last_played_game', gameId);
-    localStorage.removeItem('localrpg_active_game');
+    localStorage.setItem(STORAGE_KEYS.LAST_PLAYED_GAME, gameId);
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
     setActiveGameID(gameId);
   };
 
@@ -446,9 +447,9 @@ function useCampaignValue() {
     } else if (event.type === 'model_missing') {
       if (!dismissedModelPrompt) {
         setMissingModel({
-          id: event.model_id || 'kokoro-tts',
+          id: event.model_id || DEFAULT_KOKORO_MODEL_ID,
           name: event.name || 'Kokoro Voice Pack',
-          sizeBytes: event.size_bytes || 90177536,
+          sizeBytes: event.size_bytes || DEFAULT_KOKORO_SIZE_BYTES,
         });
       }
     } else if (event.type === 'error') {
@@ -635,7 +636,7 @@ function useCampaignValue() {
         setStatus({ state: 'playing' });
         // The server reports the completion over SSE, so the beat advances on a
         // real event rather than a status poll.
-        const source = new EventSource('/api/audio/events');
+        const source = new EventSource(APIClient.audioEventsURL());
         let settled = false;
         const settle = (entry: { state: TurnAudioState; message?: string }) => {
           if (settled) return;

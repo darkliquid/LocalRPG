@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { APIClient } from '../api/client';
 import { slugify } from '../lib/slug';
 import { EntitySummary, Turn } from '../types';
 
@@ -88,9 +89,7 @@ export function useCharacterPortraits({
     const fromEntities: Portraits = {};
     for (const entity of entities) {
       if (entity.type !== 'character' || !entity.has_portrait) continue;
-      const base =
-        entity.portrait_url ||
-        `/api/game/${encodeURIComponent(activeGameID || '')}/character/${encodeURIComponent(entity.id)}/portrait`;
+      const base = entity.portrait_url || APIClient.characterPortraitURL(activeGameID || '', entity.id);
       fromEntities[entity.id] = { url: `${base}?t=${Date.now()}`, hasCustom: true };
     }
     if (Object.keys(fromEntities).length > 0) {

@@ -13,6 +13,7 @@ import { ContentImportDialog } from './ContentImportDialog';
 import { RegistryModal } from './RegistryModal';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { ArrowLeft, X } from 'lucide-react';
+import { PACKAGE_ACCEPT, STORAGE_KEYS } from '../lib/constants';
 import { useMountTransition } from '../hooks/useMountTransition';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 
@@ -48,7 +49,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
   const [selectedGameID, setSelectedGameID] = useState<string | null>(() => {
-    return localStorage.getItem('localrpg_last_played_game') || localStorage.getItem('localrpg_active_game') || null;
+    return (
+      localStorage.getItem(STORAGE_KEYS.LAST_PLAYED_GAME) || localStorage.getItem(STORAGE_KEYS.ACTIVE_GAME) || null
+    );
   });
 
   const [isFlyoutOpen, setIsFlyoutOpen] = useState(false);
@@ -150,8 +153,8 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
       setSelectedGameID((prev) => {
         const candidateID =
           prev ||
-          localStorage.getItem('localrpg_last_played_game') ||
-          localStorage.getItem('localrpg_active_game') ||
+          localStorage.getItem(STORAGE_KEYS.LAST_PLAYED_GAME) ||
+          localStorage.getItem(STORAGE_KEYS.ACTIVE_GAME) ||
           null;
         const candidate = candidateID ? gList.find((g) => g.id === candidateID) : null;
         if (candidate && isWorkingGame(candidate, wList, sList)) {
@@ -461,7 +464,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
       <input
         ref={fileInputRef}
         type="file"
-        accept=".lrpgworld,.lrpgsystem,.lrpgpack"
+        accept={PACKAGE_ACCEPT.ALL}
         className="hidden"
         aria-label="Choose a package to import"
         onChange={handleFileSelect}

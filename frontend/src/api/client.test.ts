@@ -177,3 +177,34 @@ describe('APIClient entity deletion', () => {
     expect((err as Error).message).toMatch(/does not exist/);
   });
 });
+
+describe('APIClient URL builders', () => {
+  it('formats character portrait URLs', () => {
+    expect(APIClient.characterPortraitURL('game-1', 'char-2')).toBe('/api/game/game-1/character/char-2/portrait');
+    expect(APIClient.characterPortraitURL('game 1', 'char/2', '12345')).toBe(
+      '/api/game/game%201/character/char%2F2/portrait?t=12345',
+    );
+    expect(APIClient.characterPortraitURL('game-1', 'char-2', 98765)).toBe(
+      '/api/game/game-1/character/char-2/portrait?t=98765',
+    );
+    expect(APIClient.characterPortraitURL('game-1', 'char-2', { version: 3 })).toBe(
+      '/api/game/game-1/character/char-2/portrait?v=3',
+    );
+    expect(APIClient.characterPortraitURL('game-1', 'char-2', { version: 3, timestamp: 999 })).toBe(
+      '/api/game/game-1/character/char-2/portrait?v=3&t=999',
+    );
+  });
+
+  it('formats world asset URLs', () => {
+    expect(APIClient.worldAssetURL('world-1', 'banner')).toBe('/api/world/world-1/banner');
+    expect(APIClient.worldAssetURL('world 1', 'icon', 'ts-1')).toBe('/api/world/world%201/icon?t=ts-1');
+    expect(APIClient.worldBannerURL('world-1')).toBe('/api/world/world-1/banner');
+    expect(APIClient.worldBannerURL('world 1', 123)).toBe('/api/world/world%201/banner?t=123');
+    expect(APIClient.worldIconURL('world-1')).toBe('/api/world/world-1/icon');
+    expect(APIClient.worldIconURL('world 1', 456)).toBe('/api/world/world%201/icon?t=456');
+  });
+
+  it('formats audio events URL', () => {
+    expect(APIClient.audioEventsURL()).toBe('/api/audio/events');
+  });
+});

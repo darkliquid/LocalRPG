@@ -18,6 +18,7 @@ import { TTSProviderEditor } from '../providers/TTSProviderEditor';
 import { VoiceCatalogModal } from '../VoiceCatalogModal';
 import { SubTabs } from '../ui/SubTabs';
 import { KOKORO_VOICE_PROFILES } from '../../lib/voiceProfiles';
+import { DEFAULT_KOKORO_MODEL_ID } from '../../lib/constants';
 import { hasWebSpeechSupport } from '../../lib/webSpeech';
 import { DEFAULT_TTS_PREVIEW_TEXT, mediaEntryValue, setMediaEntry } from '../../lib/mediaProviders';
 import { useTTSInspect } from '../../hooks/useTTSInspect';
@@ -109,7 +110,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
     return [];
   }, [inspect?.catalog?.voices, isKokoro, kokoroCatalogVoices]);
 
-  const kokoroStatus = models.find((m) => m.id === 'kokoro-tts');
+  const kokoroStatus = models.find((m) => m.id === DEFAULT_KOKORO_MODEL_ID);
   const isGeminiTTS =
     activeTtsConfig?.type === 'gemini' ||
     (activeTtsConfig?.type === 'builtin' && activeTtsConfig?.builtin_name === 'gemini');
