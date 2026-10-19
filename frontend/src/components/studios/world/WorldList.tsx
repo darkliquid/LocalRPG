@@ -1,5 +1,6 @@
 import type { ChangeEvent, RefObject } from 'react';
 import { Globe, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
+import { PACKAGE_ACCEPT, PACKAGE_EXTENSIONS } from '../../../lib/constants';
 import { WorldDraft, WorldInfo, WorldSelection } from '../../../types';
 
 export interface WorldListProps {
@@ -44,7 +45,7 @@ export function WorldList({
           type="file"
           ref={importInputRef}
           onChange={handleFileSelect}
-          accept=".lrpgworld,.lrpgpack"
+          accept={PACKAGE_ACCEPT.WORLD}
           className="hidden"
         />
         <div className="flex items-center gap-1.5">
@@ -58,7 +59,7 @@ export function WorldList({
           </button>
           <button
             onClick={() => importInputRef.current?.click()}
-            title="Import world package (.lrpgworld, .lrpgpack)"
+            title={`Import world package (${PACKAGE_EXTENSIONS.WORLD}, ${PACKAGE_EXTENSIONS.PACK})`}
             className="flex-1 flex items-center justify-center gap-1 text-xs font-sans px-2 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer whitespace-nowrap"
           >
             <Upload className="w-3.5 h-3.5" />

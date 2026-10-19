@@ -14,6 +14,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { SystemVerifyResult } from '../../../types';
+import { PACKAGE_EXTENSIONS } from '../../../lib/constants';
 import { SystemTab } from './types';
 
 export interface SystemHeaderProps {
@@ -190,7 +191,7 @@ export function SystemHeader({
           type="button"
           onClick={handleExport}
           disabled={!savedID}
-          title="Export system package (.lrpgsystem)"
+          title={`Export system package (${PACKAGE_EXTENSIONS.SYSTEM})`}
           className="flex items-center gap-1.5 text-xs font-sans px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer disabled:opacity-50"
         >
           <Download className="w-3.5 h-3.5" />

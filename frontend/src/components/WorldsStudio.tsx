@@ -1,4 +1,5 @@
 import { errorMessage } from '../lib/errors';
+import { PACKAGE_EXTENSIONS } from '../lib/constants';
 import { useFailures } from '../context/FailuresContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient, WorldExistsError } from '../api/client';
@@ -623,14 +624,14 @@ export const WorldsStudio: React.FC<WorldsStudioProps> = ({ onWorldSaved, startM
 
   const handleExport = async () => {
     if (!savedID) return;
-    const defaultFilename = `${savedID}-1.0.0.lrpgworld`;
+    const defaultFilename = `${savedID}-1.0.0${PACKAGE_EXTENSIONS.WORLD}`;
     try {
       if (savePicker.nativeDialog) {
         const path = await savePicker.pick({
           title: 'Export World Package',
           default_filename: defaultFilename,
           filters: [
-            { display_name: 'LocalRPG World (*.lrpgworld)', pattern: '*.lrpgworld' },
+            { display_name: `LocalRPG World (*${PACKAGE_EXTENSIONS.WORLD})`, pattern: `*${PACKAGE_EXTENSIONS.WORLD}` },
             { display_name: 'All Files (*.*)', pattern: '*.*' },
           ],
         });

@@ -13,7 +13,7 @@ import { ContentImportDialog } from './ContentImportDialog';
 import { RegistryModal } from './RegistryModal';
 import { inspectPackageFile } from '../lib/packageInspect';
 import { ArrowLeft, X } from 'lucide-react';
-import { STORAGE_KEYS } from '../lib/constants';
+import { PACKAGE_ACCEPT, STORAGE_KEYS } from '../lib/constants';
 import { useMountTransition } from '../hooks/useMountTransition';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 
@@ -462,7 +462,7 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
       <input
         ref={fileInputRef}
         type="file"
-        accept=".lrpgworld,.lrpgsystem,.lrpgpack"
+        accept={PACKAGE_ACCEPT.ALL}
         className="hidden"
         aria-label="Choose a package to import"
         onChange={handleFileSelect}

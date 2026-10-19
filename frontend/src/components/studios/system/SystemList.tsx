@@ -1,6 +1,7 @@
 import type { ChangeEvent, RefObject } from 'react';
 import { Lightbulb, Plus, Shield, Trash2, Upload, Wand2 } from 'lucide-react';
 import { ReferenceSystem, SystemInfo } from '../../../types';
+import { PACKAGE_ACCEPT, PACKAGE_EXTENSIONS } from '../../../lib/constants';
 import { SystemDraft, SystemSelection } from './types';
 
 export interface SystemListProps {
@@ -58,7 +59,7 @@ export function SystemList({
             type="file"
             ref={importInputRef}
             onChange={handleFileSelect}
-            accept=".lrpgsystem,.lrpgpack"
+            accept={PACKAGE_ACCEPT.SYSTEM}
             className="hidden"
             aria-label="Choose a system package to import"
           />
@@ -81,7 +82,7 @@ export function SystemList({
           </button>
           <button
             onClick={() => importInputRef.current?.click()}
-            title="Import system package (.lrpgsystem, .lrpgpack)"
+            title={`Import system package (${PACKAGE_EXTENSIONS.SYSTEM}, ${PACKAGE_EXTENSIONS.PACK})`}
             className="flex items-center gap-1 text-xs font-sans px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 transition-all cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5" />

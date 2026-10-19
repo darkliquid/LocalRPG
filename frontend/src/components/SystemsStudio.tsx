@@ -1,4 +1,5 @@
 import { errorMessage } from '../lib/errors';
+import { PACKAGE_EXTENSIONS } from '../lib/constants';
 import React, { useState, useEffect, useRef } from 'react';
 import { APIClient } from '../api/client';
 import {
@@ -484,14 +485,14 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
 
   const handleExport = async () => {
     if (!savedID) return;
-    const defaultFilename = `${savedID}-${version || '1.0.0'}.lrpgsystem`;
+    const defaultFilename = `${savedID}-${version || '1.0.0'}${PACKAGE_EXTENSIONS.SYSTEM}`;
     try {
       if (savePicker.nativeDialog) {
         const path = await savePicker.pick({
           title: 'Export System Package',
           default_filename: defaultFilename,
           filters: [
-            { display_name: 'LocalRPG System (*.lrpgsystem)', pattern: '*.lrpgsystem' },
+            { display_name: `LocalRPG System (*${PACKAGE_EXTENSIONS.SYSTEM})`, pattern: `*${PACKAGE_EXTENSIONS.SYSTEM}` },
             { display_name: 'All Files (*.*)', pattern: '*.*' },
           ],
         });
