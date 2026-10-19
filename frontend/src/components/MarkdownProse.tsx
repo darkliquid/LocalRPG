@@ -1,10 +1,12 @@
 import React, { memo } from 'react';
+import type { StageDirectionsDisplayMode } from '../types';
+import { DEFAULT_STAGE_DIRECTIONS_DISPLAY_MODE } from '../lib/constants';
 
 interface MarkdownProseProps {
   text: string;
   onEntityClick?: (entityId: string) => void;
   className?: string;
-  displayMode?: 'stage_directions' | 'hidden' | 'raw';
+  displayMode?: StageDirectionsDisplayMode;
 }
 
 // The inline grammar is deliberately small: emphasis, code, entity links, and optional
@@ -16,7 +18,7 @@ const inlinePattern =
 const renderInline = (
   text: string,
   onEntityClick?: (entityId: string) => void,
-  displayMode: 'stage_directions' | 'hidden' | 'raw' = 'stage_directions',
+  displayMode: StageDirectionsDisplayMode = DEFAULT_STAGE_DIRECTIONS_DISPLAY_MODE,
 ): React.ReactNode[] => {
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -103,7 +105,7 @@ const listItemPattern = /^\s*[-*]\s+/;
 // Blank lines separate paragraphs, single newlines are kept as deliberate beats,
 // and raw HTML is never trusted: it is escaped by virtue of being plain text.
 export const MarkdownProse: React.FC<MarkdownProseProps> = memo(
-  ({ text, onEntityClick, className, displayMode = 'stage_directions' }) => {
+  ({ text, onEntityClick, className, displayMode = DEFAULT_STAGE_DIRECTIONS_DISPLAY_MODE }) => {
     const raw = (text ?? '').replace(/\r\n/g, '\n');
     const normalized =
       displayMode === 'hidden' ? raw.replace(/(?:^|\s)\[[a-zA-Z][a-zA-Z\s_-]{1,28}\](?:\s|$)/g, ' ').trim() : raw;

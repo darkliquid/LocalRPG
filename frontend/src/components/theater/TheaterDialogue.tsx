@@ -1,5 +1,5 @@
 import React from 'react';
-import { TurnCheck, TurnSegment } from '../../types';
+import { TurnCheck, TurnSegment, StageDirectionsDisplayMode } from '../../types';
 import { MarkdownProse } from '../MarkdownProse';
 import { EntityAvatar } from '../EntityAvatar';
 import { DiceCheckCard } from '../DiceCheckCard';
@@ -10,7 +10,7 @@ interface TheaterDialogueProps {
   speaker?: string;
   isPlayer?: boolean;
   onEntityClick?: (entityId: string) => void;
-  displayMode?: 'stage_directions' | 'hidden' | 'raw';
+  displayMode?: StageDirectionsDisplayMode;
   // reveal is the share of the line to show, so an exported bundle can type it out
   // while the app shows it whole. The advance caret waits until it is complete.
   reveal?: number;
