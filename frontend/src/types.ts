@@ -1244,11 +1244,13 @@ export interface SpeechCueCapabilities {
   prompt_guidance?: string;
 }
 
+export type StageDirectionsDisplayMode = 'stage_directions' | 'hidden' | 'raw';
+
 export interface SpeechCuesConfig {
   enabled: boolean;
   audio_tags?: boolean;
   markdown_emphasis?: boolean;
-  display_mode?: 'stage_directions' | 'hidden' | 'raw';
+  display_mode?: StageDirectionsDisplayMode;
 }
 
 export interface TTSInspectRequest {
