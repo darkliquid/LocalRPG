@@ -37,6 +37,13 @@ updates:
     labels:
       - "area/frontend"
       - "type/chore"
+    groups:
+      npm-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Maintain GitHub Actions dependencies
   - package-ecosystem: "github-actions"
@@ -52,3 +59,7 @@ updates:
     labels:
       - "area/tooling"
       - "type/chore"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
