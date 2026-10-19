@@ -471,14 +471,10 @@ export class APIClient {
   // regenerateCharacterPortrait asks the backend for a fresh portrait and
   // returns its cache-busted URL.
   static async regenerateCharacterPortrait(gameID: string, characterID: string): Promise<CharacterPortraitDTO> {
-    const res = await fetch(
-      APIClient.characterPortraitURL(gameID, characterID),
-      { method: 'POST' },
-    );
+    const res = await fetch(APIClient.characterPortraitURL(gameID, characterID), { method: 'POST' });
     if (!res.ok) return throwGenerationError(res);
     return res.json();
   }
-
 
   static async deleteGame(gameID: string): Promise<void> {
     const res = await fetch(`/api/game/${gameID}`, { method: 'DELETE' });

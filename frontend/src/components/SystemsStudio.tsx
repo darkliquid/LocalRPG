@@ -492,7 +492,10 @@ export const SystemsStudio: React.FC<SystemsStudioProps> = ({ onSystemSaved, sta
           title: 'Export System Package',
           default_filename: defaultFilename,
           filters: [
-            { display_name: `LocalRPG System (*${PACKAGE_EXTENSIONS.SYSTEM})`, pattern: `*${PACKAGE_EXTENSIONS.SYSTEM}` },
+            {
+              display_name: `LocalRPG System (*${PACKAGE_EXTENSIONS.SYSTEM})`,
+              pattern: `*${PACKAGE_EXTENSIONS.SYSTEM}`,
+            },
             { display_name: 'All Files (*.*)', pattern: '*.*' },
           ],
         });

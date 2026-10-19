@@ -180,9 +180,7 @@ describe('APIClient entity deletion', () => {
 
 describe('APIClient URL builders', () => {
   it('formats character portrait URLs', () => {
-    expect(APIClient.characterPortraitURL('game-1', 'char-2')).toBe(
-      '/api/game/game-1/character/char-2/portrait',
-    );
+    expect(APIClient.characterPortraitURL('game-1', 'char-2')).toBe('/api/game/game-1/character/char-2/portrait');
     expect(APIClient.characterPortraitURL('game 1', 'char/2', '12345')).toBe(
       '/api/game/game%201/character/char%2F2/portrait?t=12345',
     );

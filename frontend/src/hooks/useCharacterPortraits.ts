@@ -89,9 +89,7 @@ export function useCharacterPortraits({
     const fromEntities: Portraits = {};
     for (const entity of entities) {
       if (entity.type !== 'character' || !entity.has_portrait) continue;
-      const base =
-        entity.portrait_url ||
-        APIClient.characterPortraitURL(activeGameID || '', entity.id);
+      const base = entity.portrait_url || APIClient.characterPortraitURL(activeGameID || '', entity.id);
       fromEntities[entity.id] = { url: `${base}?t=${Date.now()}`, hasCustom: true };
     }
     if (Object.keys(fromEntities).length > 0) {

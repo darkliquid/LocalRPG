@@ -49,7 +49,9 @@ export const LauncherHub: React.FC<LauncherHubProps> = ({ onSelectGame, onOpenDo
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [worlds, setWorlds] = useState<WorldInfo[]>([]);
   const [selectedGameID, setSelectedGameID] = useState<string | null>(() => {
-    return localStorage.getItem(STORAGE_KEYS.LAST_PLAYED_GAME) || localStorage.getItem(STORAGE_KEYS.ACTIVE_GAME) || null;
+    return (
+      localStorage.getItem(STORAGE_KEYS.LAST_PLAYED_GAME) || localStorage.getItem(STORAGE_KEYS.ACTIVE_GAME) || null
+    );
   });
 
   const [isFlyoutOpen, setIsFlyoutOpen] = useState(false);
