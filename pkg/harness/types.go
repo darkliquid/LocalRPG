@@ -143,9 +143,13 @@ type ProviderConfig struct {
 	Temperature    float64  `yaml:"temperature,omitempty"`
 	MaxTokens      int      `yaml:"max_tokens,omitempty"`
 	ThinkingBudget *int     `yaml:"thinking_budget,omitempty"`
-	TopP           *float64 `yaml:"top_p,omitempty"`
-	TopK           *int     `yaml:"top_k,omitempty"`
-	SharedAPIKey   string   `yaml:"shared_api_key,omitempty"`
+	// Effort is the reasoning effort a reasoning model runs at ("low",
+	// "medium", "high", and provider-specific levels). Empty uses the model
+	// default. Adapters that have no effort control ignore it.
+	Effort       string   `yaml:"effort,omitempty"`
+	TopP         *float64 `yaml:"top_p,omitempty"`
+	TopK         *int     `yaml:"top_k,omitempty"`
+	SharedAPIKey string   `yaml:"shared_api_key,omitempty"`
 	// Instance is an optional user-chosen discriminator for this provider
 	// configuration. It becomes the key's "@<instance>" segment.
 	Instance string `yaml:"instance,omitempty"`

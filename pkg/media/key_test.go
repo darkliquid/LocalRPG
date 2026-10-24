@@ -16,6 +16,7 @@ func TestTTSKeyFor(t *testing.T) {
 		ok   bool
 	}{
 		{config.TTSConfig{Type: "gemini"}, provider.KeyTTSGemini, true},
+		{config.TTSConfig{Type: "openai"}, provider.KeyTTSOpenAI, true},
 		{config.TTSConfig{Type: "inworld"}, provider.KeyTTSInworld, true},
 		{config.TTSConfig{Type: "builtin", BuiltinName: "inworld"}, provider.KeyTTSInworld, true},
 		{config.TTSConfig{Type: "builtin", BuiltinName: "elevenlabs"}, provider.KeyTTSElevenLabs, true},
@@ -126,6 +127,7 @@ func TestImageKeyFor(t *testing.T) {
 		ok   bool
 	}{
 		{config.ImageConfig{Type: "gemini"}, provider.KeyImageGemini, true},
+		{config.ImageConfig{Type: "openai"}, provider.KeyImageOpenAI, true},
 		{config.ImageConfig{Type: "builtin", BuiltinName: "procedural-art"}, provider.KeyImageProceduralArt, true},
 		{config.ImageConfig{Type: "http", Endpoint: "http://127.0.0.1:8188"}, "image:http@127.0.0.1:8188", true},
 		{config.ImageConfig{Type: "comfyui", Endpoint: "http://127.0.0.1:8188"}, "image:http@127.0.0.1:8188", true},

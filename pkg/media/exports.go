@@ -25,6 +25,8 @@ func TTSKeyFor(cfg config.TTSConfig) (provider.Key, bool) {
 		return provider.InstanceOrSelf(provider.KeyTTSFishAudio, provider.InstanceDiscriminator(cfg.Instance, provider.HostDiscriminator(cfg.Endpoint))), true
 	case "gemini":
 		return provider.InstanceOrSelf(provider.KeyTTSGemini, provider.InstanceDiscriminator(cfg.Instance, "")), true
+	case "openai":
+		return provider.InstanceOrSelf(provider.KeyTTSOpenAI, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "inworld":
 		return provider.InstanceOrSelf(provider.KeyTTSInworld, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "cartesia":
@@ -71,6 +73,8 @@ func SharedProviderKey(cfg *config.Config, key provider.Key, ok bool) string {
 			return cfg.Providers.Inworld.APIKey
 		case string(provider.KeyTTSCartesia), string(provider.KeySTTCartesia):
 			return cfg.Providers.Cartesia.APIKey
+		case string(provider.KeyTTSOpenAI), string(provider.KeyImageOpenAI):
+			return cfg.Providers.OpenAI.APIKey
 		}
 	}
 	return cfg.Providers.Gemini.APIKey
@@ -172,6 +176,8 @@ func ImageKeyFor(cfg config.ImageConfig) (provider.Key, bool) {
 	switch cfg.Type {
 	case "gemini":
 		return provider.InstanceOrSelf(provider.KeyImageGemini, provider.InstanceDiscriminator(cfg.Instance, "")), true
+	case "openai":
+		return provider.InstanceOrSelf(provider.KeyImageOpenAI, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "builtin":
 		if cfg.BuiltinName == "procedural-art" {
 			return provider.InstanceOrSelf(provider.KeyImageProceduralArt, provider.InstanceDiscriminator(cfg.Instance, "")), true

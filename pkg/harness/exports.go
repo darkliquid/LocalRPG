@@ -16,6 +16,8 @@ func KeyFor(cfg ProviderConfig) (provider.Key, bool) {
 		return provider.InstanceOrSelf(provider.KeyLLMGemini, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "inworld":
 		return provider.InstanceOrSelf(provider.KeyLLMInworld, provider.InstanceDiscriminator(cfg.Instance, "")), true
+	case "openai":
+		return provider.InstanceOrSelf(provider.KeyLLMOpenAI, provider.InstanceDiscriminator(cfg.Instance, "")), true
 	case "builtin", "":
 		switch cfg.BuiltinName {
 		case "gemini":

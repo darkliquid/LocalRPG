@@ -40,6 +40,7 @@ choose; the ledger and provider identifiers are listed in the
 | `providers.gemini.api_key` | string |
 | `providers.inworld.api_key` | string |
 | `providers.cartesia.api_key` | string |
+| `providers.openai.api_key` | string |
 | `providers.currency` | string |
 | `providers.prices[].provider` | string |
 | `providers.prices[].model` | string |
@@ -65,6 +66,7 @@ choose; the ledger and provider identifiers are listed in the
 | `agents.roles.<key>.max_tokens` | int |
 | `agents.roles.<key>.supports_tools` | string |
 | `agents.roles.<key>.thinking_budget` | int |
+| `agents.roles.<key>.effort` | string |
 | `agents.roles.<key>.top_p` | float |
 | `agents.roles.<key>.top_k` | int |
 | `agents.roles.<key>.instance` | string |
@@ -164,6 +166,7 @@ choose; the ledger and provider identifiers are listed in the
 | `media.image.location_art_appearance` | string |
 | `media.image.aspect_ratio` | string |
 | `media.image.person_generation` | string |
+| `media.image.quality` | string |
 | `media.image.instance` | string |
 | `media.purposes` | map<string, string> |
 | `media.purpose_chains.<key>.chain` | []string |

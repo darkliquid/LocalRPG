@@ -55,9 +55,12 @@ type AgentRoleConfig struct {
 	// gets tools and every other type does not.
 	SupportsTools string `yaml:"supports_tools,omitempty" json:"supports_tools,omitempty"`
 
-	ThinkingBudget *int     `yaml:"thinking_budget,omitempty" json:"thinking_budget,omitempty"`
-	TopP           *float64 `yaml:"top_p,omitempty" json:"top_p,omitempty"`
-	TopK           *int     `yaml:"top_k,omitempty" json:"top_k,omitempty"`
+	ThinkingBudget *int `yaml:"thinking_budget,omitempty" json:"thinking_budget,omitempty"`
+	// Effort is the reasoning effort passed to reasoning models on providers
+	// that expose one (OpenAI, Anthropic). Empty uses the model default.
+	Effort string   `yaml:"effort,omitempty" json:"effort,omitempty"`
+	TopP   *float64 `yaml:"top_p,omitempty" json:"top_p,omitempty"`
+	TopK   *int     `yaml:"top_k,omitempty" json:"top_k,omitempty"`
 
 	// Instance is an optional user-chosen discriminator for this provider
 	// configuration. It becomes the key's "@<instance>" segment, so two configs
@@ -290,6 +293,10 @@ type ImageConfig struct {
 
 	AspectRatio      string `yaml:"aspect_ratio,omitempty" json:"aspect_ratio,omitempty"`
 	PersonGeneration string `yaml:"person_generation,omitempty" json:"person_generation,omitempty"`
+	// Quality selects the image model's quality tier ("low", "medium",
+	// "high", "auto"). Empty means the provider default. Adapters without
+	// quality tiers ignore it.
+	Quality string `yaml:"quality,omitempty" json:"quality,omitempty"`
 
 	// Instance is an optional user-chosen discriminator for this provider
 	// configuration. It becomes the key's "@<instance>" segment, so two configs
@@ -352,6 +359,7 @@ type ProvidersConfig struct {
 	Gemini   GeminiProviderConfig   `yaml:"gemini,omitempty" json:"gemini,omitempty"`
 	Inworld  InworldProviderConfig  `yaml:"inworld,omitempty" json:"inworld,omitempty"`
 	Cartesia CartesiaProviderConfig `yaml:"cartesia,omitempty" json:"cartesia,omitempty"`
+	OpenAI   OpenAIProviderConfig   `yaml:"openai,omitempty" json:"openai,omitempty"`
 	// Currency is the display currency for cost figures. Prices are expressed in
 	// this currency; no conversion is performed.
 	Currency string `yaml:"currency,omitempty" json:"currency,omitempty"`
@@ -384,6 +392,13 @@ type GeminiProviderConfig struct {
 // CartesiaProviderConfig is the Cartesia-specific part of the provider
 // configuration.
 type CartesiaProviderConfig struct {
+	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
+}
+
+// OpenAIProviderConfig is the OpenAI-specific part of the provider
+// configuration: the credential every OpenAI capability (chat, speech, image,
+// embeddings) inherits when a role carries no key of its own.
+type OpenAIProviderConfig struct {
 	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 }
 

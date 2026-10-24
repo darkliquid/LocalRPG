@@ -175,6 +175,7 @@ func SummariserFromConfig(cfg *config.Config, router *Router, logger trace.Logge
 			Temperature:    roleCfg.Temperature,
 			MaxTokens:      roleCfg.MaxTokens,
 			ThinkingBudget: roleCfg.ThinkingBudget,
+			Effort:         roleCfg.Effort,
 			TopP:           roleCfg.TopP,
 			TopK:           roleCfg.TopK,
 			SharedAPIKey:   cfg.Providers.Gemini.APIKey,
