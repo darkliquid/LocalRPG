@@ -16,6 +16,7 @@ import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/inworldtts"
 	_ "github.com/darkliquid/localrpg/pkg/provider/openaichat"
 	_ "github.com/darkliquid/localrpg/pkg/provider/openaiembedding"
+	_ "github.com/darkliquid/localrpg/pkg/provider/openairesponses"
 	_ "github.com/darkliquid/localrpg/pkg/provider/oracle"
 	_ "github.com/darkliquid/localrpg/pkg/provider/sttcartesia"
 	_ "github.com/darkliquid/localrpg/pkg/provider/sttwebspeech"
