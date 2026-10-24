@@ -1,14 +1,18 @@
 package openairesponses
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/darkliquid/localrpg/pkg/harness"
+	"github.com/darkliquid/localrpg/pkg/provider"
 	"github.com/darkliquid/localrpg/pkg/telemetry"
 	"github.com/darkliquid/localrpg/pkg/trace"
 )
@@ -52,6 +56,7 @@ func NewResponsesProvider(id string, opts Options) *ResponsesProvider {
 		apiKey:   opts.APIKey,
 		opts:     opts,
 		client:   &http.Client{Transport: telemetry.HTTPTransport(nil), Timeout: 5 * time.Minute},
+		logger:   trace.Nop(),
 	}
 }
 
@@ -243,6 +248,7 @@ func (p *ResponsesProvider) Generate(ctx context.Context, req harness.GenerateRe
 
 	errCh := make(chan error, 1)
 	go func() {
+		defer close(out)
 		errCh <- p.streamWithUsage(ctx, req, out, &cached)
 	}()
 
@@ -268,11 +274,185 @@ func (p *ResponsesProvider) Stream(ctx context.Context, req harness.GenerateRequ
 	return p.streamWithUsage(ctx, req, out, &cached)
 }
 
-// streamWithUsage is the single send: the SSE reader lands with the streaming
-// step of the plan.
+// streamWithUsage is the single send: it posts the payload and drains the SSE
+// stream, recording the cache-read count for Generate.
 func (p *ResponsesProvider) streamWithUsage(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk, cached *int) error {
-	defer close(out)
-	return fmt.Errorf("openairesponses: stream not implemented")
+	return p.streamOnce(ctx, req, out, cached, true, true)
+}
+
+func (p *ResponsesProvider) streamOnce(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk, cached *int, allowTools, allowTemperature bool) error {
+	payload := p.requestFor(req, allowTools, allowTemperature)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+	resp, err := p.postRequest(ctx, data)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, provider.MaxProviderDetailBytes))
+		detail := provider.TruncateDetail(body)
+		if resp.StatusCode == http.StatusBadRequest {
+			if allowTools && len(req.Tools) > 0 && strings.Contains(detail, "tools") {
+				p.logger.Event("provider.tools", map[string]any{
+					"role":     p.id,
+					"offered":  len(req.Tools),
+					"rejected": true,
+					"reason":   "the provider rejected the tools field",
+				})
+				return p.streamOnce(ctx, req, out, cached, false, allowTemperature)
+			}
+			if allowTemperature && payload.Temperature != 0 && strings.Contains(detail, "temperature") {
+				return p.streamOnce(ctx, req, out, cached, allowTools, false)
+			}
+		}
+		if detail != "" {
+			return fmt.Errorf("http error %s from %s/responses: %s", resp.Status, p.endpoint, detail)
+		}
+		return fmt.Errorf("http error %s from %s/responses", resp.Status, p.endpoint)
+	}
+
+	state := &streamState{toolCalls: newToolCallAccumulator()}
+	if err := p.consumeStream(resp.Body, state, out); err != nil {
+		return err
+	}
+	*cached = state.cached
+	if state.finishReason == "" {
+		state.finishReason = "stop"
+	}
+	out <- harness.StreamChunk{Done: true, FinishReason: state.finishReason, ToolCalls: state.toolCalls.result(), Usage: state.usage}
+	return nil
 }
 
 var _ harness.ModelProvider = (*ResponsesProvider)(nil)
+
+// streamState is what one streamed response builds up as it is read.
+type streamState struct {
+	finishReason string
+	usage        *harness.Usage
+	cached       int
+	toolCalls    *toolCallAccumulator
+	wireLines    int
+}
+
+// toolCallAccumulator reassembles streamed function calls, which arrive as an
+// item announcement plus argument deltas keyed by the item id.
+type toolCallAccumulator struct {
+	order []string
+	calls map[string]*harness.ToolCall
+}
+
+func newToolCallAccumulator() *toolCallAccumulator {
+	return &toolCallAccumulator{calls: make(map[string]*harness.ToolCall)}
+}
+
+func (a *toolCallAccumulator) open(itemID, callID, name string) {
+	if _, ok := a.calls[itemID]; !ok {
+		a.calls[itemID] = &harness.ToolCall{ID: callID, Name: name}
+		a.order = append(a.order, itemID)
+	}
+}
+
+func (a *toolCallAccumulator) appendArgs(itemID, delta string) {
+	call, ok := a.calls[itemID]
+	if !ok {
+		a.open(itemID, "", "")
+		call = a.calls[itemID]
+	}
+	call.Arguments += delta
+}
+
+func (a *toolCallAccumulator) result() []harness.ToolCall {
+	if len(a.order) == 0 {
+		return nil
+	}
+	calls := make([]harness.ToolCall, 0, len(a.order))
+	for _, id := range a.order {
+		calls = append(calls, *a.calls[id])
+	}
+	return calls
+}
+
+// responseEvent is the union of the typed SSE events the adapter reads. Events
+// it does not model are skipped rather than failing the turn.
+type responseEvent struct {
+	Type  string `json:"type"`
+	Delta string `json:"delta"`
+	Item  struct {
+		ID     string `json:"id"`
+		Type   string `json:"type"`
+		CallID string `json:"call_id"`
+		Name   string `json:"name"`
+	} `json:"item"`
+	ItemID   string `json:"item_id"`
+	Response struct {
+		Status string `json:"status"`
+		Usage  *struct {
+			InputTokens        int `json:"input_tokens"`
+			OutputTokens       int `json:"output_tokens"`
+			InputTokensDetails struct {
+				CachedTokens int `json:"cached_tokens"`
+			} `json:"input_tokens_details"`
+		} `json:"usage"`
+	} `json:"response"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// consumeStream reads the typed SSE events until response.completed. Text
+// deltas stream straight through; function calls accumulate; the final
+// response frame carries usage.
+func (p *ResponsesProvider) consumeStream(body io.Reader, state *streamState, out chan<- harness.StreamChunk) error {
+	scanner := bufio.NewScanner(body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if p.logger.Enabled(trace.LevelFull) && state.wireLines < p.chunkLimit() {
+			state.wireLines++
+			p.logger.Event("provider.wire", map[string]any{"role": p.id, "direction": "recv", "line": line})
+		}
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		var ev responseEvent
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &ev); err != nil {
+			continue
+		}
+		switch ev.Type {
+		case "response.output_text.delta":
+			if ev.Delta != "" {
+				out <- harness.StreamChunk{Text: ev.Delta}
+			}
+		case "response.output_item.added":
+			if ev.Item.Type == "function_call" {
+				state.toolCalls.open(ev.Item.ID, ev.Item.CallID, ev.Item.Name)
+			}
+		case "response.function_call_arguments.delta":
+			state.toolCalls.appendArgs(ev.ItemID, ev.Delta)
+		case "response.completed":
+			if ev.Response.Usage != nil {
+				state.usage = &harness.Usage{
+					Model:        p.model,
+					InputTokens:  ev.Response.Usage.InputTokens,
+					OutputTokens: ev.Response.Usage.OutputTokens,
+				}
+				state.cached = ev.Response.Usage.InputTokensDetails.CachedTokens
+			}
+			if ev.Response.Status != "" && ev.Response.Status != "completed" {
+				return fmt.Errorf("openai responses: status %q", ev.Response.Status)
+			}
+		case "error":
+			if ev.Error != nil {
+				return fmt.Errorf("openai responses: %s", ev.Error.Message)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		p.logger.Event("provider.error", map[string]any{"role": p.id, "error": err.Error()})
+		return err
+	}
+	return nil
+}
