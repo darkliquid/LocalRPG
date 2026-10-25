@@ -28,6 +28,7 @@ import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttsgemini"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttshttp"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttsnativeos"
+	_ "github.com/darkliquid/localrpg/pkg/provider/ttsopenai"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttspiper"
 	_ "github.com/darkliquid/localrpg/pkg/provider/ttssherpa"
 )
