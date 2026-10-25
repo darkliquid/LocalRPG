@@ -1132,7 +1132,7 @@ export interface PathsConfig {
 }
 
 export interface AgentRoleConfig {
-  type: 'builtin' | 'http' | 'cli' | 'inherit' | 'disabled' | 'gemini';
+  type: 'builtin' | 'http' | 'cli' | 'inherit' | 'disabled' | 'gemini' | 'openai';
   inherit_from?: string;
   builtin_name?: string;
   command?: string;
@@ -1145,6 +1145,8 @@ export interface AgentRoleConfig {
   // "auto" (HTTP providers only), "yes", or "no".
   supports_tools?: 'auto' | 'yes' | 'no';
   thinking_budget?: number;
+  // Reasoning effort for reasoning models (openai). Empty means the model default.
+  effort?: string;
   top_p?: number;
   top_k?: number;
   // An optional user-chosen discriminator that keeps two configs of one adapter
@@ -1293,7 +1295,7 @@ export interface MediaInspectResponse {
 }
 
 export interface TTSConfig {
-  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'gemini' | 'fish-audio' | 'cartesia';
+  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'gemini' | 'fish-audio' | 'cartesia' | 'openai';
   builtin_name?: string;
   model_path?: string;
   command?: string;
@@ -1334,7 +1336,7 @@ export interface STTConfig {
 }
 
 export interface ImageConfig {
-  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'comfyui' | 'gemini';
+  type: 'builtin' | 'http' | 'cli' | 'disabled' | 'comfyui' | 'gemini' | 'openai';
   builtin_name?: string;
   command?: string;
   args?: string[];
@@ -1349,6 +1351,9 @@ export interface ImageConfig {
   location_art_appearance?: 'original_and_current' | 'original';
   aspect_ratio?: string;
   person_generation?: string;
+  // Image quality tier ("low" | "medium" | "high" | "auto"); providers without
+  // quality tiers ignore it.
+  quality?: string;
   // An optional user-chosen discriminator that keeps two configs of one adapter
   // at one endpoint distinct in usage, pricing, and caches.
   instance?: string;

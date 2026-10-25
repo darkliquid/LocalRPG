@@ -32,6 +32,37 @@ providers:
 - **`mock`**: Returns deterministic placeholder responses for offline testing and development.
 - **`disabled`**: Explicitly disables the capability.
 
+### OpenAI
+
+The **`openai`** type is OpenAI's native path: chat runs over the Responses API
+with tool calling and reasoning effort, speech comes from a fixed 13-voice
+catalogue with delivery `instructions`, and images come from the gpt-image
+models with size and quality mapping. The key can be set once for every
+capability:
+
+```yaml
+providers:
+  openai:
+    api_key: "env:OPENAI_API_KEY"
+agents:
+  roles:
+    gm:
+      type: openai
+      model: gpt-6.1-sol
+      effort: medium # optional; reasoning models reject temperature when set
+media:
+  tts:
+    type: openai
+    default_voice: marin
+  image:
+    type: openai
+    quality: auto # low | medium | high | auto
+```
+
+The speech endpoint is deprecated by OpenAI (shutdown announced for
+2027-01-06); the provider catalogue marks the caveat. Requests are never stored
+on OpenAI's side (`store: false`).
+
 ### How providers run
 
 LocalRPG labels providers with one of four capability tiers, so an offline

@@ -69,6 +69,7 @@ export const LLMRoleEditor: React.FC<LLMRoleEditorProps> = ({
           <option value="cli">CLI Command (Local Binary e.g. llama-cli)</option>
           <option value="builtin">Builtin / Internal Engine</option>
           <option value="gemini">Google Gemini (GenAI Cloud)</option>
+          <option value="openai">OpenAI (Responses API)</option>
           <option value="inherit">Inherit from another role</option>
         </select>
       </div>
@@ -97,7 +98,7 @@ export const LLMRoleEditor: React.FC<LLMRoleEditorProps> = ({
         </div>
       )}
 
-      {roleConfig.type === 'http' && (
+      {(roleConfig.type === 'http' || roleConfig.type === 'openai') && (
         <>
           <div className="space-y-1.5">
             <label className="text-xs font-sans uppercase text-stone-300">Endpoint URL</label>
@@ -459,6 +460,35 @@ export const LLMRoleEditor: React.FC<LLMRoleEditorProps> = ({
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-xs font-mono text-stone-100 focus:outline-none focus:border-purple-500/60"
               />
             </div>
+          </div>
+        )}
+
+        {roleConfig.type === 'openai' && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-sans uppercase text-stone-300">Reasoning Effort</label>
+            <select
+              value={roleConfig.effort || ''}
+              onChange={(e) => {
+                const updated = { ...roleConfig, effort: e.target.value || undefined };
+                setConfig({
+                  ...config,
+                  agents: {
+                    ...config.agents,
+                    roles: { ...config.agents.roles, [role]: updated },
+                  },
+                });
+              }}
+              className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
+            >
+              <option value="">Model default</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+            </select>
+            <p className="text-xs text-stone-500">
+              When set, the request switches to the reasoning shape and temperature is omitted.
+            </p>
           </div>
         )}
 

@@ -47,12 +47,12 @@ func TestOpenAIImageShape(t *testing.T) {
 
 func TestSizeFor(t *testing.T) {
 	tests := map[string]string{
-		"1:1":    "1024x1024",
-		"3:2":    "1536x1024",
-		"16:9":   "1536x1024",
-		"2:3":    "1024x1536",
-		"":       "1024x1024",
-		"bogus":  "1024x1024",
+		"1:1":   "1024x1024",
+		"3:2":   "1536x1024",
+		"16:9":  "1536x1024",
+		"2:3":   "1024x1536",
+		"":      "1024x1024",
+		"bogus": "1024x1024",
 	}
 	for ratio, want := range tests {
 		if got := sizeFor(ratio); got != want {

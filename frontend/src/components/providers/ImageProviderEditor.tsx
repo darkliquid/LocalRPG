@@ -107,6 +107,7 @@ export const ImageProviderEditor: React.FC<ImageProviderEditorProps> = ({
         >
           <option value="disabled">Disabled</option>
           <option value="gemini">Google Gemini / Imagen (GenAI Cloud)</option>
+          <option value="openai">OpenAI Images (Cloud, metered)</option>
           <option value="http">HTTP (ComfyUI, Automatic1111, LocalAI, DALL-E)</option>
           <option value="comfyui">ComfyUI Dedicated (Port 8188)</option>
           <option value="cli">CLI Command (e.g. sd-cli)</option>

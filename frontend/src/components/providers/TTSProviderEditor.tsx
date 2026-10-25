@@ -244,6 +244,7 @@ export const TTSProviderEditor: React.FC<TTSProviderEditorProps> = ({
         >
           <option value="disabled">Disabled</option>
           <option value="gemini">Google Gemini TTS (Cloud, metered)</option>
+          <option value="openai">OpenAI Speech (Cloud, metered)</option>
           <option value="builtin:cartesia">Built-in: Cartesia Sonic (Cloud, metered)</option>
           <option value="builtin:sherpa-onnx">Built-in: Sherpa-ONNX (Kokoro Neural Voice)</option>
           <option value="builtin:native-os">Built-in: Native OS Speech (spd-say / SAPI / procedural)</option>

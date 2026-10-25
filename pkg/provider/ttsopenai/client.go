@@ -130,8 +130,8 @@ func (c *client) VoiceOptions() []media.VoiceOption {
 func (c *client) Metered() bool { return true }
 
 var (
-	_ media.TTSClient      = (*client)(nil)
-	_ media.VoiceCatalog   = (*client)(nil)
-	_ media.VoiceOptions   = (*client)(nil)
+	_ media.TTSClient       = (*client)(nil)
+	_ media.VoiceCatalog    = (*client)(nil)
+	_ media.VoiceOptions    = (*client)(nil)
 	_ media.MeteredProvider = (*client)(nil)
 )
