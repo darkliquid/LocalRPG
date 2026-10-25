@@ -10,6 +10,7 @@ import (
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagecli"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagegemini"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imagehttp"
+	_ "github.com/darkliquid/localrpg/pkg/provider/imageopenai"
 	_ "github.com/darkliquid/localrpg/pkg/provider/imageprocedural"
 	_ "github.com/darkliquid/localrpg/pkg/provider/inworldllm"
 	_ "github.com/darkliquid/localrpg/pkg/provider/inworldstt"
