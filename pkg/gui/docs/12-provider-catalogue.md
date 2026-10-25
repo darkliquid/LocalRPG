@@ -40,6 +40,7 @@ provider is your own name for it.
 
 | Provider ID | Tier | Source | Ledger key | Presets and models |
 | --- | --- | --- | --- | --- |
+| `llm:anthropic` | cloud | http | `llm:anthropic` | `claude-fable-5-1`, `claude-haiku-5-5`, `claude-opus-5-5`, `claude-sonnet-5-5` |
 | `llm:cli` | local-server | cli | `llm:cli@llama-cli` | `claude-cli`, `llama-cli` |
 | `llm:gemini` | cloud | gemini | `llm:gemini` | `gemini-3.8-flash` |
 | `llm:inworld` | cloud | http | `llm:inworld` | `inworld/compare-frontier-models` |
@@ -114,6 +115,11 @@ are absent on purpose: they aren't metered.
 | `llm:openai` | `gpt-6-luna` | 100000 | 500000 | 0 | 0 |
 | `llm:openai` | `any` | 2000000 | 10000000 | 0 | 0 |
 | `tts:openai` | `any` | 0 | 0 | 15 | 0 |
+| `llm:anthropic` | `claude-fable-5-1` | 10000000 | 50000000 | 0 | 0 |
+| `llm:anthropic` | `claude-opus-5-5` | 4000000 | 20000000 | 0 | 0 |
+| `llm:anthropic` | `claude-sonnet-5-5` | 2000000 | 10000000 | 0 | 0 |
+| `llm:anthropic` | `claude-haiku-5-5` | 100000 | 500000 | 0 | 0 |
+| `llm:anthropic` | `any` | 2000000 | 10000000 | 0 | 0 |
 | `tts:elevenlabs` | `any` | 0 | 0 | 80 | 0 |
 | `tts:http@api.openai.com` | `any` | 0 | 0 | 15 | 0 |
 | `image:gemini` | `imagen-3.0-generate-002` | 0 | 0 | 0 | 40000 |

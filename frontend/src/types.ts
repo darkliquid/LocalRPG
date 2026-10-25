@@ -1132,7 +1132,7 @@ export interface PathsConfig {
 }
 
 export interface AgentRoleConfig {
-  type: 'builtin' | 'http' | 'cli' | 'inherit' | 'disabled' | 'gemini' | 'openai';
+  type: 'builtin' | 'http' | 'cli' | 'inherit' | 'disabled' | 'gemini' | 'openai' | 'anthropic';
   inherit_from?: string;
   builtin_name?: string;
   command?: string;
@@ -1145,8 +1145,10 @@ export interface AgentRoleConfig {
   // "auto" (HTTP providers only), "yes", or "no".
   supports_tools?: 'auto' | 'yes' | 'no';
   thinking_budget?: number;
-  // Reasoning effort for reasoning models (openai). Empty means the model default.
+  // Reasoning effort for reasoning models (openai, anthropic). Empty means the model default.
   effort?: string;
+  // Prompt caching: 'auto' (default) or 'off'; Anthropic only.
+  prompt_cache?: string;
   top_p?: number;
   top_k?: number;
   // An optional user-chosen discriminator that keeps two configs of one adapter

@@ -15,6 +15,7 @@ import (
 var transportByKey = map[provider.Key]string{
 	provider.KeyLLMOpenAIChat:      "http",
 	provider.KeyLLMOpenAI:          "http",
+	provider.KeyLLMAnthropic:       "http",
 	provider.KeyLLMGemini:          "gemini",
 	provider.KeyLLMCLI:             "cli",
 	provider.KeyLLMNarrativeOracle: "builtin",

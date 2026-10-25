@@ -463,7 +463,7 @@ export const LLMRoleEditor: React.FC<LLMRoleEditorProps> = ({
           </div>
         )}
 
-        {roleConfig.type === 'openai' && (
+        {(roleConfig.type === 'openai' || roleConfig.type === 'anthropic') && (
           <div className="space-y-1.5">
             <label className="text-xs font-sans uppercase text-stone-300">Reasoning Effort</label>
             <select
@@ -485,9 +485,36 @@ export const LLMRoleEditor: React.FC<LLMRoleEditorProps> = ({
               <option value="medium">medium</option>
               <option value="high">high</option>
               <option value="xhigh">xhigh</option>
+              <option value="max">max</option>
             </select>
             <p className="text-xs text-stone-500">
               When set, the request switches to the reasoning shape and temperature is omitted.
+            </p>
+          </div>
+        )}
+
+        {roleConfig.type === 'anthropic' && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-sans uppercase text-stone-300">Prompt Caching</label>
+            <select
+              value={roleConfig.prompt_cache || 'auto'}
+              onChange={(e) => {
+                const updated = { ...roleConfig, prompt_cache: e.target.value === 'auto' ? undefined : e.target.value };
+                setConfig({
+                  ...config,
+                  agents: {
+                    ...config.agents,
+                    roles: { ...config.agents.roles, [role]: updated },
+                  },
+                });
+              }}
+              className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-3 pr-8 py-2 text-xs text-stone-100 focus:outline-none focus:border-purple-500/60 cursor-pointer"
+            >
+              <option value="auto">auto (recommended)</option>
+              <option value="off">off</option>
+            </select>
+            <p className="text-xs text-stone-500">
+              Auto sends Anthropic's cache_control so repeated narration context reads at a fraction of input cost.
             </p>
           </div>
         )}

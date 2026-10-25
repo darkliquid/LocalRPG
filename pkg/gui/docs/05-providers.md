@@ -63,6 +63,30 @@ The speech endpoint is deprecated by OpenAI (shutdown announced for
 2027-01-06); the provider catalogue marks the caveat. Requests are never stored
 on OpenAI's side (`store: false`).
 
+### Anthropic
+
+The **`anthropic`** type is Anthropic's native LLM path over the Messages API.
+It supports tool calling, reasoning effort, and prompt caching on by default
+(the growing narration context reads at a fraction of base input). Anthropic
+offers no image generation, speech, or embeddings API, so this type applies to
+roles only:
+
+```yaml
+providers:
+  anthropic:
+    api_key: "env:ANTHROPIC_API_KEY"
+agents:
+  roles:
+    gm:
+      type: anthropic
+      model: claude-sonnet-5-5
+      prompt_cache: auto # auto (default) | off
+```
+
+The Messages API removed `temperature`, `top_p` and `top_k`; configure behaviour
+with `effort` instead, and note that `max_tokens` is always required, so the
+role's `max_tokens` or a default of 1024 is used.
+
 ### How providers run
 
 LocalRPG labels providers with one of four capability tiers, so an offline

@@ -50,6 +50,15 @@ var BuiltinPrices = []config.PriceConfig{
 	{Provider: string(provider.KeyLLMOpenAI), PerMillionInput: 2_000_000, PerMillionOutput: 10_000_000},
 	{Provider: string(provider.KeyTTSOpenAI), PerCharacter: 15},
 
+	// Anthropic, keyed by model. Rates captured 2026-10-24. Cache reads run
+	// at a fraction of base input; the current price model charges them at
+	// this base rate rather than under-counting them.
+	{Provider: string(provider.KeyLLMAnthropic), Model: "claude-fable-5-1", PerMillionInput: 10_000_000, PerMillionOutput: 50_000_000},
+	{Provider: string(provider.KeyLLMAnthropic), Model: "claude-opus-5-5", PerMillionInput: 4_000_000, PerMillionOutput: 20_000_000},
+	{Provider: string(provider.KeyLLMAnthropic), Model: "claude-sonnet-5-5", PerMillionInput: 2_000_000, PerMillionOutput: 10_000_000},
+	{Provider: string(provider.KeyLLMAnthropic), Model: "claude-haiku-5-5", PerMillionInput: 100_000, PerMillionOutput: 500_000},
+	{Provider: string(provider.KeyLLMAnthropic), PerMillionInput: 2_000_000, PerMillionOutput: 10_000_000},
+
 	// Speech, billed per character. ElevenLabs is a cloud-only adapter; the
 	// generic HTTP adapter is priced at the OpenAI endpoint only.
 	{Provider: string(provider.KeyTTSElevenLabs), PerCharacter: 80},

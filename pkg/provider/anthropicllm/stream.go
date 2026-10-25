@@ -166,8 +166,8 @@ func (p *AnthropicProvider) streamOnce(ctx context.Context, req harness.Generate
 }
 
 // consumeStream reads Anthropic's event/data SSE frames until message_stop.
-// Frames the adapter does not model are skipped rather than failing the turn,
-// because the wire carries pings and progress markers alongside the content.
+// The dispatch is per event so each handler is a small, named phase. Frames
+// the adapter does not model are skipped rather than failing the turn.
 func (p *AnthropicProvider) consumeStream(body io.Reader, state *streamState, out chan<- harness.StreamChunk) error {
 	scanner := bufio.NewScanner(body)
 	var lastEvent string
@@ -185,83 +185,125 @@ func (p *AnthropicProvider) consumeStream(body io.Reader, state *streamState, ou
 			continue
 		}
 		payload := strings.TrimPrefix(line, "data: ")
-		switch lastEvent {
-		case "message_start":
-			var frame struct {
-				Message struct {
-					Usage struct {
-						InputTokens              int `json:"input_tokens"`
-						CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-						CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
-					} `json:"usage"`
-				} `json:"message"`
-			}
-			if err := json.Unmarshal([]byte(payload), &frame); err == nil {
-				state.inputTokens = frame.Message.Usage.InputTokens
-				state.cacheRead = frame.Message.Usage.CacheReadInputTokens
-				state.cacheCreation = frame.Message.Usage.CacheCreationInputTokens
-			}
-		case "content_block_start":
-			var frame struct {
-				Index        int `json:"index"`
-				ContentBlock struct {
-					Type string `json:"type"`
-					ID   string `json:"id"`
-					Name string `json:"name"`
-				} `json:"content_block"`
-			}
-			if err := json.Unmarshal([]byte(payload), &frame); err == nil && frame.ContentBlock.Type == "tool_use" {
-				state.toolCalls.open(frame.Index, frame.ContentBlock.ID, frame.ContentBlock.Name)
-			}
-		case "content_block_delta":
-			var frame struct {
-				Index int `json:"index"`
-				Delta struct {
-					Type        string `json:"type"`
-					Text        string `json:"text"`
-					PartialJSON string `json:"partial_json"`
-				} `json:"delta"`
-			}
-			if err := json.Unmarshal([]byte(payload), &frame); err != nil {
-				continue
-			}
-			switch frame.Delta.Type {
-			case "text_delta":
-				if frame.Delta.Text != "" {
-					out <- harness.StreamChunk{Text: frame.Delta.Text}
-				}
-			case "input_json_delta":
-				state.toolCalls.appendArgs(frame.Index, frame.Delta.PartialJSON)
-			}
-		case "message_delta":
-			var frame struct {
-				Delta struct {
-					StopReason string `json:"stop_reason"`
-				} `json:"delta"`
-				Usage struct {
-					OutputTokens int `json:"output_tokens"`
-				} `json:"usage"`
-			}
-			if err := json.Unmarshal([]byte(payload), &frame); err == nil {
-				if frame.Delta.StopReason != "" {
-					state.finishReason = frame.Delta.StopReason
-				}
-				if frame.Usage.OutputTokens > 0 {
-					state.outputTokens = frame.Usage.OutputTokens
-				}
-			}
-		case "message_stop":
+		if err := p.handleEvent(lastEvent, payload, state, out); err != nil {
+			return err
+		}
+		if lastEvent == "message_stop" {
 			return nil
-		case "error":
-			var frame struct {
-				Error struct {
-					Message string `json:"message"`
-				} `json:"error"`
-			}
-			if err := json.Unmarshal([]byte(payload), &frame); err == nil && frame.Error.Message != "" {
-				return fmt.Errorf("anthropic: %s", frame.Error.Message)
-			}
 		}
 	}
 	return scanner.Err()
+}
+
+// handleEvent routes one data frame to the parser for its event type.
+func (p *AnthropicProvider) handleEvent(event, payload string, state *streamState, out chan<- harness.StreamChunk) error {
+	switch event {
+	case "message_start":
+		return p.handleMessageStart(payload, state)
+	case "content_block_start":
+		return p.handleBlockStart(payload, state)
+	case "content_block_delta":
+		return p.handleBlockDelta(payload, state, out)
+	case "message_delta":
+		return p.handleMessageDelta(payload, state)
+	case "error":
+		return p.handleErrorEvent(payload)
+	}
+	return nil
+}
+
+func (p *AnthropicProvider) handleMessageStart(payload string, state *streamState) error {
+	var frame struct {
+		Message struct {
+			Usage struct {
+				InputTokens              int `json:"input_tokens"`
+				CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+				CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+			} `json:"usage"`
+		} `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(payload), &frame); err != nil {
+		return nil
+	}
+	state.inputTokens = frame.Message.Usage.InputTokens
+	state.cacheRead = frame.Message.Usage.CacheReadInputTokens
+	state.cacheCreation = frame.Message.Usage.CacheCreationInputTokens
+	return nil
+}
+
+func (p *AnthropicProvider) handleBlockStart(payload string, state *streamState) error {
+	var frame struct {
+		Index        int `json:"index"`
+		ContentBlock struct {
+			Type string `json:"type"`
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"content_block"`
+	}
+	if err := json.Unmarshal([]byte(payload), &frame); err != nil {
+		return nil
+	}
+	if frame.ContentBlock.Type == "tool_use" {
+		state.toolCalls.open(frame.Index, frame.ContentBlock.ID, frame.ContentBlock.Name)
+	}
+	return nil
+}
+
+func (p *AnthropicProvider) handleBlockDelta(payload string, state *streamState, out chan<- harness.StreamChunk) error {
+	var frame struct {
+		Index int `json:"index"`
+		Delta struct {
+			Type        string `json:"type"`
+			Text        string `json:"text"`
+			PartialJSON string `json:"partial_json"`
+		} `json:"delta"`
+	}
+	if err := json.Unmarshal([]byte(payload), &frame); err != nil {
+		return nil
+	}
+	switch frame.Delta.Type {
+	case "text_delta":
+		if frame.Delta.Text != "" {
+			out <- harness.StreamChunk{Text: frame.Delta.Text}
+		}
+	case "input_json_delta":
+		state.toolCalls.appendArgs(frame.Index, frame.Delta.PartialJSON)
+	}
+	return nil
+}
+
+func (p *AnthropicProvider) handleMessageDelta(payload string, state *streamState) error {
+	var frame struct {
+		Delta struct {
+			StopReason string `json:"stop_reason"`
+		} `json:"delta"`
+		Usage struct {
+			OutputTokens int `json:"output_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal([]byte(payload), &frame); err != nil {
+		return nil
+	}
+	if frame.Delta.StopReason != "" {
+		state.finishReason = frame.Delta.StopReason
+	}
+	if frame.Usage.OutputTokens > 0 {
+		state.outputTokens = frame.Usage.OutputTokens
+	}
+	return nil
+}
+
+func (p *AnthropicProvider) handleErrorEvent(payload string) error {
+	var frame struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(payload), &frame); err != nil {
+		return nil
+	}
+	if frame.Error.Message != "" {
+		return fmt.Errorf("anthropic: %s", frame.Error.Message)
+	}
+	return nil
 }

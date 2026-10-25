@@ -106,6 +106,26 @@ var AgentPresets = map[string]AgentRoleConfig{
 		Model:     "gpt-6.1-sol",
 		MaxTokens: 4096,
 	},
+	"anthropic-sonnet": {
+		Type:      "anthropic",
+		Model:     "claude-sonnet-5-5",
+		MaxTokens: 4096,
+	},
+	"anthropic-haiku": {
+		Type:      "anthropic",
+		Model:     "claude-haiku-5-5",
+		MaxTokens: 2048,
+	},
+	"anthropic-opus": {
+		Type:      "anthropic",
+		Model:     "claude-opus-5-5",
+		MaxTokens: 4096,
+	},
+	"anthropic-fable": {
+		Type:      "anthropic",
+		Model:     "claude-fable-5-1",
+		MaxTokens: 4096,
+	},
 }
 
 func intPtr(i int) *int           { return &i }

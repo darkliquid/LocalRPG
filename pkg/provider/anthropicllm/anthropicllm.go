@@ -17,7 +17,7 @@ func init() {
 			Description: "Hosted Claude models over the Messages API: tool calling, prompt caching and reasoning effort included.",
 			Source:      "http",
 			Tier:        provider.TierCloud,
-			Features:    []provider.Feature{provider.FeatureStreaming, provider.FeatureTools, provider.FeatureKeyRequired, provider.FeatureContextCache},
+			Features:    []provider.Feature{provider.FeatureStreaming, provider.FeatureTools, provider.FeatureKeyRequired},
 			Presets: []provider.Preset{
 				{ID: "anthropic-sonnet", Order: 9, Label: "Claude Sonnet 5.5 (Cloud API)",
 					Description: "The recommended Claude narration model. Good balance of cost and depth.",
