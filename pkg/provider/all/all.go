@@ -3,6 +3,7 @@
 package all
 
 import (
+	_ "github.com/darkliquid/localrpg/pkg/provider/anthropicllm"
 	_ "github.com/darkliquid/localrpg/pkg/provider/clillm"
 	_ "github.com/darkliquid/localrpg/pkg/provider/embeddingonnx"
 	_ "github.com/darkliquid/localrpg/pkg/provider/geminiembedding"
