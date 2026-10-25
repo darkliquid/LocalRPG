@@ -146,7 +146,11 @@ type ProviderConfig struct {
 	// Effort is the reasoning effort a reasoning model runs at ("low",
 	// "medium", "high", and provider-specific levels). Empty uses the model
 	// default. Adapters that have no effort control ignore it.
-	Effort       string   `yaml:"effort,omitempty"`
+	Effort string `yaml:"effort,omitempty"`
+	// PromptCache is "auto" (default: send Anthropic's top-level cache_control
+	// so the growing narration context reads at a fraction of base input) or
+	// "off". Other providers ignore it.
+	PromptCache  string   `yaml:"prompt_cache,omitempty"`
 	TopP         *float64 `yaml:"top_p,omitempty"`
 	TopK         *int     `yaml:"top_k,omitempty"`
 	SharedAPIKey string   `yaml:"shared_api_key,omitempty"`

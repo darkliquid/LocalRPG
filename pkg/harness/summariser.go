@@ -176,6 +176,7 @@ func SummariserFromConfig(cfg *config.Config, router *Router, logger trace.Logge
 			MaxTokens:      roleCfg.MaxTokens,
 			ThinkingBudget: roleCfg.ThinkingBudget,
 			Effort:         roleCfg.Effort,
+			PromptCache:    roleCfg.PromptCache,
 			TopP:           roleCfg.TopP,
 			TopK:           roleCfg.TopK,
 			SharedAPIKey:   cfg.Providers.Gemini.APIKey,

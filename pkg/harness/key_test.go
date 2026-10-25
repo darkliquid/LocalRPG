@@ -19,6 +19,8 @@ func TestKeyFor(t *testing.T) {
 		{harness.ProviderConfig{Type: "inworld"}, provider.KeyLLMInworld, true},
 		{harness.ProviderConfig{Type: "openai"}, provider.KeyLLMOpenAI, true},
 		{harness.ProviderConfig{Type: "openai", Instance: "work"}, "llm:openai@work", true},
+		{harness.ProviderConfig{Type: "anthropic"}, provider.KeyLLMAnthropic, true},
+		{harness.ProviderConfig{Type: "anthropic", Instance: "work"}, "llm:anthropic@work", true},
 		{harness.ProviderConfig{Type: "builtin", BuiltinName: "inworld"}, provider.KeyLLMInworld, true},
 		{harness.ProviderConfig{Type: "builtin", BuiltinName: "narrative-oracle"}, provider.KeyLLMNarrativeOracle, true},
 		{harness.ProviderConfig{Type: "cli", Command: "claude"}, "llm:cli@claude", true},

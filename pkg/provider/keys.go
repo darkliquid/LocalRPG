@@ -10,6 +10,7 @@ const (
 	KeyLLMNarrativeOracle Key = "llm:narrative-oracle"
 	KeyLLMInworld         Key = "llm:inworld"
 	KeyLLMOpenAI          Key = "llm:openai"
+	KeyLLMAnthropic       Key = "llm:anthropic"
 
 	KeyTTSGemini     Key = "tts:gemini"
 	KeyTTSElevenLabs Key = "tts:elevenlabs"
@@ -43,7 +44,7 @@ const (
 // AllKeys lists every canonical adapter key, for validation and docs.
 func AllKeys() []Key {
 	return []Key{
-		KeyLLMOpenAIChat, KeyLLMGemini, KeyLLMCLI, KeyLLMNarrativeOracle, KeyLLMInworld, KeyLLMOpenAI,
+		KeyLLMOpenAIChat, KeyLLMGemini, KeyLLMCLI, KeyLLMNarrativeOracle, KeyLLMInworld, KeyLLMOpenAI, KeyLLMAnthropic,
 		KeyTTSGemini, KeyTTSElevenLabs, KeyTTSNativeOS, KeyTTSSherpaONNX, KeyTTSPiper,
 		KeyTTSFishAudio, KeyTTSHTTP, KeyTTSInworld, KeyTTSCartesia, KeyTTSOpenAI,
 		KeySTTWhisperHTTP, KeySTTWhisperCLI, KeySTTWebSpeech, KeySTTInworld, KeySTTCartesia,

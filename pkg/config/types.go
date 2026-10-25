@@ -58,9 +58,11 @@ type AgentRoleConfig struct {
 	ThinkingBudget *int `yaml:"thinking_budget,omitempty" json:"thinking_budget,omitempty"`
 	// Effort is the reasoning effort passed to reasoning models on providers
 	// that expose one (OpenAI, Anthropic). Empty uses the model default.
-	Effort string   `yaml:"effort,omitempty" json:"effort,omitempty"`
-	TopP   *float64 `yaml:"top_p,omitempty" json:"top_p,omitempty"`
-	TopK   *int     `yaml:"top_k,omitempty" json:"top_k,omitempty"`
+	Effort string `yaml:"effort,omitempty" json:"effort,omitempty"`
+	// PromptCache is "auto" (default) or "off"; Anthropic only.
+	PromptCache string   `yaml:"prompt_cache,omitempty" json:"prompt_cache,omitempty"`
+	TopP        *float64 `yaml:"top_p,omitempty" json:"top_p,omitempty"`
+	TopK        *int     `yaml:"top_k,omitempty" json:"top_k,omitempty"`
 
 	// Instance is an optional user-chosen discriminator for this provider
 	// configuration. It becomes the key's "@<instance>" segment, so two configs
@@ -356,10 +358,11 @@ type TelemetryConfig struct {
 
 // ProvidersConfig groups shared credentials and defaults for external ecosystem providers.
 type ProvidersConfig struct {
-	Gemini   GeminiProviderConfig   `yaml:"gemini,omitempty" json:"gemini,omitempty"`
-	Inworld  InworldProviderConfig  `yaml:"inworld,omitempty" json:"inworld,omitempty"`
-	Cartesia CartesiaProviderConfig `yaml:"cartesia,omitempty" json:"cartesia,omitempty"`
-	OpenAI   OpenAIProviderConfig   `yaml:"openai,omitempty" json:"openai,omitempty"`
+	Gemini    GeminiProviderConfig    `yaml:"gemini,omitempty" json:"gemini,omitempty"`
+	Inworld   InworldProviderConfig   `yaml:"inworld,omitempty" json:"inworld,omitempty"`
+	Cartesia  CartesiaProviderConfig  `yaml:"cartesia,omitempty" json:"cartesia,omitempty"`
+	OpenAI    OpenAIProviderConfig    `yaml:"openai,omitempty" json:"openai,omitempty"`
+	Anthropic AnthropicProviderConfig `yaml:"anthropic,omitempty" json:"anthropic,omitempty"`
 	// Currency is the display currency for cost figures. Prices are expressed in
 	// this currency; no conversion is performed.
 	Currency string `yaml:"currency,omitempty" json:"currency,omitempty"`
@@ -392,6 +395,13 @@ type GeminiProviderConfig struct {
 // CartesiaProviderConfig is the Cartesia-specific part of the provider
 // configuration.
 type CartesiaProviderConfig struct {
+	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
+}
+
+// AnthropicProviderConfig is the Anthropic-specific part of the provider
+// configuration: the credential every Anthropic capability (chat) inherits
+// when a role carries no key of its own.
+type AnthropicProviderConfig struct {
 	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 }
 

@@ -52,7 +52,7 @@ func NewModelProvider(id string, cfg ProviderConfig) (ModelProvider, error) {
 			return &builtinEchoModelProvider{id: id}, nil
 		}
 		return BuildModelFor(id, cfg)
-	case "cli", "http", "gemini", "inworld", "openai", "":
+	case "cli", "http", "gemini", "inworld", "openai", "anthropic", "":
 		return BuildModelFor(id, cfg)
 	default:
 		return nil, fmt.Errorf("unknown model provider type: %s", cfg.Type)
@@ -95,8 +95,9 @@ func BuildModelFor(id string, cfg ProviderConfig) (ModelProvider, error) {
 
 // sharedKeyFor picks the provider-wide credential a role inherits when it has
 // none of its own: an Inworld role gets providers.inworld.api_key, an OpenAI
-// role gets providers.openai.api_key, and every other role keeps the Gemini
-// key it has always used.
+// role gets providers.openai.api_key, an Anthropic role gets
+// providers.anthropic.api_key, and every other role keeps the Gemini key it
+// has always used.
 func sharedKeyFor(cfg *config.Config, key provider.Key, hasKey bool) string {
 	if hasKey {
 		switch key.Parent() {
@@ -104,6 +105,8 @@ func sharedKeyFor(cfg *config.Config, key provider.Key, hasKey bool) string {
 			return cfg.Providers.Inworld.APIKey
 		case provider.KeyLLMOpenAI:
 			return cfg.Providers.OpenAI.APIKey
+		case provider.KeyLLMAnthropic:
+			return cfg.Providers.Anthropic.APIKey
 		}
 	}
 	return cfg.Providers.Gemini.APIKey
@@ -217,6 +220,7 @@ func registerConfiguredRoles(router *Router, cfg *config.Config, logger trace.Lo
 			MaxTokens:      roleCfg.MaxTokens,
 			ThinkingBudget: roleCfg.ThinkingBudget,
 			Effort:         roleCfg.Effort,
+			PromptCache:    roleCfg.PromptCache,
 			TopP:           roleCfg.TopP,
 			TopK:           roleCfg.TopK,
 			SharedAPIKey:   sharedKeyFor(cfg, key, hasKey),
@@ -325,6 +329,7 @@ func ExtractorFromConfigWithLogger(cfg *config.Config, router *Router, logger tr
 		MaxTokens:      roleCfg.MaxTokens,
 		ThinkingBudget: roleCfg.ThinkingBudget,
 		Effort:         roleCfg.Effort,
+		PromptCache:    roleCfg.PromptCache,
 		TopP:           roleCfg.TopP,
 		TopK:           roleCfg.TopK,
 		SharedAPIKey:   cfg.Providers.Gemini.APIKey,
@@ -387,6 +392,7 @@ func CompletionFromConfig(cfg *config.Config, router *Router, logger trace.Logge
 		MaxTokens:      roleCfg.MaxTokens,
 		ThinkingBudget: roleCfg.ThinkingBudget,
 		Effort:         roleCfg.Effort,
+		PromptCache:    roleCfg.PromptCache,
 		TopP:           roleCfg.TopP,
 		TopK:           roleCfg.TopK,
 		SharedAPIKey:   cfg.Providers.Gemini.APIKey,

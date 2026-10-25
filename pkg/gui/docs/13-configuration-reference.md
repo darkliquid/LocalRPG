@@ -41,6 +41,7 @@ choose; the ledger and provider identifiers are listed in the
 | `providers.inworld.api_key` | string |
 | `providers.cartesia.api_key` | string |
 | `providers.openai.api_key` | string |
+| `providers.anthropic.api_key` | string |
 | `providers.currency` | string |
 | `providers.prices[].provider` | string |
 | `providers.prices[].model` | string |
@@ -67,6 +68,7 @@ choose; the ledger and provider identifiers are listed in the
 | `agents.roles.<key>.supports_tools` | string |
 | `agents.roles.<key>.thinking_budget` | int |
 | `agents.roles.<key>.effort` | string |
+| `agents.roles.<key>.prompt_cache` | string |
 | `agents.roles.<key>.top_p` | float |
 | `agents.roles.<key>.top_k` | int |
 | `agents.roles.<key>.instance` | string |
