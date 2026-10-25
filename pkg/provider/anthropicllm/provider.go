@@ -297,16 +297,4 @@ func (p *AnthropicProvider) logRequest(req harness.GenerateRequest) {
 	})
 }
 
-// Generate streams the reply and collects it; implemented fully in the
-// streaming step of the plan.
-func (p *AnthropicProvider) Generate(ctx context.Context, req harness.GenerateRequest) (*harness.GenerateResponse, error) {
-	return nil, fmt.Errorf("anthropicllm: stream not implemented")
-}
-
-// Stream forwards each delta as it arrives.
-func (p *AnthropicProvider) Stream(ctx context.Context, req harness.GenerateRequest, out chan<- harness.StreamChunk) error {
-	defer close(out)
-	return fmt.Errorf("anthropicllm: stream not implemented")
-}
-
 var _ harness.ModelProvider = (*AnthropicProvider)(nil)
