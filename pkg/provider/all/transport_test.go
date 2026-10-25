@@ -14,6 +14,7 @@ import (
 // map; a missing entry fails the test rather than being ignored.
 var transportByKey = map[provider.Key]string{
 	provider.KeyLLMOpenAIChat:      "http",
+	provider.KeyLLMOpenAI:          "http",
 	provider.KeyLLMGemini:          "gemini",
 	provider.KeyLLMCLI:             "cli",
 	provider.KeyLLMNarrativeOracle: "builtin",
@@ -26,6 +27,7 @@ var transportByKey = map[provider.Key]string{
 	provider.KeyTTSPiper:      "cli",
 	provider.KeyTTSFishAudio:  "http",
 	provider.KeyTTSHTTP:       "http",
+	provider.KeyTTSOpenAI:     "http",
 	provider.KeyTTSInworld:    "http",
 	provider.KeyTTSCartesia:   "http",
 
@@ -37,6 +39,7 @@ var transportByKey = map[provider.Key]string{
 
 	provider.KeyImageGemini:        "gemini",
 	provider.KeyImageHTTP:          "http",
+	provider.KeyImageOpenAI:        "http",
 	provider.KeyImageCLI:           "cli",
 	provider.KeyImageProceduralArt: "builtin",
 

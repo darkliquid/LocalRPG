@@ -16,7 +16,7 @@ func init() {
 			Family:      provider.FamilyImage,
 			Label:       "OpenAI Images",
 			Description: "gpt-image generation with size and quality mapping. Metered per image.",
-			Source:      "openai",
+			Source:      "http",
 			Tier:        provider.TierCloud,
 			Features:    []provider.Feature{provider.FeatureKeyRequired, provider.FeatureMetered, provider.FeatureAutoGenerate},
 			Presets: []provider.Preset{

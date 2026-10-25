@@ -27,10 +27,10 @@ func init() {
 						"model": "whisper-1",
 					}},
 				{ID: "openai-whisper", Order: 4, Label: "OpenAI Whisper (Cloud API)",
-					Description: "Cloud transcription via OpenAI Whisper API.",
+					Description: "Cloud transcription via OpenAI transcription API.",
 					Config: map[string]any{
 						"type": "http", "endpoint": "https://api.openai.com/v1/audio/transcriptions",
-						"model": "whisper-1",
+						"model": "gpt-transcribe",
 					}},
 			},
 		},

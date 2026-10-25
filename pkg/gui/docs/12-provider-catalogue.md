@@ -44,6 +44,7 @@ provider is your own name for it.
 | `llm:gemini` | cloud | gemini | `llm:gemini` | `gemini-3.8-flash` |
 | `llm:inworld` | cloud | http | `llm:inworld` | `inworld/compare-frontier-models` |
 | `llm:narrative-oracle` | offline-basic | builtin | `llm:narrative-oracle` | `narrative-oracle` |
+| `llm:openai` | cloud | http | `llm:openai` | `gpt-6.1-sol` |
 | `llm:openaichat` | cloud | http | `llm:openaichat@localhost:11434` | `default`, `gpt-4`, `llama3.2` |
 
 ## Speech (TTS) providers
@@ -54,9 +55,10 @@ provider is your own name for it.
 | `tts:elevenlabs` | cloud | http | `tts:elevenlabs` | `eleven_multilingual_v2` |
 | `tts:fish-audio` | local-server | http | `tts:http@localhost:8091` | `fishaudio/s2-pro` |
 | `tts:gemini` | cloud | gemini | `tts:gemini` | `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`, `gemini-3.1-flash-tts-preview`, `gemini-3.8-flash-lite-tts`, `gemini-3.8-flash-tts` |
-| `tts:http` | local-server | http | `tts:http@localhost:8880` | `alltalk`, `kokoro`, `tts-1` |
+| `tts:http` | local-server | http | `tts:http@localhost:8880` | `alltalk`, `gpt-4o-mini-tts`, `kokoro` |
 | `tts:inworld` | cloud | http | `tts:inworld` | `inworld-tts-2` |
 | `tts:native-os` | offline-basic | builtin | `tts:native-os` | `native-os` |
+| `tts:openai` | cloud | http | `tts:openai` | `gpt-4o-mini-tts` |
 | `tts:piper` | local-server | cli | `tts:piper@piper` | `piper` |
 | `tts:sherpa-onnx` | offline-neural | builtin | `tts:sherpa-onnx` | `sherpa-onnx` |
 
@@ -68,7 +70,7 @@ provider is your own name for it.
 | `stt:inworld` | cloud | http | `stt:inworld` | `inworld/inworld-stt-1` |
 | `stt:web-speech` | offline-basic | builtin | `not reported` | `web-speech` |
 | `stt:whisper-cli` | local-server | cli | `stt:whisper-cli@whisper-cli` | `whisper-cli` |
-| `stt:whisper-http` | local-server | http | `stt:whisper-http@localhost:8000` | `whisper-1` |
+| `stt:whisper-http` | local-server | http | `stt:whisper-http@localhost:8000` | `gpt-transcribe`, `whisper-1` |
 
 ## Image providers
 
@@ -76,7 +78,8 @@ provider is your own name for it.
 | --- | --- | --- | --- | --- |
 | `image:cli` | local-server | cli | `image:cli@sd` | `sd-cli` |
 | `image:gemini` | cloud | gemini | `image:gemini` | `gemini-2.5-flash-image`, `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `imagen-3.0-fast-generate-001`, `imagen-3.0-generate-002` |
-| `image:http` | local-server | http | `image:http@127.0.0.1:8188` | `automatic1111`, `comfyui`, `dall-e-3`, `stablediffusion` |
+| `image:http` | local-server | http | `image:http@127.0.0.1:8188` | `automatic1111`, `comfyui`, `stablediffusion` |
+| `image:openai` | cloud | http | `image:openai` | `gpt-image-2.5-flare` |
 | `image:procedural-art` | offline-basic | builtin | `image:procedural-art` | `procedural-art` |
 
 ## Embedding providers
@@ -106,6 +109,11 @@ are absent on purpose: they aren't metered.
 | `llm:openaichat@api.openai.com` | `gpt-4o` | 2500000 | 10000000 | 0 | 0 |
 | `llm:openaichat@api.openai.com` | `gpt-4o-mini` | 150000 | 600000 | 0 | 0 |
 | `llm:openaichat@api.openai.com` | `any` | 150000 | 600000 | 0 | 0 |
+| `llm:openai` | `gpt-6-astra` | 10000000 | 50000000 | 0 | 0 |
+| `llm:openai` | `gpt-6.1-sol` | 2000000 | 10000000 | 0 | 0 |
+| `llm:openai` | `gpt-6-luna` | 100000 | 500000 | 0 | 0 |
+| `llm:openai` | `any` | 2000000 | 10000000 | 0 | 0 |
+| `tts:openai` | `any` | 0 | 0 | 15 | 0 |
 | `tts:elevenlabs` | `any` | 0 | 0 | 80 | 0 |
 | `tts:http@api.openai.com` | `any` | 0 | 0 | 15 | 0 |
 | `image:gemini` | `imagen-3.0-generate-002` | 0 | 0 | 0 | 40000 |

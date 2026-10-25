@@ -36,12 +36,6 @@ func init() {
 						"type": "http", "endpoint": "http://127.0.0.1:8080/v1/images/generations",
 						"model": "stablediffusion", "auto_generate": false,
 					}},
-				{ID: "dall-e-3", Order: 6, Label: "OpenAI DALL-E 3 (Cloud API)",
-					Description: "Cloud generation using OpenAI DALL-E 3 endpoint.",
-					Config: map[string]any{
-						"type": "http", "endpoint": "https://api.openai.com/v1/images/generations",
-						"model": "dall-e-3", "auto_generate": false,
-					}},
 			},
 		},
 		Build: func(_ context.Context, raw []byte) (any, error) {

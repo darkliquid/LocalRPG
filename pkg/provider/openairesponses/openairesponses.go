@@ -16,7 +16,7 @@ func init() {
 			Family:      provider.FamilyLLM,
 			Label:       "OpenAI (Responses API)",
 			Description: "OpenAI's hosted models over the Responses API: tool calling and reasoning effort included.",
-			Source:      "openai",
+			Source:      "http",
 			Tier:        provider.TierCloud,
 			Features:    []provider.Feature{provider.FeatureStreaming, provider.FeatureTools, provider.FeatureKeyRequired},
 			Presets: []provider.Preset{

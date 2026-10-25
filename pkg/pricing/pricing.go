@@ -42,6 +42,14 @@ var BuiltinPrices = []config.PriceConfig{
 	{Provider: string(openAI('l', "api.openai.com")), Model: "gpt-4o-mini", PerMillionInput: 150_000, PerMillionOutput: 600_000},
 	{Provider: string(openAI('l', "api.openai.com")), PerMillionInput: 150_000, PerMillionOutput: 600_000},
 
+	// OpenAI Responses chat, keyed by model. Rates captured 2026-10-24; the
+	// adapter-wide row follows the shipped preset model, as with Gemini.
+	{Provider: string(provider.KeyLLMOpenAI), Model: "gpt-6-astra", PerMillionInput: 10_000_000, PerMillionOutput: 50_000_000},
+	{Provider: string(provider.KeyLLMOpenAI), Model: "gpt-6.1-sol", PerMillionInput: 2_000_000, PerMillionOutput: 10_000_000},
+	{Provider: string(provider.KeyLLMOpenAI), Model: "gpt-6-luna", PerMillionInput: 100_000, PerMillionOutput: 500_000},
+	{Provider: string(provider.KeyLLMOpenAI), PerMillionInput: 2_000_000, PerMillionOutput: 10_000_000},
+	{Provider: string(provider.KeyTTSOpenAI), PerCharacter: 15},
+
 	// Speech, billed per character. ElevenLabs is a cloud-only adapter; the
 	// generic HTTP adapter is priced at the OpenAI endpoint only.
 	{Provider: string(provider.KeyTTSElevenLabs), PerCharacter: 80},

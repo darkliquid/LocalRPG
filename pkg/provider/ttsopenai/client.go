@@ -125,8 +125,13 @@ func (c *client) VoiceOptions() []media.VoiceOption {
 	}
 }
 
+// Metered marks the adapter as charging per request, so the cost guardrails
+// treat a clip as money spent.
+func (c *client) Metered() bool { return true }
+
 var (
-	_ media.TTSClient    = (*client)(nil)
-	_ media.VoiceCatalog = (*client)(nil)
-	_ media.VoiceOptions = (*client)(nil)
+	_ media.TTSClient      = (*client)(nil)
+	_ media.VoiceCatalog   = (*client)(nil)
+	_ media.VoiceOptions   = (*client)(nil)
+	_ media.MeteredProvider = (*client)(nil)
 )

@@ -101,6 +101,11 @@ var AgentPresets = map[string]AgentRoleConfig{
 		TopP:           floatPtr(0.95),
 		TopK:           intPtr(40),
 	},
+	"openai": {
+		Type:      "openai",
+		Model:     "gpt-6.1-sol",
+		MaxTokens: 4096,
+	},
 }
 
 func intPtr(i int) *int           { return &i }
@@ -154,10 +159,19 @@ var TTSPresets = map[string]TTSConfig{
 	"openai-speech": {
 		Type:         "http",
 		Endpoint:     "https://api.openai.com/v1/audio/speech",
-		Model:        "tts-1",
+		Model:        "gpt-4o-mini-tts",
 		DefaultVoice: "alloy",
 		Pitch:        1.0,
 		SpeechRate:   1.0,
+		MasterVolume: 1.0,
+	},
+	"openai": {
+		Type:         "openai",
+		Model:        "gpt-4o-mini-tts",
+		DefaultVoice: "marin",
+		Pitch:        1.0,
+		SpeechRate:   1.0,
+		AutoPlay:     true,
 		MasterVolume: 1.0,
 	},
 
@@ -269,7 +283,7 @@ var STTPresets = map[string]STTConfig{
 	"openai-whisper": {
 		Type:     "http",
 		Endpoint: "https://api.openai.com/v1/audio/transcriptions",
-		Model:    "whisper-1",
+		Model:    "gpt-transcribe",
 	},
 	"inworld-stt": {
 		Type:        "builtin",
@@ -302,10 +316,15 @@ var ImagePresets = map[string]ImageConfig{
 		Type:        "builtin",
 		BuiltinName: "procedural-art",
 	},
-	"dall-e-3": {
-		Type:     "http",
-		Endpoint: "https://api.openai.com/v1/images/generations",
-		Model:    "dall-e-3",
+	"openai-image": {
+		Type:  "openai",
+		Model: "gpt-image-2.5-flare",
+	},
+	"openai": {
+		Type:        "openai",
+		Model:       "gpt-image-2.5-flare",
+		AspectRatio: "3:2",
+		Quality:     "auto",
 	},
 	"imagen-3": {
 		Type:             "gemini",

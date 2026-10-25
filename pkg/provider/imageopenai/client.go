@@ -139,3 +139,7 @@ func (c *client) GenerateImage(ctx context.Context, prompt string) ([]byte, erro
 	}
 	return image, nil
 }
+
+// Metered marks the adapter as charging per request, so the cost guardrails
+// treat a generation as money spent.
+func (c *client) Metered() bool { return true }

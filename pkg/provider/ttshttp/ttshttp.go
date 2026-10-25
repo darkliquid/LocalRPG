@@ -36,10 +36,10 @@ func init() {
 						"auto_play": true, "master_volume": 1.0,
 					}},
 				{ID: "openai-speech", Order: 6, Label: "OpenAI Audio Speech (Cloud API)",
-					Description: "Cloud synthesis with OpenAI tts-1 model.",
+					Description: "Cloud synthesis with OpenAI speech models.",
 					Config: map[string]any{
 						"type": "http", "endpoint": "https://api.openai.com/v1/audio/speech",
-						"model": "tts-1", "default_voice": "alloy",
+						"model": "gpt-4o-mini-tts", "default_voice": "alloy",
 						"pitch": 1.0, "speech_rate": 1.0, "auto_play": true, "master_volume": 1.0,
 					}},
 			},

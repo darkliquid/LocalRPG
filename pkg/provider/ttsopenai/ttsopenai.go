@@ -16,7 +16,7 @@ func init() {
 			Family:      provider.FamilyTTS,
 			Label:       "OpenAI Speech",
 			Description: "Cloud speech with a fixed 13-voice catalogue and delivery instructions. Metered per character.",
-			Source:      "openai",
+			Source:      "http",
 			Tier:        provider.TierCloud,
 			Caveat:      "The /v1/audio/speech endpoint is deprecated by OpenAI with shutdown announced for 2027-01-06.",
 			Features:    []provider.Feature{provider.FeatureKeyRequired, provider.FeatureVoiceCatalog, provider.FeatureVoiceOptions, provider.FeatureMetered},
