@@ -1,6 +1,6 @@
 module github.com/darkliquid/localrpg
 
-go 1.27.1
+go 1.27.3
 
 require (
 	github.com/XSAM/otelsql v0.44.0
