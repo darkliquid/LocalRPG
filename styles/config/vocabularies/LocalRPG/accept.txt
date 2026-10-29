@@ -13,6 +13,7 @@
 
 # Product and project names.
 LocalRPG
+Anthropic
 Ollama
 ollama
 Kokoro

@@ -68,7 +68,7 @@ on OpenAI's side (`store: false`).
 The **`anthropic`** type is Anthropic's native LLM path over the Messages API.
 It supports tool calling, reasoning effort, and prompt caching on by default
 (the growing narration context reads at a fraction of base input). Anthropic
-offers no image generation, speech, or embeddings API, so this type applies to
+doesn't offer image generation, speech, or embeddings APIs, so this type applies to
 roles only:
 
 ```yaml
