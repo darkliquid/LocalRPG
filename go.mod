@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/glamour v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
-	github.com/chromedp/cdproto v0.158.2
+	github.com/chromedp/cdproto v0.158.5
 	github.com/chromedp/chromedp v0.21.0
 	github.com/darkliquid/roll v0.0.0-20261006063131-e515e24fa1af
 	github.com/dop251/goja v0.0.0-20261017142635-e6862644b38f
