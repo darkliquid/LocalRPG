@@ -14,7 +14,7 @@ require (
 	github.com/darkliquid/roll v0.0.0-20261006063131-e515e24fa1af
 	github.com/dop251/goja v0.0.0-20261017142635-e6862644b38f
 	github.com/ebitengine/oto/v3 v3.5.1
-	github.com/gen2brain/vpx v0.2.1
+	github.com/gen2brain/vpx v0.2.3
 	github.com/google/uuid v1.6.0
 	github.com/gopxl/beep v1.4.1
 	github.com/hajimehoshi/go-mp3 v0.3.4
